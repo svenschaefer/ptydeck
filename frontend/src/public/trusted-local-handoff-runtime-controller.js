@@ -31,6 +31,19 @@ function openDialog(dialogEl) {
   dialogEl.hidden = false;
 }
 
+function isSessionNotFoundError(error) {
+  const errorCode = normalizeText(error?.error);
+  const message = normalizeText(error?.message);
+  return (
+    (Number(error?.status) === 404 && errorCode === "SessionNotFound") ||
+    /^Session '.+' was not found\.$/i.test(message)
+  );
+}
+
+function createMissingSessionTakeoverError() {
+  return new Error("Trusted-local session takeover target is no longer available.");
+}
+
 export function createTrustedLocalHandoffRuntimeController(options = {}) {
   const promptEl = options.promptEl || null;
   const promptMessageEl = options.promptMessageEl || null;
@@ -155,6 +168,10 @@ export function createTrustedLocalHandoffRuntimeController(options = {}) {
       }
       let updatedSessions = [];
       if (normalizedScope === "session") {
+        const targetSession = getSessionById(normalizedSessionId);
+        if (!targetSession || !canTakeSessionControl(targetSession)) {
+          throw createMissingSessionTakeoverError();
+        }
         const updatedSession = await takeSessionControl(normalizedSessionId);
         updatedSessions = updatedSession ? [updatedSession] : [];
       } else {
@@ -179,9 +196,10 @@ export function createTrustedLocalHandoffRuntimeController(options = {}) {
         layoutResult: layoutResult || { applied: false, captured: false }
       };
     } catch (error) {
-      setError(getErrorMessage(error, "Failed to take control on this device."));
+      const surfacedError = normalizedScope === "session" && isSessionNotFoundError(error) ? createMissingSessionTakeoverError() : error;
+      setError(getErrorMessage(surfacedError, "Failed to take control on this device."));
       requestRender();
-      throw error;
+      throw surfacedError;
     }
   }
 

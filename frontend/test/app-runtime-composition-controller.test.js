@@ -345,6 +345,27 @@ function createJsonResponse(status, payload, headers = {}) {
   };
 }
 
+function createLocalStorageFixture() {
+  const values = new Map();
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(String(key), String(value));
+    },
+    removeItem(key) {
+      values.delete(String(key));
+    },
+    clear() {
+      values.clear();
+    },
+    dump() {
+      return new Map(values);
+    }
+  };
+}
+
 function createControllerHarness(options = {}) {
   const fixture = createMinimalDocumentFixture();
   const hooks = {};
@@ -704,6 +725,76 @@ test("app-runtime composition controller retries a blocked action immediately wh
   assert.deepEqual(clearedActions, [{ render: false }]);
   assert.equal(clearErrorCalls, 1);
   assert.equal(harness.hooks.getCommandFeedbackActionMeta(), null);
+});
+
+test("app-runtime composition controller replays trusted-local layouts through the session-control runtime client id authority", async () => {
+  const windowRef = createWindowFixture({ querySelector() { return null; }, getElementById() { return null; } });
+  const localStorageRef = createLocalStorageFixture();
+  windowRef.localStorage = localStorageRef;
+  const harness = createControllerHarness({ windowRef });
+
+  harness.hooks.setRuntimeClientId("client-local");
+  harness.hooks.setSessionsForTest([
+    {
+      id: "s-1",
+      deckId: "ops",
+      name: "one",
+      controlState: {
+        currentController: {
+          clientId: "client-legacy-ip",
+          active: true,
+          label: "Legacy"
+        },
+        attachedClients: [
+          {
+            clientId: "client-local",
+            active: true,
+            accessMode: "operator",
+            permissionMode: "",
+            label: "Laptop"
+          }
+        ]
+      }
+    }
+  ]);
+  harness.hooks.setCollaborators({
+    appCommandUiFacadeController: {
+      render() {},
+      setCommandFeedback() {},
+      setError() {},
+      scheduleCommandPreview() {},
+      scheduleCommandSuggestions() {},
+      getErrorMessage(error, fallback) {
+        return error?.message || fallback;
+      }
+    }
+  });
+  harness.hooks.getApi().takeSessionControl = async (sessionId) => ({
+    id: sessionId,
+    deckId: "ops",
+    name: "one",
+    controlState: {
+      currentController: {
+        clientId: "client-local",
+        active: true,
+        label: "Laptop"
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          active: true,
+          accessMode: "operator",
+          permissionMode: "",
+          label: "Laptop"
+        }
+      ]
+    }
+  });
+
+  const result = await harness.hooks.getTrustedLocalHandoffRuntimeController().takeControlScope("session", { sessionId: "s-1" });
+
+  assert.deepEqual(result.layoutResult, { applied: false, captured: true });
+  assert.ok(localStorageRef.dump().has("ptydeck.trusted-local-layouts.v1"));
 });
 
 test("app-runtime composition controller uses the read-only access summary for blocked write messaging", () => {

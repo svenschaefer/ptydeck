@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (`QLT-261` completed; `v0.4.0-H163` is now closed and no active wave is currently promoted)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; `v0.4.0-H163` remains closed with no active promoted wave)
 
 ## Current Product Truth
 
@@ -442,6 +442,10 @@ Current contract:
 - `Reclaim Control` is only valid when a real current controller exists but is reconnect-reserved or inactive.
 - `Take Control` remains the correct operator label when no current controller is attached, even if the local device is already attached to session metadata.
 - `frontend/src/public/session-control-runtime-controller.js` mirrors that distinction in button titles and post-action feedback so unattached-controller states are not mislabeled as reconnect reclaim events.
+- `frontend/src/public/app-runtime-composition-controller.js` must resolve trusted-local device-local layout replay through `sessionControlRuntimeController.getRuntimeClientId()` instead of reading an ad hoc composition-local variable.
+- `frontend/src/public/trusted-local-handoff-runtime-controller.js` must fail closed on stale session takeover targets:
+  - reject missing or no-longer-takeable session targets before calling the backend
+  - normalize backend `SessionNotFound` failures into the stable operator-facing message `Trusted-local session takeover target is no longer available.`
 
 ## Theme Import/Export Baseline
 

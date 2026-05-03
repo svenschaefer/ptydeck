@@ -549,6 +549,7 @@ const canWriteToSession = sessionControlRuntimeController.canWriteToSession;
 const getSessionWriteBlockMessage = sessionControlRuntimeController.getSessionWriteBlockMessage;
 const canTakeSessionControl = sessionControlRuntimeController.canTakeSessionControl;
 const setRuntimeClientId = sessionControlRuntimeController.setRuntimeClientId;
+const getRuntimeClientId = sessionControlRuntimeController.getRuntimeClientId;
 const renameTrustedLocalDevice = sessionControlRuntimeController.renameTrustedLocalDevice;
 const showBlockedWriteReclaimUi = sessionControlRuntimeController.showBlockedWriteReclaimUi;
 const renderSessionControl = sessionControlRuntimeController.renderSessionControl;
@@ -625,6 +626,7 @@ function installTestHooks() {
     maybeAutoRepairOriginHandoffControl,
     handleCommandFeedbackAction,
     getCommandFeedbackActionMeta: () => sessionControlRuntimeController.getCommandFeedbackActionMeta(),
+    getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
     getOriginHandoffSourceOrigin: () => sessionControlRuntimeController.getOriginHandoffSourceOrigin(),
     setOriginHandoffSourceOrigin(origin) {
       sessionControlRuntimeController.setOriginHandoffSourceOrigin(origin);
@@ -1084,7 +1086,7 @@ trustedLocalHandoffRuntimeController = createTrustedLocalHandoffRuntimeControlle
   takeSessionControlScope: (payload) => api.takeSessionControlScope(payload),
   applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
   applyDeviceLocalLayout: (scope, runtimeOptions = {}) =>
-    trustedLocalLayoutRuntimeController?.applyLayoutForClient?.(runtimeClientId, {
+    trustedLocalLayoutRuntimeController?.applyLayoutForClient?.(getRuntimeClientId(), {
       scope,
       targetDeckId:
         normalizeControlText(runtimeOptions.deckId) ||

@@ -219,6 +219,48 @@ test("trusted-local handoff runtime controller validates session takeover scope 
   assert.equal(renderCalls, 1);
 });
 
+test("trusted-local handoff runtime controller fails closed for stale or deleted session takeover targets", async () => {
+  let backendCalls = 0;
+  const staleErrors = [];
+  const staleController = createTrustedLocalHandoffRuntimeController({
+    getSessionById: () => null,
+    canTakeSessionControl: () => true,
+    takeSessionControl: async () => {
+      backendCalls += 1;
+      return null;
+    },
+    setError: (message) => staleErrors.push(message),
+    getErrorMessage: (error, fallback) => error?.message || fallback
+  });
+
+  await assert.rejects(
+    staleController.takeControlScope("session", { sessionId: "s1" }),
+    /Trusted-local session takeover target is no longer available\./i
+  );
+  assert.equal(backendCalls, 0);
+  assert.deepEqual(staleErrors, ["Trusted-local session takeover target is no longer available."]);
+
+  const deletedErrors = [];
+  const deletedController = createTrustedLocalHandoffRuntimeController({
+    getSessionById: (sessionId) => ({ id: sessionId, deckId: "default", name: "one" }),
+    canTakeSessionControl: () => true,
+    takeSessionControl: async () => {
+      const error = new Error("Session 's1' was not found.");
+      error.status = 404;
+      error.error = "SessionNotFound";
+      throw error;
+    },
+    setError: (message) => deletedErrors.push(message),
+    getErrorMessage: (error, fallback) => error?.message || fallback
+  });
+
+  await assert.rejects(
+    deletedController.takeControlScope("session", { sessionId: "s1" }),
+    /Trusted-local session takeover target is no longer available\./i
+  );
+  assert.deepEqual(deletedErrors, ["Trusted-local session takeover target is no longer available."]);
+});
+
 test("trusted-local handoff runtime controller reports backend takeover failures and ignores malformed updated sessions", async () => {
   const feedback = [];
   const errors = [];
