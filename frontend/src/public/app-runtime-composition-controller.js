@@ -5,6 +5,7 @@ import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
 import { createAppRuntimeInitializationController } from "./app-runtime-initialization-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
+import { createAppRuntimeTrustedLocalComposition } from "./app-runtime-trusted-local-composition.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createConnectionProfileRuntimeController } from "./connection-profile-runtime-controller.js";
@@ -21,8 +22,6 @@ import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
 import { createPasteObservationRuntimeController } from "./paste-observation-runtime-controller.js";
-import { createTrustedLocalHandoffRuntimeController } from "./trusted-local-handoff-runtime-controller.js";
-import { createTrustedLocalLayoutRuntimeController } from "./trusted-local-layout-runtime-controller.js";
 import { createWorkspaceManagerRuntimeController } from "./workspace-manager-runtime-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
@@ -1073,13 +1072,14 @@ sendHistoryRuntimeController = createSendHistoryRuntimeController({
   requestRender: () => appCommandUiFacadeController?.render?.()
 });
 
-trustedLocalLayoutRuntimeController = createTrustedLocalLayoutRuntimeController({
+({
+  trustedLocalLayoutRuntimeController,
+  trustedLocalHandoffRuntimeController
+} = createAppRuntimeTrustedLocalComposition({
+  windowRef: window,
   localStorageRef: window?.localStorage || null,
   captureCurrentLayout: () => layoutProfileRuntimeController?.captureCurrentLayout?.() || {},
-  applyLayoutSnapshot: (layout, runtimeOptions) => layoutProfileRuntimeController?.applyLayoutSnapshot?.(layout, runtimeOptions) || ""
-});
-
-trustedLocalHandoffRuntimeController = createTrustedLocalHandoffRuntimeController({
+  applyLayoutSnapshot: (layout, runtimeOptions) => layoutProfileRuntimeController?.applyLayoutSnapshot?.(layout, runtimeOptions) || "",
   promptEl: trustedLocalHandoffPromptEl,
   promptMessageEl: trustedLocalHandoffPromptMessageEl,
   promptYesBtn: trustedLocalHandoffPromptYesBtn,
@@ -1094,32 +1094,22 @@ trustedLocalHandoffRuntimeController = createTrustedLocalHandoffRuntimeControlle
   getState: () => store?.getState?.() || {},
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
+  getActiveDeckId: () => store?.getState?.().activeDeckId || "",
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || "",
   resolveDeckName: (deckId) => appLayoutDeckFacadeController?.resolveDeckName?.(deckId) || deckId,
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
   canTakeSessionControl,
   isReadOnlyMode,
+  getRuntimeClientId,
   takeSessionControl: (sessionId) => api.takeSessionControl(sessionId),
   takeSessionControlScope: (payload) => api.takeSessionControlScope(payload),
   applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
-  applyDeviceLocalLayout: (scope, runtimeOptions = {}) =>
-    trustedLocalLayoutRuntimeController?.applyLayoutForClient?.(getRuntimeClientId(), {
-      scope,
-      targetDeckId:
-        normalizeControlText(runtimeOptions.deckId) ||
-        normalizeControlText(
-          runtimeOptions.sessionId
-            ? appSessionRuntimeFacadeController?.resolveSessionDeckId?.(appSessionRuntimeFacadeController?.getSessionById?.(runtimeOptions.sessionId) || runtimeOptions.sessionId)
-            : ""
-        ) ||
-        normalizeControlText(store?.getState?.().activeDeckId)
-    }) || Promise.resolve({ applied: false, captured: false }),
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
   requestRender: () => appCommandUiFacadeController?.render?.()
-});
-trustedLocalHandoffRuntimeController.bindUiEvents?.();
+}));
 
 pasteObservationRuntimeController = createPasteObservationRuntimeController({
   windowRef: window,

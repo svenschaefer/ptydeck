@@ -1794,6 +1794,84 @@ test("session-terminal-runtime controller leaves unambiguous Ctrl-C untouched wh
   assert.deepEqual(terminalWrites, []);
 });
 
+test("session-terminal-runtime controller leaves Ctrl-C untouched when clipboard copy is unavailable", () => {
+  let promptCalled = false;
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    canWriteClipboardText: () => false,
+    requestTerminalCtrlCAction: async () => {
+      promptCalled = true;
+      return "copy";
+    }
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "selected text";
+  const ctrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(ctrlCEvent);
+
+  assert.equal(ctrlCEvent.defaultPrevented, false);
+  assert.equal(promptCalled, false);
+  assert.deepEqual(terminalWrites, []);
+});
+
+test("session-terminal-runtime controller refresh fails closed when no mounted terminal registry exists", () => {
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+
+  assert.equal(controller.refreshMountedTerminal("s1"), false);
+});
+
 test("session-terminal-runtime controller disposes clipboard bindings and restores the custom key handler", () => {
   const controller = createSessionTerminalRuntimeController({
     windowRef: {

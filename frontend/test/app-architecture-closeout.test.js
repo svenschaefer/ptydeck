@@ -58,6 +58,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppLayoutDeckFacadeController",
     "createAppRuntimeInitializationController",
     "createAppRuntimeStateController",
+    "createAppRuntimeTrustedLocalComposition",
     "createAppSessionRuntimeFacadeController",
     "createDeckRuntimeController",
     "createRuntimeEventController",

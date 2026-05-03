@@ -344,3 +344,51 @@ test("session-runtime controller updates session lifecycle and delegates runtime
   assert.equal(controller.formatSessionDisplayName({ id: "s1", name: "Alpha" }), "vm:Alpha");
   assert.equal(controller.formatSessionToken("s1"), "1");
 });
+
+test("session-runtime controller fails closed for invalid inputs and falls back deterministically for display and token sorting", () => {
+  const removals = [];
+  const closures = [];
+  const controller = createSessionRuntimeController({
+    store: {
+      removeSession(sessionId) {
+        removals.push(sessionId);
+      },
+      markSessionClosed(sessionId) {
+        closures.push(sessionId);
+      },
+      getState() {
+        return { sessions: [] };
+      }
+    },
+    terminals: new Map(),
+    sessionQuickIds: new Map([
+      ["s1", "1"],
+      ["s2", "1"],
+      ["s4", "1"],
+      ["s3", "2"]
+    ]),
+    quickIdPool: ["1", "2", "3"]
+  });
+
+  assert.equal(controller.ensureQuickId(""), "?");
+  assert.equal(controller.appendTerminalChunk("missing", ""), false);
+  assert.equal(controller.ensureSessionRuntime(null), false);
+  assert.equal(controller.disposeSessionRuntime(""), false);
+  controller.markSessionExited("missing", { exitCode: 1 });
+  controller.removeSession("s1");
+  controller.markSessionClosed("s2");
+  assert.equal(controller.applyRuntimeEvent({ type: "session.updated" }), false);
+  assert.equal(controller.formatSessionDisplayName({ id: "s9" }), "s9");
+
+  const sortedByNameThenId = controller.sortSessionsByQuickId([
+    { id: "s2", name: "Beta" },
+    { id: "s4", name: "Alpha" },
+    { id: "s1", name: "Alpha" }
+  ]);
+  assert.deepEqual(
+    sortedByNameThenId.map((session) => session.id),
+    ["s1", "s4", "s2"]
+  );
+  assert.deepEqual(removals, ["s1"]);
+  assert.deepEqual(closures, ["s2"]);
+});

@@ -512,6 +512,35 @@ test("store wrapper APIs fail closed for invalid deck, command, and submission o
   );
 });
 
+test("store wrapper APIs return existing scoped commands for no-op upserts and remove commands by record object", () => {
+  const store = createStore();
+  store.replaceCustomCommands([
+    {
+      name: "deploy",
+      scope: "session",
+      sessionId: "s1",
+      content: "echo session",
+      createdAt: 1,
+      updatedAt: 2
+    }
+  ]);
+
+  const unchanged = store.upsertCustomCommand({
+    name: "deploy",
+    scope: "session",
+    sessionId: "s1",
+    content: "echo session",
+    createdAt: 1,
+    updatedAt: 2
+  });
+  assert.equal(unchanged?.content, "echo session");
+  assert.equal(unchanged?.scope, "session");
+  assert.equal(unchanged?.sessionId, "s1");
+
+  assert.equal(store.removeCustomCommand(unchanged), true);
+  assert.equal(store.listCustomCommands().length, 0);
+});
+
 test("store reducer clears unread on same-session activation and removes commands by lookup key or scope fallback", () => {
   const initial = {
     sessions: [{ id: "s1", deckId: "default", hasUnreadActivity: true }],
