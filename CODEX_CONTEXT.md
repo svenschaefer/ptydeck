@@ -411,7 +411,7 @@ Promoted `H168` tasks:
 
 `QLT-272` is now complete. `backend/src/runtime.js` delegates the remaining HTTP request entry seam into `backend/src/runtime-http-request-handler.js`, reducing the runtime monolith from `6136` to `5925` lines without widening the shipped REST contract. Direct deterministic seam coverage now lives in `backend/test/runtime-http-request-handler.test.js`, and the extracted module validates at `95.59%` line / `90.16%` branch coverage.
 
-The validated backend hotspot snapshot after `QLT-272` now reports the reduced `backend/src/runtime.js` at `78.77%` line / `69.38%` branch coverage, `backend/src/runtime-http-request-handler.js` at `95.59%` line / `90.16%` branch coverage, and backend top-line coverage at `95.41%` line / `89.31%` branch on the active tree.
+The final validated hotspot snapshot after `QLT-272` now reports the reduced `backend/src/runtime.js` at `78.77%` line / `69.45%` branch coverage, `backend/src/runtime-http-request-handler.js` at `95.59%` line / `90.16%` branch coverage, and final validated repo totals at root tooling `92.82%` line / `77.09%` branch, backend `95.40%` line / `89.28%` branch, and frontend `97.02%` line / `89.60%` branch on the active tree.
 
 Not promoted from the fresh review:
 
