@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (`QLT-260` and `QLT-264` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
+Last updated: 2026-05-03 (`QLT-260`, `QLT-262`, and `QLT-264` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
 
 ## Current Product Truth
 
@@ -257,10 +257,18 @@ Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 - Commands that intentionally accept positional selectors, such as `/restart` and selector-taking replay forms, keep that positional grammar documented as part of the authoritative command surface.
 - The handbook no longer advertises the invalid positional `/rename 4 build-agent` form; it now documents the supported active-session and direct-route variants.
 
+`QLT-262` is now complete. Backend reliability coverage around SSH host-key probing and Linux foreground-process inspection is now materially tighter without widening the shipped runtime contract:
+
+- `backend/test/runtime.ssh-host-key-probe.test.js` now covers invalid object payloads, invalid key-type rejection, canonical base64 validation failures, strict target rejection, same-key-type fingerprint tiebreak sorting, timeout flooring, and the retained ssh-keyscan unavailable/timeout/empty/error mapping paths.
+- `backend/test/terminal-foreground-process.test.js` now covers non-string and underspecified `/proc/<pid>/stat` payloads, missing optional proc files, non-Linux fail-closed behavior, invalid terminal metadata, proc scan fallback failure, missing-parent ancestry truncation, and malformed peer-process skipping.
+- The focused hotspot snapshot after the task is:
+  - `backend/src/ssh-host-key-probe.js`: `100.00%` line / `95.83%` branch
+  - `backend/src/terminal-foreground-process.js`: `97.42%` line / `89.80%` branch
+- The remaining uncovered lines in `backend/src/terminal-foreground-process.js` are internal null-guard clauses that are not externally reachable through the current exported helper contract.
+
 Remaining promoted `H163` tasks:
 
 - `QLT-261` hardens the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
-- `QLT-262` hardens SSH/foreground/runtime reliability coverage across `backend/src/ssh-host-key-probe.js`, `backend/src/terminal-foreground-process.js`, and the retained runtime config/error-path helpers that gate them.
 - `QLT-263` extracts the next bootstrap/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and closes it with direct deterministic regressions.
 - `QLT-265` hardens terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
 
@@ -311,7 +319,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-261`, `QLT-262`, `QLT-263`, and `QLT-265`.
+- `TODO.md`: active promoted tasks are `QLT-261`, `QLT-263`, and `QLT-265`.
 - `ROADMAP.md`: latest completed wave is `v0.4.0-H164`; active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.

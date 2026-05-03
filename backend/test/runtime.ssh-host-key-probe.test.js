@@ -142,6 +142,77 @@ test("SSH host-key probe normalizers trim inputs, default ports, and reject inva
   assert.equal(formatSshTarget("example.internal", "bad"), "example.internal");
 });
 
+test("SSH host-key candidate validation rejects invalid object, key-type, and canonical base64 edge cases deterministically", () => {
+  const target = { host: "example.internal", port: 22 };
+
+  assert.throws(() => normalizeSshHostKeyProbeCandidate(null, target), /Body must be an object/);
+  assert.equal(normalizeSshHostKeyProbeCandidate(null, target, { strict: false }), null);
+
+  assert.throws(
+    () =>
+      normalizeSshHostKeyProbeCandidate(
+        {
+          keyType: "bad key type",
+          publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCy"
+        },
+        target
+      ),
+    /Field 'keyType'/
+  );
+
+  assert.equal(
+    normalizeSshHostKeyProbeCandidate(
+        {
+          keyType: "ssh-ed25519",
+          publicKey: "A==="
+        },
+        target,
+        { strict: false }
+    ),
+    null
+  );
+
+  assert.equal(
+    normalizeSshHostKeyProbeCandidate(
+        {
+          keyType: "ssh-ed25519",
+          publicKey: "ABC"
+        },
+        target,
+        { strict: false }
+    ),
+    null
+  );
+
+  assert.throws(
+    () =>
+      normalizeSshHostKeyProbeCandidate(
+        {
+          keyType: "ssh-ed25519",
+          publicKey: "A==="
+        },
+        target
+      ),
+    /valid base64-encoded SSH public key blob/
+  );
+
+  assert.throws(
+    () =>
+      normalizeSshHostKeyProbeCandidate(
+        {
+          keyType: "ssh-ed25519",
+          publicKey: "ABC"
+        },
+        target
+      ),
+    /valid base64-encoded SSH public key blob/
+  );
+});
+
+test("parseSshKeyscanOutput rejects malformed strict target payloads before parsing lines", () => {
+  assert.throws(() => parseSshKeyscanOutput("", null), /Body must be an object/);
+});
+
 test("parseSshKeyscanOutput ignores malformed lines and probe candidate normalization can fail softly", () => {
   const payload = parseSshKeyscanOutput(
     [
@@ -165,6 +236,24 @@ test("parseSshKeyscanOutput ignores malformed lines and probe candidate normaliz
       { strict: false }
     ),
     null
+  );
+});
+
+test("parseSshKeyscanOutput sorts equal key types by fingerprint as a deterministic tiebreaker", () => {
+  const payload = parseSshKeyscanOutput(
+    [
+      "example.internal ssh-ed25519 ////",
+      "example.internal ssh-ed25519 AAAA"
+    ].join("\n"),
+    { host: "example.internal", port: 22 }
+  );
+
+  assert.deepEqual(
+    payload.map((entry) => entry.fingerprintSha256),
+    [
+      computeSshTrustFingerprintSha256("////"),
+      computeSshTrustFingerprintSha256("AAAA")
+    ].sort((left, right) => left.localeCompare(right, "en-US", { sensitivity: "base" }))
   );
 });
 

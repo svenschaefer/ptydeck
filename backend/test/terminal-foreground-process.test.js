@@ -57,9 +57,11 @@ test("parseLinuxProcStat extracts process-group and terminal fields", () => {
 });
 
 test("parseLinuxProcStat rejects malformed proc stat payloads", () => {
+  assert.equal(parseLinuxProcStat(null), null);
   assert.equal(parseLinuxProcStat(""), null);
   assert.equal(parseLinuxProcStat("200 bash S 100 200 200 34821 210"), null);
   assert.equal(parseLinuxProcStat("200 (bash S 100 200 200 34821 210"), null);
+  assert.equal(parseLinuxProcStat("200 (bash) S 100 200 200"), null);
   assert.equal(parseLinuxProcStat("200 (bash) S nope 200 200 34821 210"), null);
 });
 
@@ -100,6 +102,35 @@ test("readLinuxProcessSnapshot rejects invalid pids and malformed proc payloads"
   assert.equal(readLinuxProcessSnapshot(0, fixtures), null);
   assert.equal(readLinuxProcessSnapshot("abc", fixtures), null);
   assert.equal(readLinuxProcessSnapshot(200, fixtures), null);
+});
+
+test("readLinuxProcessSnapshot tolerates missing optional proc files and falls back to stat metadata", () => {
+  const snapshot = readLinuxProcessSnapshot(200, {
+    readFileSync(filePath) {
+      if (filePath.endsWith("/stat")) {
+        return "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0";
+      }
+      if (filePath.endsWith("/status")) {
+        throw new Error("missing status");
+      }
+      if (filePath.endsWith("/cmdline")) {
+        throw new Error("missing cmdline");
+      }
+      throw new Error(`unexpected file ${filePath}`);
+    },
+    readlinkSync() {
+      throw new Error("missing link");
+    }
+  });
+
+  assert.equal(snapshot.pid, 200);
+  assert.equal(snapshot.name, "bash");
+  assert.equal(snapshot.executablePath, "");
+  assert.equal(snapshot.executableName, "bash");
+  assert.deepEqual(snapshot.commandLine, []);
+  assert.equal(snapshot.ttyPath, "");
+  assert.equal(snapshot.namespaceProcessGroupId, null);
+  assert.equal(snapshot.namespaceSessionId, null);
 });
 
 test("inspectLinuxTerminalForegroundProcess resolves the foreground group representative and ancestry", () => {
@@ -236,4 +267,97 @@ test("inspectLinuxTerminalForegroundProcess returns null when the terminal has n
   });
 
   assert.equal(inspectLinuxTerminalForegroundProcess(200, fixtures), null);
+});
+
+test("inspectLinuxTerminalForegroundProcess fails closed on non-linux platforms, invalid terminal metadata, and proc scan failures", () => {
+  const originalPlatform = process.platform;
+  Object.defineProperty(process, "platform", { value: "darwin" });
+  try {
+    assert.equal(inspectLinuxTerminalForegroundProcess(200), null);
+  } finally {
+    Object.defineProperty(process, "platform", { value: originalPlatform });
+  }
+
+  const invalidTerminalFixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    }
+  });
+  assert.equal(inspectLinuxTerminalForegroundProcess(200, invalidTerminalFixtures), null);
+
+  const procScanFailureFixtures = {
+    ...createProcFixtures({
+      200: {
+        stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+        status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+        cmdline: "bash\u0000--login\u0000",
+        exe: "/usr/bin/bash",
+        tty: "/dev/pts/5"
+      }
+    }),
+    readdirSync() {
+      throw new Error("proc unavailable");
+    }
+  };
+  assert.equal(inspectLinuxTerminalForegroundProcess(200, procScanFailureFixtures), null);
+});
+
+test("inspectLinuxTerminalForegroundProcess stops ancestry at missing parents and respects the available foreground scope", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    },
+    210: {
+      stat: "210 (codex) S 999 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Malformed\nName:\tcodex\n",
+      cmdline: "codex\u0000--json\u0000",
+      exe: "/usr/local/bin/codex",
+      tty: "/dev/pts/5"
+    }
+  });
+
+  const inspection = inspectLinuxTerminalForegroundProcess(200, fixtures);
+
+  assert.equal(inspection.representativeProcess.pid, 210);
+  assert.deepEqual(inspection.foregroundProcesses.map((entry) => entry.pid), [210]);
+  assert.deepEqual(inspection.ancestry, []);
+});
+
+test("inspectLinuxTerminalForegroundProcess skips malformed peer proc entries while keeping the valid foreground process", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    },
+    210: {
+      stat: "210 (codex) S 200 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tcodex\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "codex\u0000--json\u0000",
+      exe: "/usr/local/bin/codex",
+      tty: "/dev/pts/5"
+    },
+    211: {
+      stat: "invalid",
+      status: "Name:\tbroken\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "broken\u0000",
+      exe: "/usr/bin/broken",
+      tty: "/dev/pts/5"
+    }
+  });
+
+  const inspection = inspectLinuxTerminalForegroundProcess(200, fixtures);
+
+  assert.equal(inspection.representativeProcess.pid, 210);
+  assert.deepEqual(inspection.foregroundProcesses.map((entry) => entry.pid), [210]);
 });
