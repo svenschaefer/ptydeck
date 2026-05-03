@@ -1371,6 +1371,48 @@ test("SessionManager create honors persisted timestamps when provided", () => {
   assert.equal(created.updatedAt, 1710000001234);
 });
 
+test("SessionManager sendInput records per-session quick-send usage server-side", () => {
+  const fakePty = createFakePty();
+  let now = 1710000000000;
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => {
+      now += 10;
+      return now;
+    }
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "bash",
+    quickSendUsage: [{ lookupKey: "project::build", count: 2, lastUsedAt: 1710000000000 }]
+  });
+
+  manager.sendInput(created.id, "pwd\n", {
+    customCommandUsage: {
+      lookupKey: "project::deploy"
+    }
+  });
+  manager.sendInput(created.id, "pwd\n", {
+    customCommandUsage: {
+      lookupKey: "project::deploy"
+    }
+  });
+
+  assert.deepEqual(fakePty.writes, ["pwd\n", "pwd\n"]);
+  assert.equal(created.quickSendUsage.length, 2);
+  assert.deepEqual(created.quickSendUsage[0], {
+    lookupKey: "project::deploy",
+    count: 2,
+    lastUsedAt: created.updatedAt
+  });
+  assert.deepEqual(created.quickSendUsage[1], {
+    lookupKey: "project::build",
+    count: 2,
+    lastUsedAt: 1710000000000
+  });
+});
+
 test("SessionManager defaults cwd to user home when not provided", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({

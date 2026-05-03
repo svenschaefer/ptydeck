@@ -50,7 +50,7 @@ When you work from the session cards, hover the toolbar area to reveal quick act
 - up to five of the most frequently sent custom commands for that session
 - one `Clipboard` action that reads the browser clipboard and routes it through the existing guarded paste/send path
 
-The quick-send ranking is browser-local and origin-local. It follows the current browser profile plus origin in the same way other browser-local operator state does.
+The quick-send ranking is backend-authoritative and restart-persistent. It follows the session across reloads, browser profiles, and operator devices with normal write access, while read-only share spectators do not receive the ranking data.
 
 ## When to Use Session Settings
 

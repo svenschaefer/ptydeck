@@ -25,8 +25,10 @@ export function createCommandExecutorCustomHandlers(options = {}) {
   const normalizeSendTerminatorMode =
     typeof options.normalizeSendTerminatorMode === "function" ? options.normalizeSendTerminatorMode : (value) => value;
   const delayedSubmitMs = Number.isInteger(options.delayedSubmitMs) ? options.delayedSubmitMs : 80;
-  const recordCustomCommandUsage =
-    typeof options.recordCustomCommandUsage === "function" ? options.recordCustomCommandUsage : () => false;
+  const buildCustomCommandUsageApiOptions =
+    typeof options.buildCustomCommandUsageApiOptions === "function"
+      ? options.buildCustomCommandUsageApiOptions
+      : () => undefined;
   const recordCommandSubmission =
     typeof options.recordCommandSubmission === "function" ? options.recordCommandSubmission : () => null;
   const normalizeCustomCommandPayloadForShell =
@@ -87,6 +89,7 @@ export function createCommandExecutorCustomHandlers(options = {}) {
     await Promise.all(
       rendered.entries.map((entry) => {
         const normalizedPayload = normalizeCustomCommandPayloadForShell(entry.text);
+        const apiRequestOptions = buildCustomCommandUsageApiOptions(entry.custom || custom);
         return sendInputWithConfiguredTerminator(
           sendInput,
           entry.session.id,
@@ -94,7 +97,8 @@ export function createCommandExecutorCustomHandlers(options = {}) {
           getSessionSendTerminator(entry.session.id),
           {
             normalizeMode: normalizeSendTerminatorMode,
-            delayedSubmitMs
+            delayedSubmitMs,
+            apiRequestOptions
           }
         );
       })
@@ -102,9 +106,6 @@ export function createCommandExecutorCustomHandlers(options = {}) {
 
     for (const entry of rendered.entries) {
       const normalizedPayload = normalizeCustomCommandPayloadForShell(entry.text);
-      recordCustomCommandUsage(entry.session.id, entry.custom || custom, {
-        usedAt: Date.now()
-      });
       recordCommandSubmission(entry.session.id, {
         source: "custom-command",
         commandName: custom.name,

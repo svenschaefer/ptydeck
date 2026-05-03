@@ -14,11 +14,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Latest completed wave in this segment:
-  - `v0.4.0-H162` Repo-Wide Quality and Coverage Follow-Up
+  - `v0.4.0-H164` Server-Authoritative Session Quick-Send Favorites
 - Active wave:
   - `v0.4.0-H163` Repo-Wide Quality and Coverage Follow-Up
 - Queued next waves:
-  - none currently
+  - none
 
 ## Active Wave Order
 
@@ -29,10 +29,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 5. `QLT-265` Owner `FE`: harden terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
 6. `QLT-261` Owner `BE`: harden the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
 
-## Queued Wave Order
-
-- none currently
-
 ## Wave Dependencies
 
 - `QLT-260 -> QLT-262` so the next backend runtime seam extraction lands before narrower reliability follow-up coverage touches adjacent authority paths.
@@ -42,9 +38,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Exit Criteria
 
-- all `QLT-260` through `QLT-265` tasks have direct deterministic regression coverage on their promoted seams
+- all `QLT-260` through `QLT-265` tasks are implemented and validated
+- the next backend runtime seam extraction lands before narrower reliability and transport-only messaging hardening stack additional coverage on adjacent authority paths
+- the next frontend runtime-composition seam extraction lands before additional command-entry and operator-interaction hardening stack on the remaining monoliths
 - validated root, backend, and frontend coverage lanes still pass `npm run test:coverage:check`
-- `TODO.md` and `ROADMAP.md` return to no active or queued wave state after closeout
+- `TODO.md` and `ROADMAP.md` continue to reflect the explicit split between open tasks and sequencing state
 
 ## Sequencing Rules
 

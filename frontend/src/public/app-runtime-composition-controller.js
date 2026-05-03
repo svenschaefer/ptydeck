@@ -621,7 +621,6 @@ const maybeAutoRepairOriginHandoffControl = () => sessionControlRuntimeControlle
 sessionQuickSendRuntimeController = createSessionQuickSendRuntimeController({
   windowRef: window,
   documentRef: document,
-  localStorageRef: window?.localStorage || null,
   listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
   getSessions: () => store.getState().sessions,
@@ -638,7 +637,7 @@ sessionQuickSendRuntimeController = createSessionQuickSendRuntimeController({
   submitTerminalPaste: (sessionId, text, runtimeOptions) =>
     commandComposerRuntimeController?.submitProgrammaticPaste?.(sessionId, text, runtimeOptions) ||
     Promise.resolve({ ok: false, status: "unavailable", feedback: "Clipboard send is unavailable." }),
-  apiSendInput: (sessionId, data) => api.sendInput(sessionId, data),
+  apiSendInput: (sessionId, data, requestOptions) => api.sendInput(sessionId, data, requestOptions),
   sendInputWithConfiguredTerminator,
   normalizeCustomCommandPayloadForShell,
   normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode?.(value) || "auto",
@@ -1292,7 +1291,7 @@ runtimeEventController = createRuntimeEventController({
     debugLog("terminal.input.error", payload);
   },
   setError: (message) => appCommandUiFacadeController?.setError(message),
-  sendInput: (sessionId, data) => api.sendInput(sessionId, data)
+  sendInput: (sessionId, data, requestOptions) => api.sendInput(sessionId, data, requestOptions)
 });
 
 sessionCardMetaController = createSessionCardMetaController({
@@ -1791,8 +1790,8 @@ appBootstrapCompositionController = createAppBootstrapCompositionController({
   sessionViewModel,
   runtimeEventController,
   deckRuntimeController,
-  recordCustomCommandUsage: (sessionId, command, runtimeOptions) =>
-    sessionQuickSendRuntimeController?.recordCustomCommandUsage?.(sessionId, command, runtimeOptions),
+  buildCustomCommandUsageApiOptions: (command) =>
+    sessionQuickSendRuntimeController?.buildCustomCommandUsageApiOptions?.(command),
   getDiscoveryUsageScore: (key) => commandDiscoveryUsageStore.getUsageScore(key),
   recordDiscoveryUsage: (key) => commandDiscoveryUsageStore.record(key),
   readClipboardText: () => clipboardRuntimeController.readText(),

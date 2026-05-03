@@ -38,7 +38,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Central command/composer flow plus slash-command plane
 - Decks, layout profiles, split-layout support, and a dedicated `Workspace Library` surface for guided connection setup with `Advanced` disclosure, SSH trust verification, workspace presets, and deck-group management
 - Session-level control badges/actions, trusted-local device identity/handoff states, subtle startup/anytime takeover prompts, blocked-write `Take Control and Retry` recovery, and browser-side write blocking for non-controller clients in the mainline single-user runtime
-- Browser-local per-session quick-send ranking for custom commands, including direct hover-triggered clipboard relay through the existing guarded paste path
+- Server-persisted per-session quick-send ranking for custom commands, including direct hover-triggered clipboard relay through the existing guarded paste path
 - Runtime/debug helpers for traceability and troubleshooting
 
 ## Quick Start

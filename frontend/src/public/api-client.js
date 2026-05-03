@@ -371,8 +371,15 @@ export function createApiClient(baseUrl, options = {}) {
     async deleteSession(sessionId) {
       await request(`/sessions/${sessionId}`, { method: "DELETE" }, { expectJson: false });
     },
-    async sendInput(sessionId, data) {
-      await request(`/sessions/${sessionId}/input`, withJson({ data }), { expectJson: false });
+    async sendInput(sessionId, data, options = {}) {
+      const payload = { data };
+      if (options?.customCommandUsage && typeof options.customCommandUsage === "object" && !Array.isArray(options.customCommandUsage)) {
+        const lookupKey = String(options.customCommandUsage.lookupKey || "").trim();
+        if (lookupKey) {
+          payload.customCommandUsage = { lookupKey };
+        }
+      }
+      await request(`/sessions/${sessionId}/input`, withJson(payload), { expectJson: false });
     },
     async resizeSession(sessionId, cols, rows) {
       await request(`/sessions/${sessionId}/resize`, withJson({ cols, rows }), { expectJson: false });

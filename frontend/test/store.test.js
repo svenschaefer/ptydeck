@@ -481,12 +481,15 @@ test("store correlates submitted commands with output, interpretation, artifacts
 test("store wrapper APIs fail closed for invalid deck, command, and submission operations", () => {
   const store = createStore();
   store.setDecks([{ id: "default", name: "Default" }]);
-  store.setSessions([{ id: "s1", deckId: "default" }]);
+  store.setSessions([{ id: "s1", deckId: "default", quickSendUsage: [{ lookupKey: "project::deploy", count: 2, lastUsedAt: 10 }] }]);
   store.replaceCustomCommands([{ name: "deploy", scope: "session", sessionId: "s1", content: "echo session" }]);
 
   const listed = store.listCustomCommands();
   listed[0].content = "mutated";
   assert.equal(store.listCustomCommands()[0].content, "echo session");
+  const sessionSnapshot = store.getState().sessions[0];
+  sessionSnapshot.quickSendUsage[0].count = 99;
+  assert.equal(store.getState().sessions[0].quickSendUsage[0].count, 2);
   assert.equal(store.getCustomCommand("   "), null);
   assert.equal(store.getCustomCommand("deploy", { scope: "global" }), null);
 

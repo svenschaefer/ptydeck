@@ -180,6 +180,22 @@ test("validateRequest accepts valid input body", () => {
   });
 });
 
+test("validateRequest accepts input body with quick-send custom-command usage metadata", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/input",
+      params: { sessionId: "abc" },
+      body: {
+        data: "echo hi\n",
+        customCommandUsage: {
+          lookupKey: "project::deploy"
+        }
+      }
+    });
+  });
+});
+
 test("validateRequest rejects invalid resize payload", () => {
   assert.throws(() => {
     validateRequest({
@@ -630,6 +646,34 @@ test("validateRequest rejects missing input payload field", () => {
       body: {}
     });
   });
+});
+
+test("validateRequest rejects malformed quick-send custom-command usage metadata", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/input",
+      params: { sessionId: "abc" },
+      body: {
+        data: "echo hi\n",
+        customCommandUsage: []
+      }
+    });
+  }, /Field 'customCommandUsage' must be an object/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/input",
+      params: { sessionId: "abc" },
+      body: {
+        data: "echo hi\n",
+        customCommandUsage: {
+          lookupKey: "   "
+        }
+      }
+    });
+  }, /Field 'customCommandUsage.lookupKey' must be a non-empty string/);
 });
 
 test("validateRequest accepts quick-id swap payload", () => {

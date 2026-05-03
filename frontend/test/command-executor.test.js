@@ -52,7 +52,7 @@ function createExecutor(overrides = {}) {
     getSessionSendTerminator: overrides.getSessionSendTerminator || (() => "auto"),
     sendInputWithConfiguredTerminator: overrides.sendInputWithConfiguredTerminator || (async () => {}),
     recordCommandSubmission: overrides.recordCommandSubmission || (() => null),
-    recordCustomCommandUsage: overrides.recordCustomCommandUsage || (() => false),
+    buildCustomCommandUsageApiOptions: overrides.buildCustomCommandUsageApiOptions || (() => undefined),
     normalizeCustomCommandPayloadForShell: overrides.normalizeCustomCommandPayloadForShell || ((value) => value),
     normalizeSessionTags: overrides.normalizeSessionTags || ((tags) => (Array.isArray(tags) ? tags : [])),
     normalizeThemeProfile: overrides.normalizeThemeProfile || ((profile) => profile || {}),
@@ -3028,7 +3028,7 @@ test("command executor records correlated custom-command submissions per target 
   ]);
 });
 
-test("command executor records quick-send usage when executing custom commands", async () => {
+test("command executor builds server-backed quick-send usage metadata when executing custom commands", async () => {
   const calls = [];
   const executor = createCommandExecutor({
     store: {
@@ -3071,8 +3071,9 @@ test("command executor records quick-send usage when executing custom commands",
     setSessionSendTerminator: () => {},
     getSessionSendTerminator: () => "CRLF",
     sendInputWithConfiguredTerminator: async () => {},
-    recordCustomCommandUsage: (sessionId, command, runtimeOptions) => {
-      calls.push(["usage", sessionId, command.name, command.scope, Number.isFinite(runtimeOptions.usedAt)]);
+    buildCustomCommandUsageApiOptions: (command) => {
+      calls.push(["usage-options", command.name, command.scope]);
+      return { customCommandUsage: { lookupKey: `${command.scope}::${command.name}` } };
     },
     recordCommandSubmission: (sessionId, submission) => {
       calls.push(["record", sessionId, submission.commandName, submission.label]);
@@ -3087,7 +3088,7 @@ test("command executor records quick-send usage when executing custom commands",
 
   assert.equal(feedback, "Executed /go on [s1].");
   assert.deepEqual(calls, [
-    ["usage", "s1", "go", "project", true],
+    ["usage-options", "go", "project"],
     ["record", "s1", "go", "/go"]
   ]);
 });

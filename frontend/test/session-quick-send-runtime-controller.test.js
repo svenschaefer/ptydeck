@@ -1,10 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  createSessionQuickSendRuntimeController,
-  SESSION_QUICK_SEND_USAGE_STORAGE_KEY
-} from "../src/public/session-quick-send-runtime-controller.js";
+import { createSessionQuickSendRuntimeController } from "../src/public/session-quick-send-runtime-controller.js";
 
 class FakeElement {
   constructor(tagName = "div") {
@@ -64,10 +61,6 @@ class FakeElement {
   getAttribute(name) {
     return this.attributes.has(String(name)) ? this.attributes.get(String(name)) : null;
   }
-
-  removeAttribute(name) {
-    this.attributes.delete(String(name));
-  }
 }
 
 function createDocumentRef() {
@@ -78,45 +71,32 @@ function createDocumentRef() {
   };
 }
 
-function createLocalStorage(seed = {}) {
-  const data = new Map(Object.entries(seed));
-  return {
-    getItem(key) {
-      return data.has(key) ? data.get(key) : null;
-    },
-    setItem(key, value) {
-      data.set(key, String(value));
-    },
-    removeItem(key) {
-      data.delete(key);
-    }
-  };
-}
-
 function flushAsyncEvents() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
 function createSessions() {
   return [
-    { id: "s1", name: "Alpha", deckId: "default" },
-    { id: "s2", name: "Beta", deckId: "default" }
+    {
+      id: "s1",
+      name: "Alpha",
+      deckId: "default",
+      quickSendUsage: [
+        { lookupKey: "project::build", count: 2, lastUsedAt: 200 },
+        { lookupKey: "global::deploy", count: 1, lastUsedAt: 150 },
+        { lookupKey: "project::removed", count: 9, lastUsedAt: 300 }
+      ]
+    },
+    {
+      id: "s2",
+      name: "Beta",
+      deckId: "default",
+      quickSendUsage: [{ lookupKey: "project::ship", count: 1, lastUsedAt: 120 }]
+    }
   ];
 }
 
-test("session quick-send controller ranks favorites per session and prunes stale usage entries", () => {
-  const localStorageRef = createLocalStorage({
-    [SESSION_QUICK_SEND_USAGE_STORAGE_KEY]: JSON.stringify({
-      sessions: {
-        s1: [
-          { lookupKey: "project::build", count: 2, lastUsedAt: 200 },
-          { lookupKey: "global::deploy", count: 1, lastUsedAt: 150 },
-          { lookupKey: "project::removed", count: 9, lastUsedAt: 300 }
-        ],
-        s2: [{ lookupKey: "project::ship", count: 1, lastUsedAt: 120 }]
-      }
-    })
-  });
+test("session quick-send controller ranks server-backed favorites per session and ignores stale entries", () => {
   const sessions = createSessions();
   const commands = [
     { name: "build", scope: "project", content: "npm run build" },
@@ -125,9 +105,7 @@ test("session quick-send controller ranks favorites per session and prunes stale
   ];
   const controller = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef,
     listCustomCommands: () => commands,
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null
   });
 
@@ -140,93 +118,51 @@ test("session quick-send controller ranks favorites per session and prunes stale
       ["global::deploy", 1, 150]
     ]
   );
-  assert.deepEqual(controller.snapshot(), {
-    s1: [
-      { lookupKey: "project::build", count: 2, lastUsedAt: 200 },
-      { lookupKey: "global::deploy", count: 1, lastUsedAt: 150 }
-    ],
-    s2: [{ lookupKey: "project::ship", count: 1, lastUsedAt: 120 }]
-  });
-
-  controller.syncSessions([{ id: "s1", name: "Alpha", deckId: "default" }]);
-
-  assert.deepEqual(controller.snapshot(), {
-    s1: [
-      { lookupKey: "project::build", count: 2, lastUsedAt: 200 },
-      { lookupKey: "global::deploy", count: 1, lastUsedAt: 150 }
-    ]
-  });
-  assert.deepEqual(JSON.parse(localStorageRef.getItem(SESSION_QUICK_SEND_USAGE_STORAGE_KEY)), {
-    sessions: {
-      s1: [
-        { lookupKey: "project::build", count: 2, lastUsedAt: 200 },
-        { lookupKey: "global::deploy", count: 1, lastUsedAt: 150 }
-      ]
-    }
-  });
+  assert.deepEqual(controller.listTopCustomCommands("missing"), []);
 });
 
-test("session quick-send controller tolerates malformed persistence and enforces deterministic pruning caps", () => {
-  let readAttempts = 0;
-  const localStorageRef = {
-    getItem() {
-      readAttempts += 1;
-      if (readAttempts === 1) {
-        throw new Error("storage read failed");
-      }
-      return JSON.stringify({
-        sessions: {
-          " ": [{ lookupKey: "project::ignored", count: 2, lastUsedAt: 10 }],
-          s1: [
-            { lookupKey: "project::deploy", count: 1, lastUsedAt: 10 },
-            { lookupKey: "project::deploy", count: 2, lastUsedAt: 20 }
-          ]
-        }
-      });
-    },
-    setItem() {
-      throw new Error("storage write failed");
+test("session quick-send controller normalizes request metadata for server-backed usage tracking", () => {
+  const controller = createSessionQuickSendRuntimeController();
+
+  assert.deepEqual(controller.buildCustomCommandUsageApiOptions({ name: "deploy", scope: "project", content: "echo deploy" }), {
+    customCommandUsage: {
+      lookupKey: "project::deploy"
     }
-  };
-  const controller = createSessionQuickSendRuntimeController({
-    documentRef: createDocumentRef(),
-    localStorageRef,
-    maxEntriesPerSession: 1,
-    maxSessions: 1,
-    nowMs: () => 30
   });
-
-  assert.equal(controller.recordCustomCommandUsage("", { name: "deploy", scope: "project", content: "echo deploy" }), false);
-  assert.deepEqual(controller.listTopCustomCommands(""), []);
-
-  controller.recordCustomCommandUsage("s1", { name: "deploy", scope: "project", content: "echo deploy" }, { usedAt: 10 });
-  controller.recordCustomCommandUsage("s1", { name: "restart", scope: "project", content: "echo restart" }, { usedAt: 20 });
-  controller.recordCustomCommandUsage("s2", { name: "logs", scope: "project", content: "echo logs" }, { usedAt: 30 });
-  controller.recordCustomCommandUsage("s2", { name: "logs", scope: "project", content: "echo logs" }, { usedAt: 40 });
-
-  assert.deepEqual(controller.snapshot(), {
-    s2: [{ lookupKey: "project::logs", count: 2, lastUsedAt: 40 }]
-  });
+  assert.equal(controller.buildCustomCommandUsageApiOptions(null), undefined);
 });
 
-test("session quick-send controller dispatches custom favorites through the configured send seam", async () => {
+test("session quick-send controller dispatches custom favorites through the configured send seam with server metadata", async () => {
   const calls = [];
   const feedback = [];
   const errors = [];
-  const sessions = [createSessions()[0]];
+  const sessions = [
+    {
+      id: "s1",
+      name: "Alpha",
+      deckId: "default",
+      quickSendUsage: [{ lookupKey: "project::deploy", count: 1, lastUsedAt: 100 }]
+    }
+  ];
   const controller = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
     listCustomCommands: () => [{ name: "deploy", scope: "project", content: "./deploy.sh" }],
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     resolveDeckForSession: () => ({ id: "default", name: "Default" }),
-    apiSendInput: async (sessionId, payload) => {
-      calls.push(["api", sessionId, payload]);
+    apiSendInput: async (sessionId, payload, requestOptions) => {
+      calls.push(["api", sessionId, payload, requestOptions]);
     },
     sendInputWithConfiguredTerminator: async (sendInput, sessionId, payload, mode, runtimeOptions) => {
-      calls.push(["terminator", sessionId, payload, mode, runtimeOptions.normalizeMode(mode), runtimeOptions.delayedSubmitMs]);
-      await sendInput(sessionId, payload);
+      calls.push([
+        "terminator",
+        sessionId,
+        payload,
+        mode,
+        runtimeOptions.normalizeMode(mode),
+        runtimeOptions.delayedSubmitMs,
+        runtimeOptions.apiRequestOptions
+      ]);
+      await sendInput(sessionId, payload, runtimeOptions.apiRequestOptions);
     },
     normalizeCustomCommandPayloadForShell: (value) => `${value}\n`,
     normalizeSendTerminatorMode: (mode) => String(mode || "").toLowerCase(),
@@ -251,15 +187,19 @@ test("session quick-send controller dispatches custom favorites through the conf
     feedback: "Executed /deploy on [1]."
   });
   assert.deepEqual(calls, [
-    ["terminator", "s1", "./deploy.sh\n", "CRLF", "crlf", 25],
-    ["api", "s1", "./deploy.sh\n"],
+    [
+      "terminator",
+      "s1",
+      "./deploy.sh\n",
+      "CRLF",
+      "crlf",
+      25,
+      { customCommandUsage: { lookupKey: "project::deploy" } }
+    ],
+    ["api", "s1", "./deploy.sh\n", { customCommandUsage: { lookupKey: "project::deploy" } }],
     ["record", "s1", "custom-command", "deploy", "/deploy", "./deploy.sh\n"],
     ["render"]
   ]);
-  assert.deepEqual(controller.snapshot(), {
-    s1: [{ lookupKey: "project::deploy", count: 1, lastUsedAt: controller.snapshot().s1[0].lastUsedAt }]
-  });
-  assert.equal(typeof controller.snapshot().s1[0].lastUsedAt, "number");
   assert.deepEqual(feedback, ["Executed /deploy on [1]."]);
   assert.deepEqual(errors, ["clear"]);
 });
@@ -268,12 +208,10 @@ test("session quick-send controller sends clipboard content through the existing
   const calls = [];
   const feedback = [];
   const errors = [];
-  const sessions = [createSessions()[0]];
+  const sessions = [{ id: "s1", name: "Alpha", deckId: "default", quickSendUsage: [] }];
   let clipboardText = "pwd";
   const controller = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     canReadClipboardText: () => true,
     readClipboardText: async () => clipboardText,
@@ -307,19 +245,27 @@ test("session quick-send controller sends clipboard content through the existing
   assert.deepEqual(errors, ["clear", "clear"]);
 });
 
-test("session quick-send controller renders hover actions, differentiates duplicate names, and wires click handlers", async () => {
+test("session quick-send controller renders hover actions from server-backed ranking and wires click handlers", async () => {
   const calls = [];
   const feedback = [];
-  const sessions = [createSessions()[0]];
+  const sessions = [
+    {
+      id: "s1",
+      name: "Alpha",
+      deckId: "default",
+      quickSendUsage: [
+        { lookupKey: "project::deploy", count: 4, lastUsedAt: 200 },
+        { lookupKey: "global::deploy", count: 1, lastUsedAt: 100 }
+      ]
+    }
+  ];
   const commands = [
     { name: "deploy", scope: "global", content: "echo global" },
     { name: "deploy", scope: "project", content: "echo project" }
   ];
   const controller = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
     listCustomCommands: () => commands,
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     resolveDeckForSession: () => ({ id: "default", name: "Default" }),
     canReadClipboardText: () => true,
@@ -328,12 +274,12 @@ test("session quick-send controller renders hover actions, differentiates duplic
       calls.push(["paste", sessionId, text, runtimeOptions]);
       return { ok: true, status: "sent" };
     },
-    apiSendInput: async (sessionId, payload) => {
-      calls.push(["api", sessionId, payload]);
+    apiSendInput: async (sessionId, payload, requestOptions) => {
+      calls.push(["api", sessionId, payload, requestOptions]);
     },
-    sendInputWithConfiguredTerminator: async (sendInput, sessionId, payload) => {
-      calls.push(["send", sessionId, payload]);
-      await sendInput(sessionId, payload);
+    sendInputWithConfiguredTerminator: async (sendInput, sessionId, payload, _mode, runtimeOptions) => {
+      calls.push(["send", sessionId, payload, runtimeOptions.apiRequestOptions]);
+      await sendInput(sessionId, payload, runtimeOptions.apiRequestOptions);
     },
     normalizeCustomCommandPayloadForShell: (value) => `${value}\n`,
     recordCommandSubmission: (sessionId, submission) => {
@@ -346,8 +292,6 @@ test("session quick-send controller renders hover actions, differentiates duplic
     formatSessionDisplayName: (session) => session.name
   });
 
-  controller.recordCustomCommandUsage("s1", commands[0], { usedAt: 100 });
-  controller.recordCustomCommandUsage("s1", commands[1], { usedAt: 200 });
   const panelEl = new FakeElement("div");
   const titleEl = new FakeElement("p");
   const targetEl = new FakeElement("p");
@@ -378,8 +322,8 @@ test("session quick-send controller renders hover actions, differentiates duplic
   await flushAsyncEvents();
 
   assert.deepEqual(calls, [
-    ["send", "s1", "echo project\n"],
-    ["api", "s1", "echo project\n"],
+    ["send", "s1", "echo project\n", { customCommandUsage: { lookupKey: "project::deploy" } }],
+    ["api", "s1", "echo project\n", { customCommandUsage: { lookupKey: "project::deploy" } }],
     ["record", "s1", "deploy", "/deploy"],
     ["render"],
     ["paste", "s1", "whoami", { source: "paste", activateTargetBeforeSend: false }]
@@ -389,12 +333,10 @@ test("session quick-send controller renders hover actions, differentiates duplic
 
 test("session quick-send controller fails closed for blocked sessions and unavailable clipboards", async () => {
   const errors = [];
-  const sessions = [createSessions()[0]];
+  const sessions = [{ id: "s1", name: "Alpha", deckId: "default", quickSendUsage: [{ lookupKey: "project::deploy", count: 1, lastUsedAt: 1 }] }];
   const controller = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
     listCustomCommands: () => [{ name: "deploy", scope: "project", content: "./deploy.sh" }],
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     canReadClipboardText: () => false,
     isReadOnlyMode: () => true,
@@ -418,12 +360,11 @@ test("session quick-send controller fails closed for blocked sessions and unavai
 });
 
 test("session quick-send controller reports missing, invalid, and failed custom-command dispatches", async () => {
-  const sessions = [createSessions()[0]];
+  const sessions = [{ id: "s1", name: "Alpha", deckId: "default", quickSendUsage: [] }];
   const errors = [];
 
   const missingSessionController = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
     getSessionById: () => null,
     setError: (message) => errors.push(["missing-session", message])
   });
@@ -435,8 +376,6 @@ test("session quick-send controller reports missing, invalid, and failed custom-
 
   const missingCommandController = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     listCustomCommands: () => [],
     requestRender: () => errors.push(["missing-command-render"]),
@@ -452,8 +391,6 @@ test("session quick-send controller reports missing, invalid, and failed custom-
 
   const invalidCommandController = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     listCustomCommands: () => [{ name: "deploy", scope: "project", kind: "template", content: "echo {{param:env}}" }],
     resolveDeckForSession: () => ({ id: "default", name: "Default" }),
@@ -463,8 +400,6 @@ test("session quick-send controller reports missing, invalid, and failed custom-
 
   const failedCommandController = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     listCustomCommands: () => [{ name: "deploy", scope: "project", content: "echo deploy" }],
     resolveDeckForSession: () => ({ id: "default", name: "Default" }),
@@ -489,13 +424,11 @@ test("session quick-send controller reports missing, invalid, and failed custom-
 });
 
 test("session quick-send controller reports clipboard read and paste failures explicitly", async () => {
-  const sessions = [createSessions()[0]];
+  const sessions = [{ id: "s1", name: "Alpha", deckId: "default", quickSendUsage: [] }];
   const errors = [];
 
   const unavailableController = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     canReadClipboardText: () => false,
     setError: (message) => errors.push(["unavailable", message])
@@ -508,8 +441,6 @@ test("session quick-send controller reports clipboard read and paste failures ex
 
   const readErrorController = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     canReadClipboardText: () => true,
     readClipboardText: async () => {
@@ -525,8 +456,6 @@ test("session quick-send controller reports clipboard read and paste failures ex
 
   const pasteFailureController = createSessionQuickSendRuntimeController({
     documentRef: createDocumentRef(),
-    localStorageRef: createLocalStorage(),
-    getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     canReadClipboardText: () => true,
     readClipboardText: async () => "pwd",

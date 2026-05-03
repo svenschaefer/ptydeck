@@ -281,6 +281,7 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(created.controlState.owner.subject, "local-operator");
     assert.equal(created.controlState.currentController, null);
     assert.deepEqual(created.controlState.attachedClients, []);
+    assert.deepEqual(created.quickSendUsage, []);
 
     const listRes = await fetch(`${baseUrl}/sessions`);
     assert.equal(listRes.status, 200);
@@ -310,7 +311,12 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: "echo REST_OK\n" })
+      body: JSON.stringify({
+        data: "echo REST_OK\n",
+        customCommandUsage: {
+          lookupKey: "project::rest-ok"
+        }
+      })
     });
     assert.equal(inputRes.status, 204);
 
@@ -319,6 +325,14 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     const afterInput = await afterInputRes.json();
     assert.equal(afterInput.controlState.lastInput.subject, "local-operator");
     assert.equal(afterInput.controlState.lastInput.clientId, null);
+    assert.deepEqual(afterInput.quickSendUsage, [
+      {
+        lookupKey: "project::rest-ok",
+        count: 1,
+        lastUsedAt: afterInput.quickSendUsage[0].lastUsedAt
+      }
+    ]);
+    assert.equal(typeof afterInput.quickSendUsage[0].lastUsedAt, "number");
 
     const resizeRes = await fetch(`${baseUrl}/sessions/${created.id}/resize`, {
       method: "POST",
@@ -336,6 +350,7 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(restarted.state, "running");
     assert.ok(["build-test", "coding-agent"].includes(restarted.appIdentity.family));
     assert.equal(restarted.appIdentity.label, "codex");
+    assert.deepEqual(restarted.quickSendUsage, afterInput.quickSendUsage);
 
     const deleteRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "DELETE"
@@ -343,6 +358,83 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(deleteRes.status, 204);
   } finally {
     await runtime.stop();
+  }
+});
+
+test("runtime restores persisted session quick-send usage after a runtime restart", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-quick-send-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+  let createdSessionId = "";
+
+  try {
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", name: "restart-persist" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdSessionId = created.id;
+
+    const inputRes = await fetch(`${baseUrlA}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        data: "echo persist\n",
+        customCommandUsage: {
+          lookupKey: "project::persist"
+        }
+      })
+    });
+    assert.equal(inputRes.status, 204);
+
+    await waitFor(async () => {
+      const raw = await readFile(dataPath, "utf8");
+      return raw.includes("\"lookupKey\": \"project::persist\"");
+    }, 2000);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    const getRes = await fetch(`${baseUrlB}/sessions/${createdSessionId}`);
+    assert.equal(getRes.status, 200);
+    const restored = await getRes.json();
+    assert.deepEqual(restored.quickSendUsage, [
+      {
+        lookupKey: "project::persist",
+        count: 1,
+        lastUsedAt: restored.quickSendUsage[0].lastUsedAt
+      }
+    ]);
+    assert.equal(typeof restored.quickSendUsage[0].lastUsedAt, "number");
+  } finally {
+    await runtimeB.stop();
   }
 });
 
@@ -4035,12 +4127,37 @@ test("share links persist and enforce read-only spectator access across restart"
     });
     assert.equal(getSessionShareRes.status, 200);
 
+    const operatorQuickSendRes = await fetch(`${baseUrlA}/sessions/${sharedSessionId}/input`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({
+        data: "echo shared\n",
+        customCommandUsage: { lookupKey: "project::deploy" }
+      })
+    });
+    assert.equal(operatorQuickSendRes.status, 204);
+
+    const operatorSharedSessionRes = await fetch(`${baseUrlA}/sessions/${sharedSessionId}`, {
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(operatorSharedSessionRes.status, 200);
+    const operatorSharedSession = await operatorSharedSessionRes.json();
+    assert.deepEqual(operatorSharedSession.quickSendUsage, [
+      {
+        lookupKey: "project::deploy",
+        count: 1,
+        lastUsedAt: operatorSharedSession.quickSendUsage[0].lastUsedAt
+      }
+    ]);
+    assert.equal(typeof operatorSharedSession.quickSendUsage[0].lastUsedAt, "number");
+
     const sessionSpectatorListRes = await fetch(`${baseUrlA}/sessions`, {
       headers: createAuthHeaders(sessionShareToken)
     });
     assert.equal(sessionSpectatorListRes.status, 200);
     const sessionSpectatorSessions = await sessionSpectatorListRes.json();
     assert.deepEqual(sessionSpectatorSessions.map((session) => session.id), [sharedSessionId]);
+    assert.deepEqual(sessionSpectatorSessions[0].quickSendUsage, []);
 
     const sessionSpectatorDecksRes = await fetch(`${baseUrlA}/decks`, {
       headers: createAuthHeaders(sessionShareToken)
@@ -4053,6 +4170,8 @@ test("share links persist and enforce read-only spectator access across restart"
       headers: createAuthHeaders(sessionShareToken)
     });
     assert.equal(sessionGetSharedRes.status, 200);
+    const sessionSharedSpectator = await sessionGetSharedRes.json();
+    assert.deepEqual(sessionSharedSpectator.quickSendUsage, []);
 
     const sessionGetHiddenRes = await fetch(`${baseUrlA}/sessions/${hiddenSessionId}`, {
       headers: createAuthHeaders(sessionShareToken)
@@ -4118,11 +4237,14 @@ test("share links persist and enforce read-only spectator access across restart"
       deckSpectatorSessions.map((session) => session.id).sort(),
       [companionSessionId, sharedSessionId].sort()
     );
+    assert.equal(deckSpectatorSessions.every((session) => Array.isArray(session.quickSendUsage) && session.quickSendUsage.length === 0), true);
 
     const deckGetCompanionRes = await fetch(`${baseUrlA}/sessions/${companionSessionId}`, {
       headers: createAuthHeaders(deckShareToken)
     });
     assert.equal(deckGetCompanionRes.status, 200);
+    const deckCompanionSpectator = await deckGetCompanionRes.json();
+    assert.deepEqual(deckCompanionSpectator.quickSendUsage, []);
 
     const deckGetHiddenRes = await fetch(`${baseUrlA}/sessions/${hiddenSessionId}`, {
       headers: createAuthHeaders(deckShareToken)
@@ -4176,6 +4298,7 @@ test("share links persist and enforce read-only spectator access across restart"
     assert.equal(sessionSpectatorListRes.status, 200);
     const sessionSpectatorSessions = await sessionSpectatorListRes.json();
     assert.deepEqual(sessionSpectatorSessions.map((session) => session.id), [sharedSessionId]);
+    assert.deepEqual(sessionSpectatorSessions[0].quickSendUsage, []);
 
     const revokeSessionShareRes = await fetch(`${baseUrlB}/shares/${sessionShareId}/revoke`, {
       method: "POST",

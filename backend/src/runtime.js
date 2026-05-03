@@ -45,6 +45,10 @@ import {
   normalizeSessionInputSafetyProfile
 } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
+import {
+  normalizeQuickSendUsageEntries,
+  normalizeQuickSendUsageMutation
+} from "./session-quick-send-usage.js";
 import { SessionManager } from "./session-manager.js";
 import { deriveTerminalAppIdentityFromSessionHints, normalizeTerminalAppIdentity } from "./terminal-app-identity.js";
 import {
@@ -3980,19 +3984,29 @@ export function createRuntime(config) {
     return left.id.localeCompare(right.id, "en-US", { sensitivity: "base" });
   }
 
+  function sanitizeApiSessionForAuth(session, auth = null) {
+    if (!session || !isSpectatorAuth(auth)) {
+      return session;
+    }
+    return {
+      ...session,
+      quickSendUsage: []
+    };
+  }
+
   function getSpectatorTargetSession(auth) {
     if (!isSpectatorAuth(auth) || auth.shareTargetType !== SHARE_LINK_TARGET_TYPE_SESSION) {
       return null;
     }
     try {
-      return toApiSession(manager.get(auth.shareTargetId).meta);
+      return sanitizeApiSessionForAuth(toApiSession(manager.get(auth.shareTargetId).meta), auth);
     } catch (error) {
       if (!(error instanceof ApiError) || error.statusCode !== 404) {
         throw error;
       }
     }
     const unrestored = unrestoredSessions.get(auth.shareTargetId);
-    return unrestored ? toApiSession(unrestored, "unrestored") : null;
+    return unrestored ? sanitizeApiSessionForAuth(toApiSession(unrestored, "unrestored"), auth) : null;
   }
 
   function isSessionVisibleToAuth(session, auth) {
@@ -4521,7 +4535,7 @@ export function createRuntime(config) {
     const payload = [];
     const seen = new Set();
     for (const session of manager.list()) {
-      const apiSession = toApiSession(session);
+      const apiSession = sanitizeApiSessionForAuth(toApiSession(session), auth);
       if ((!deckId || apiSession.deckId === deckId) && isSessionVisibleToAuth(apiSession, auth)) {
         payload.push(apiSession);
       }
@@ -4531,7 +4545,7 @@ export function createRuntime(config) {
       if (seen.has(sessionId)) {
         continue;
       }
-      const apiSession = toApiSession(session, "unrestored");
+      const apiSession = sanitizeApiSessionForAuth(toApiSession(session, "unrestored"), auth);
       if ((!deckId || apiSession.deckId === deckId) && isSessionVisibleToAuth(apiSession, auth)) {
         payload.push(apiSession);
       }
@@ -4542,7 +4556,7 @@ export function createRuntime(config) {
   function getApiSessionOrThrow(sessionId, auth = null) {
     try {
       const active = manager.get(sessionId).meta;
-      const apiSession = toApiSession(active);
+      const apiSession = sanitizeApiSessionForAuth(toApiSession(active), auth);
       if (!isSessionVisibleToAuth(apiSession, auth)) {
         throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
       }
@@ -4554,7 +4568,7 @@ export function createRuntime(config) {
     }
     const unrestored = unrestoredSessions.get(sessionId);
     if (unrestored) {
-      const apiSession = toApiSession(unrestored, "unrestored");
+      const apiSession = sanitizeApiSessionForAuth(toApiSession(unrestored, "unrestored"), auth);
       if (isSessionVisibleToAuth(apiSession, auth)) {
         return apiSession;
       }
@@ -5019,6 +5033,7 @@ function tryCreateRestoredSession({
   mouseForwardingMode,
   inputSafetyProfile,
   tags,
+  quickSendUsage,
   themeProfile,
   activeThemeProfile,
   inactiveThemeProfile
@@ -5042,6 +5057,7 @@ function tryCreateRestoredSession({
       mouseForwardingMode,
       inputSafetyProfile,
       tags,
+      quickSendUsage,
       themeProfile,
       activeThemeProfile,
       inactiveThemeProfile,
@@ -5135,7 +5151,11 @@ function tryCreateRestoredSession({
     if (payload.type === "snapshot") {
       return {
         ...payload,
-        sessions: Array.isArray(payload.sessions) ? payload.sessions.filter((session) => isSessionVisibleToAuth(session, auth)) : [],
+        sessions: Array.isArray(payload.sessions)
+          ? payload.sessions
+              .filter((session) => isSessionVisibleToAuth(session, auth))
+              .map((session) => sanitizeApiSessionForAuth(session, auth))
+          : [],
         outputs: filterOutputsForAuth(payload.outputs, auth),
         customCommands: [],
         decks: Array.isArray(payload.decks) ? payload.decks.filter((deck) => isDeckVisibleToAuth(deck, auth)) : []
@@ -5147,7 +5167,12 @@ function tryCreateRestoredSession({
       payload.type === "session.updated" ||
       payload.type === "session.activity.completed"
     ) {
-      return isSessionVisibleToAuth(payload.session, auth) ? payload : null;
+      return isSessionVisibleToAuth(payload.session, auth)
+        ? {
+            ...payload,
+            session: sanitizeApiSessionForAuth(payload.session, auth)
+          }
+        : null;
     }
     if (
       payload.type === "session.data" ||
@@ -5959,11 +5984,19 @@ function tryCreateRestoredSession({
           ...(typeof body.data === "string" && /[\r\n]/.test(body.data) ? { replyPromotionEligible: true } : {}),
           ...(normalizedReplyInputText ? { replyInputText: normalizedReplyInputText } : {})
         };
+        const customCommandUsage = normalizeQuickSendUsageMutation(body?.customCommandUsage);
+        if (customCommandUsage) {
+          metadataForAudit.quickSendLookupKey = customCommandUsage.lookupKey;
+        }
         messagingRuntime.observeSessionInput(match.params.sessionId, inputTrace);
         manager.sendInput(match.params.sessionId, body.data, {
-          trace: inputTrace
+          trace: inputTrace,
+          ...(customCommandUsage ? { customCommandUsage } : {})
         });
         recordSessionLastInput(match.params.sessionId, auth, req);
+        if (customCommandUsage) {
+          persistSoon();
+        }
         broadcastSessionUpdated(match.params.sessionId, {
           ...requestTraceContext,
           sessionId: match.params.sessionId
@@ -6277,6 +6310,7 @@ function tryCreateRestoredSession({
         const mouseForwardingMode = normalizeSessionMouseForwardingMode(session.mouseForwardingMode, { strict: false });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
+        const quickSendUsage = normalizeQuickSendUsageEntries(session.quickSendUsage);
         const quickIdToken = assignSessionQuickIdToken(session.id, session.quickIdToken);
         const requestedShell =
           typeof session.shell === "string" && session.shell.trim()
@@ -6305,6 +6339,7 @@ function tryCreateRestoredSession({
           quickIdToken,
           inputSafetyProfile,
           tags,
+          quickSendUsage,
           themeProfile: themeSlots.themeProfile,
           activeThemeProfile: themeSlots.activeThemeProfile,
           inactiveThemeProfile: themeSlots.inactiveThemeProfile,
@@ -6362,6 +6397,7 @@ function tryCreateRestoredSession({
               mouseForwardingMode,
               inputSafetyProfile,
               tags,
+              quickSendUsage,
               themeProfile: themeSlots.themeProfile,
               activeThemeProfile: themeSlots.activeThemeProfile,
               inactiveThemeProfile: themeSlots.inactiveThemeProfile

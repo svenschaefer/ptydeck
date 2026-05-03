@@ -1145,6 +1145,8 @@ paths:
               properties:
                 data:
                   type: string
+                customCommandUsage:
+                  $ref: '#/components/schemas/SessionQuickSendUsageMutation'
       responses:
         '204':
           description: Input accepted
@@ -2036,6 +2038,10 @@ components:
           type: array
           items:
             type: string
+        quickSendUsage:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionQuickSendUsageEntry'
         controlState:
           $ref: '#/components/schemas/SessionControlState'
         themeProfile:
@@ -2071,6 +2077,27 @@ components:
           type: integer
           format: int64
           nullable: true
+    SessionQuickSendUsageEntry:
+      type: object
+      required:
+        - lookupKey
+        - count
+        - lastUsedAt
+      properties:
+        lookupKey:
+          type: string
+        count:
+          type: integer
+        lastUsedAt:
+          type: integer
+          format: int64
+    SessionQuickSendUsageMutation:
+      type: object
+      required:
+        - lookupKey
+      properties:
+        lookupKey:
+          type: string
     SessionControlPrincipal:
       type: object
       required:

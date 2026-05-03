@@ -21,18 +21,22 @@ export async function sendInputWithConfiguredTerminator(sendInput, sessionId, va
   const normalizeMode =
     typeof options.normalizeMode === "function" ? options.normalizeMode : (inputMode) => String(inputMode || "");
   const delayedSubmitMs = Number.isFinite(options.delayedSubmitMs) ? options.delayedSubmitMs : 90;
+  const apiRequestOptions =
+    options.apiRequestOptions && typeof options.apiRequestOptions === "object" && !Array.isArray(options.apiRequestOptions)
+      ? options.apiRequestOptions
+      : undefined;
   const normalizedMode = normalizeMode(String(mode || "").toLowerCase());
   if (normalizedMode === "cr_delay") {
     const body = normalizePayloadWithoutTrailingNewline(value, "lf");
     if (body) {
-      await sendInput(sessionId, body);
+      await sendInput(sessionId, body, apiRequestOptions);
     }
     await new Promise((resolve) => setTimeout(resolve, delayedSubmitMs));
-    await sendInput(sessionId, "\r");
+    await sendInput(sessionId, "\r", body ? undefined : apiRequestOptions);
     return;
   }
   const payload = withSingleTrailingNewline(value, normalizedMode);
-  await sendInput(sessionId, payload);
+  await sendInput(sessionId, payload, apiRequestOptions);
 }
 
 export function countUnescapedSingleQuotes(line) {

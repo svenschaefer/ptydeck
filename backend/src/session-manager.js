@@ -21,6 +21,10 @@ import {
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import {
+  normalizeQuickSendUsageEntries,
+  recordQuickSendUsageEntry
+} from "./session-quick-send-usage.js";
+import {
   createTerminalAppIdentityRuntimeState,
   deriveTerminalAppIdentityCandidateFromForegroundProcess,
   deriveTerminalAppIdentityCandidateFromOutputHeuristics,
@@ -1523,6 +1527,7 @@ export class SessionManager {
     mouseForwardingMode,
     inputSafetyProfile,
     tags = [],
+    quickSendUsage = [],
     themeProfile = {},
     activeThemeProfile,
     inactiveThemeProfile,
@@ -1556,6 +1561,7 @@ export class SessionManager {
     const normalizedMouseForwardingMode = normalizeSessionMouseForwardingMode(mouseForwardingMode, { strict: false });
     const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
     const normalizedTags = normalizeSessionTags(tags);
+    const normalizedQuickSendUsage = normalizeQuickSendUsageEntries(quickSendUsage);
     const normalizedQuickIdToken = normalizeQuickIdToken(quickIdToken);
     const normalizedRemoteConnection = normalizeRemoteConnection(remoteConnection, normalizedKind);
     const normalizedRemoteAuth = normalizeRemoteAuth(remoteAuth, normalizedKind);
@@ -1651,6 +1657,7 @@ export class SessionManager {
         mouseForwardingMode: normalizedMouseForwardingMode,
         inputSafetyProfile: normalizedInputSafetyProfile,
         tags: normalizedTags,
+        quickSendUsage: normalizedQuickSendUsage,
         ...(normalizedKind === SESSION_KIND_SSH
           ? {
               remoteRuntime: buildRemoteRuntimeMeta({
@@ -1740,6 +1747,11 @@ export class SessionManager {
       trace: eventTrace
     });
     const timestamp = this.nowFn();
+    if (options.customCommandUsage) {
+      session.meta.quickSendUsage = recordQuickSendUsageEntry(session.meta.quickSendUsage, options.customCommandUsage, {
+        usedAt: timestamp
+      });
+    }
     session.lastActivityAt = timestamp;
     session.meta.updatedAt = timestamp;
     this.scheduleSessionForegroundProcessIdentityRefresh(session, {
@@ -1956,6 +1968,7 @@ export class SessionManager {
       mouseForwardingMode: snapshot.mouseForwardingMode,
       inputSafetyProfile: snapshot.inputSafetyProfile,
       tags: snapshot.tags || [],
+      quickSendUsage: snapshot.quickSendUsage || [],
       themeProfile: snapshot.themeProfile || {},
       activeThemeProfile: snapshot.activeThemeProfile,
       inactiveThemeProfile: snapshot.inactiveThemeProfile,

@@ -6,7 +6,6 @@ const DEFAULT_SOURCE_KEYS = [
   "ptydeck.session-input-settings.v1",
   "ptydeck.session-filter.v1",
   "ptydeck.command-discovery-usage.v1",
-  "ptydeck.session-quick-send-usage.v1",
   "ptydeck.send-history.v1"
 ];
 

@@ -6,13 +6,9 @@ import {
   renderCustomCommandForSession
 } from "./custom-command-model.js";
 import {
-  cloneQuickSendUsageEntry,
-  cloneQuickSendUsageState,
+  cloneQuickSendUsageEntries,
   normalizeQuickSendUsageEntry,
-  parseSessionQuickSendUsagePayload,
-  pruneSessionQuickSendUsageState,
-  readSessionQuickSendUsagePayload,
-  serializeSessionQuickSendUsageState
+  pruneQuickSendUsageEntries
 } from "./session-quick-send-usage.js";
 
 function normalizeText(value) {
@@ -72,28 +68,23 @@ function buildQuickSendMetaText(session, topCommands, showClipboardAction, forma
   return parts.join(" · ");
 }
 
-export const SESSION_QUICK_SEND_USAGE_STORAGE_KEY = "ptydeck.session-quick-send-usage.v1";
-export const SESSION_QUICK_SEND_USAGE_MAX_ENTRIES_PER_SESSION = 32;
-export const SESSION_QUICK_SEND_USAGE_MAX_SESSIONS = 200;
+export const SESSION_QUICK_SEND_MAX_ENTRIES = 32;
 export const SESSION_QUICK_SEND_TOP_LIMIT = 5;
 
 export function createSessionQuickSendRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const documentRef = options.documentRef || windowRef?.document || globalThis.document || null;
-  const localStorageRef = options.localStorageRef || windowRef?.localStorage || null;
-  const storageKey = normalizeText(options.storageKey) || SESSION_QUICK_SEND_USAGE_STORAGE_KEY;
-  const maxEntriesPerSession = Number.isInteger(options.maxEntriesPerSession)
-    ? options.maxEntriesPerSession
-    : SESSION_QUICK_SEND_USAGE_MAX_ENTRIES_PER_SESSION;
-  const maxSessions = Number.isInteger(options.maxSessions) ? options.maxSessions : SESSION_QUICK_SEND_USAGE_MAX_SESSIONS;
+  const maxEntries = Number.isInteger(options.maxEntries) && options.maxEntries > 0 ? options.maxEntries : SESSION_QUICK_SEND_MAX_ENTRIES;
   const nowMs = typeof options.nowMs === "function" ? options.nowMs : () => Date.now();
   const listCustomCommands = typeof options.listCustomCommands === "function" ? options.listCustomCommands : () => [];
   const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
-  const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
   const resolveDeckForSession = typeof options.resolveDeckForSession === "function" ? options.resolveDeckForSession : () => null;
   const canReadClipboardText = typeof options.canReadClipboardText === "function" ? options.canReadClipboardText : () => false;
   const readClipboardText = typeof options.readClipboardText === "function" ? options.readClipboardText : async () => "";
-  const submitTerminalPaste = typeof options.submitTerminalPaste === "function" ? options.submitTerminalPaste : async () => ({ ok: false, status: "unavailable", feedback: "Clipboard send is unavailable." });
+  const submitTerminalPaste =
+    typeof options.submitTerminalPaste === "function"
+      ? options.submitTerminalPaste
+      : async () => ({ ok: false, status: "unavailable", feedback: "Clipboard send is unavailable." });
   const apiSendInput = typeof options.apiSendInput === "function" ? options.apiSendInput : async () => undefined;
   const sendInputWithConfiguredTerminator =
     typeof options.sendInputWithConfiguredTerminator === "function" ? options.sendInputWithConfiguredTerminator : async () => undefined;
@@ -132,133 +123,16 @@ export function createSessionQuickSendRuntimeController(options = {}) {
       ? options.formatSessionDisplayName
       : (session) => String(session?.name || session?.id || "session");
 
-  let usageBySession = pruneSessionQuickSendUsageState(
-    parseSessionQuickSendUsagePayload(readSessionQuickSendUsagePayload(localStorageRef, storageKey)),
-    {
-      maxEntriesPerSession,
-      maxSessions
-    }
-  );
-
-  function persist() {
-    if (!localStorageRef || typeof localStorageRef.setItem !== "function") {
-      return;
-    }
-    try {
-      localStorageRef.setItem(storageKey, serializeSessionQuickSendUsageState(usageBySession));
-    } catch {
-      // Ignore browser persistence write failures and keep the in-memory state alive.
-    }
-  }
-
-  function replaceUsageState(nextState) {
-    usageBySession = pruneSessionQuickSendUsageState(nextState, { maxEntriesPerSession, maxSessions });
-    persist();
-  }
-
-  function syncSessions(sessions = getSessions()) {
-    const knownSessionIds = new Set((Array.isArray(sessions) ? sessions : []).map((session) => normalizeText(session?.id)).filter(Boolean));
-    const nextState = {};
-    let changed = false;
-    for (const [sessionId, entries] of Object.entries(usageBySession)) {
-      if (!knownSessionIds.has(sessionId)) {
-        changed = true;
-        continue;
-      }
-      nextState[sessionId] = Array.isArray(entries) ? entries.map((entry) => cloneQuickSendUsageEntry(entry)) : [];
-    }
-    if (changed) {
-      replaceUsageState(nextState);
-    }
-  }
-
-  function recordCustomCommandUsage(sessionId, command, runtimeOptions = {}) {
-    const normalizedSessionId = normalizeText(sessionId);
+  function buildCustomCommandUsageApiOptions(command) {
     const normalizedCommand = normalizeCustomCommandRecord(command);
-    if (!normalizedSessionId || !normalizedCommand?.lookupKey) {
-      return false;
+    if (!normalizedCommand?.lookupKey) {
+      return undefined;
     }
-    const nextEntries = Array.isArray(usageBySession[normalizedSessionId])
-      ? usageBySession[normalizedSessionId].map((entry) => cloneQuickSendUsageEntry(entry))
-      : [];
-    const usedAt = Number.isFinite(runtimeOptions.usedAt) ? Number(runtimeOptions.usedAt) : nowMs();
-    const index = nextEntries.findIndex((entry) => entry.lookupKey === normalizedCommand.lookupKey);
-    if (index >= 0) {
-      nextEntries[index] = {
-        lookupKey: normalizedCommand.lookupKey,
-        count: (Number(nextEntries[index]?.count) || 0) + 1,
-        lastUsedAt: usedAt
-      };
-    } else {
-      nextEntries.push({
-        lookupKey: normalizedCommand.lookupKey,
-        count: 1,
-        lastUsedAt: usedAt
-      });
-    }
-    replaceUsageState({
-      ...usageBySession,
-      [normalizedSessionId]: nextEntries
-    });
-    return true;
-  }
-
-  function resolveVisibleCustomCommands(sessionId, commands = listCustomCommands()) {
-    const normalizedSessionId = normalizeText(sessionId);
-    return (Array.isArray(commands) ? commands : [])
-      .map((entry) => normalizeCustomCommandRecord(entry))
-      .filter((entry) => entry && isCustomCommandVisibleForSession(entry, normalizedSessionId));
-  }
-
-  function listTopCustomCommands(sessionId, commands = listCustomCommands(), options = {}) {
-    const normalizedSessionId = normalizeText(sessionId);
-    if (!normalizedSessionId) {
-      return [];
-    }
-    const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : SESSION_QUICK_SEND_TOP_LIMIT;
-    const visibleCommands = resolveVisibleCustomCommands(normalizedSessionId, commands);
-    const visibleByLookupKey = new Map(visibleCommands.map((entry) => [entry.lookupKey, entry]));
-    const currentEntries = Array.isArray(usageBySession[normalizedSessionId]) ? usageBySession[normalizedSessionId] : [];
-    const nextEntries = [];
-    const ranked = [];
-    let changed = false;
-    for (const entry of currentEntries) {
-      const normalizedEntry = normalizeQuickSendUsageEntry(entry);
-      if (!normalizedEntry) {
-        changed = true;
-        continue;
+    return {
+      customCommandUsage: {
+        lookupKey: normalizedCommand.lookupKey
       }
-      const command = visibleByLookupKey.get(normalizedEntry.lookupKey);
-      if (!command) {
-        changed = true;
-        continue;
-      }
-      nextEntries.push(normalizedEntry);
-      ranked.push({
-        command,
-        count: normalizedEntry.count,
-        lastUsedAt: normalizedEntry.lastUsedAt
-      });
-    }
-    if (changed) {
-      const nextState = { ...usageBySession };
-      if (nextEntries.length > 0) {
-        nextState[normalizedSessionId] = nextEntries;
-      } else {
-        delete nextState[normalizedSessionId];
-      }
-      replaceUsageState(nextState);
-    }
-    ranked.sort((left, right) => {
-      if (left.count !== right.count) {
-        return right.count - left.count;
-      }
-      if (left.lastUsedAt !== right.lastUsedAt) {
-        return right.lastUsedAt - left.lastUsedAt;
-      }
-      return compareCustomCommandRecords(left.command, right.command);
-    });
-    return ranked.slice(0, limit).map((entry) => ({ ...entry, command: normalizeCustomCommandRecord(entry.command) }));
+    };
   }
 
   function resolveBlockedMessage(session) {
@@ -284,12 +158,59 @@ export function createSessionQuickSendRuntimeController(options = {}) {
     return getSessionById(sessionOrId) || null;
   }
 
+  function resolveSessionUsageEntries(session) {
+    return cloneQuickSendUsageEntries(pruneQuickSendUsageEntries(session?.quickSendUsage, maxEntries));
+  }
+
+  function resolveVisibleCustomCommands(sessionId, commands = listCustomCommands()) {
+    const normalizedSessionId = normalizeText(sessionId);
+    return (Array.isArray(commands) ? commands : [])
+      .map((entry) => normalizeCustomCommandRecord(entry))
+      .filter((entry) => entry && isCustomCommandVisibleForSession(entry, normalizedSessionId));
+  }
+
   function resolveCustomCommandByLookupKey(sessionId, lookupKey, commands = listCustomCommands()) {
     const normalizedLookupKey = normalizeText(lookupKey);
     if (!normalizedLookupKey) {
       return null;
     }
     return resolveVisibleCustomCommands(sessionId, commands).find((entry) => entry.lookupKey === normalizedLookupKey) || null;
+  }
+
+  function listTopCustomCommands(sessionId, commands = listCustomCommands(), options = {}) {
+    const session = resolveCurrentSession(sessionId);
+    if (!session?.id) {
+      return [];
+    }
+    const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : SESSION_QUICK_SEND_TOP_LIMIT;
+    const visibleCommands = resolveVisibleCustomCommands(session.id, commands);
+    const visibleByLookupKey = new Map(visibleCommands.map((entry) => [entry.lookupKey, entry]));
+    const ranked = [];
+    for (const entry of resolveSessionUsageEntries(session)) {
+      const normalizedEntry = normalizeQuickSendUsageEntry(entry);
+      if (!normalizedEntry) {
+        continue;
+      }
+      const command = visibleByLookupKey.get(normalizedEntry.lookupKey);
+      if (!command) {
+        continue;
+      }
+      ranked.push({
+        command,
+        count: normalizedEntry.count,
+        lastUsedAt: normalizedEntry.lastUsedAt
+      });
+    }
+    ranked.sort((left, right) => {
+      if (left.count !== right.count) {
+        return right.count - left.count;
+      }
+      if (left.lastUsedAt !== right.lastUsedAt) {
+        return right.lastUsedAt - left.lastUsedAt;
+      }
+      return compareCustomCommandRecords(left.command, right.command);
+    });
+    return ranked.slice(0, limit).map((entry) => ({ ...entry, command: normalizeCustomCommandRecord(entry.command) }));
   }
 
   async function sendCustomCommand(sessionOrId, lookupKey) {
@@ -324,9 +245,9 @@ export function createSessionQuickSendRuntimeController(options = {}) {
       const payload = normalizeCustomCommandPayloadForShell(rendered.text);
       await sendInputWithConfiguredTerminator(apiSendInput, session.id, payload, getSessionSendTerminator(session.id), {
         normalizeMode: normalizeSendTerminatorMode,
-        delayedSubmitMs
+        delayedSubmitMs,
+        apiRequestOptions: buildCustomCommandUsageApiOptions(command)
       });
-      recordCustomCommandUsage(session.id, command, { usedAt: submittedAt });
       recordCommandSubmission(session.id, {
         source: "custom-command",
         commandName: command.name,
@@ -422,8 +343,8 @@ export function createSessionQuickSendRuntimeController(options = {}) {
 
     const duplicateNames = new Set();
     const names = new Map();
-    for (const entry of topCommands) {
-      const name = normalizeText(entry?.command?.name).toLowerCase();
+    for (const rankedEntry of topCommands) {
+      const name = normalizeText(rankedEntry?.command?.name).toLowerCase();
       if (!name) {
         continue;
       }
@@ -474,18 +395,12 @@ export function createSessionQuickSendRuntimeController(options = {}) {
     }
   }
 
-  function snapshot() {
-    return cloneQuickSendUsageState(usageBySession);
-  }
-
   return {
-    syncSessions,
-    recordCustomCommandUsage,
+    buildCustomCommandUsageApiOptions,
     listTopCustomCommands,
     sendCustomCommand,
     sendClipboard,
     renderSessionQuickSend,
-    snapshot,
     dispose() {}
   };
 }

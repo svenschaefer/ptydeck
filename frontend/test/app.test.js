@@ -3226,7 +3226,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/blockcmd s-1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line 1\nline 2\n" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], {
+    sessionId: "s-1",
+    data: "line 1\nline 2\n",
+    customCommandUsage: { lookupKey: "project::blockcmd" }
+  });
 
   fixture.elements.commandInput.value = '@s-1 /settings apply {"sendTerminator":"cr"}';
   fixture.elements.sendCommand.click();
@@ -3238,7 +3242,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/blockcmd s-1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line 1\nline 2\r" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], {
+    sessionId: "s-1",
+    data: "line 1\nline 2\r",
+    customCommandUsage: { lookupKey: "project::blockcmd" }
+  });
 
   const unresolvedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@does-not-exist echo routed";

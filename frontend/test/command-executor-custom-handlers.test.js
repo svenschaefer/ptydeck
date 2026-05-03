@@ -34,7 +34,7 @@ function createHandlers(overrides = {}) {
     getSessionSendTerminator: overrides.getSessionSendTerminator || (() => "CRLF"),
     normalizeSendTerminatorMode: overrides.normalizeSendTerminatorMode || ((value) => String(value || "").toLowerCase()),
     delayedSubmitMs: overrides.delayedSubmitMs,
-    recordCustomCommandUsage: overrides.recordCustomCommandUsage || (() => false),
+    buildCustomCommandUsageApiOptions: overrides.buildCustomCommandUsageApiOptions || (() => undefined),
     recordCommandSubmission: overrides.recordCommandSubmission || (() => null),
     normalizeCustomCommandPayloadForShell: overrides.normalizeCustomCommandPayloadForShell || ((value) => `${value}\n`),
     formatSessionToken: overrides.formatSessionToken || ((id) => String(id || "")),
@@ -92,10 +92,19 @@ test("custom command handlers dispatch rendered payloads, honor selector routing
       };
     },
     sendInputWithConfiguredTerminator: async (_sendInput, sessionId, payload, terminator, runtimeOptions) => {
-      calls.push(["send", sessionId, payload, terminator, runtimeOptions.normalizeMode("CRLF"), runtimeOptions.delayedSubmitMs]);
+      calls.push([
+        "send",
+        sessionId,
+        payload,
+        terminator,
+        runtimeOptions.normalizeMode("CRLF"),
+        runtimeOptions.delayedSubmitMs,
+        runtimeOptions.apiRequestOptions
+      ]);
     },
-    recordCustomCommandUsage: (sessionId, command, runtimeOptions) => {
-      calls.push(["usage", sessionId, command.name, command.scope, Number.isFinite(runtimeOptions.usedAt)]);
+    buildCustomCommandUsageApiOptions: (command) => {
+      calls.push(["usage-options", command.name, command.scope]);
+      return { customCommandUsage: { lookupKey: `${command.scope}::${command.name}` } };
     },
     recordCommandSubmission: (sessionId, submission) => {
       calls.push(["record", sessionId, submission.source, submission.commandName, submission.label, submission.text, Number.isFinite(submission.submittedAt)]);
@@ -115,11 +124,11 @@ test("custom command handlers dispatch rendered payloads, honor selector routing
   assert.equal(feedback, "Executed /deploy on 2 sessions.");
   assert.deepEqual(calls, [
     ["render", "deploy", null, ["s1", "s2"], {}, 1, 1, 2],
-    ["send", "s1", "echo one\n", "CRLF", "crlf", 25],
-    ["send", "s2", "echo two\n", "CRLF", "crlf", 25],
-    ["usage", "s1", "deploy", "project", true],
+    ["usage-options", "deploy", "project"],
+    ["send", "s1", "echo one\n", "CRLF", "crlf", 25, { customCommandUsage: { lookupKey: "project::deploy" } }],
+    ["usage-options", "deploy", "project"],
+    ["send", "s2", "echo two\n", "CRLF", "crlf", 25, { customCommandUsage: { lookupKey: "project::deploy" } }],
     ["record", "s1", "custom-command", "deploy", "/deploy", "echo one\n", true],
-    ["usage", "s2", "deploy", "project", true],
     ["record", "s2", "custom-command", "deploy", "/deploy", "echo two\n", true]
   ]);
 });
@@ -136,8 +145,9 @@ test("custom command handlers fail closed on blocked targets and invalid templat
     sendInputWithConfiguredTerminator: async () => {
       calls.push(["send"]);
     },
-    recordCustomCommandUsage: () => {
-      calls.push(["usage"]);
+    buildCustomCommandUsageApiOptions: () => {
+      calls.push(["usage-options"]);
+      return undefined;
     },
     recordCommandSubmission: () => {
       calls.push(["record"]);

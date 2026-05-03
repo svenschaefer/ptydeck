@@ -15,6 +15,7 @@ import {
   reduceSessionActivityClear
 } from "./session-activity-state.js";
 import { normalizeSessionAppIdentity } from "./session-app-identity.js";
+import { cloneQuickSendUsageEntries, pruneQuickSendUsageEntries } from "./session-quick-send-usage.js";
 
 const DEFAULT_CONNECTION_STATE = "connecting";
 const DEFAULT_DECK_ID = "default";
@@ -116,6 +117,7 @@ function cloneSessionRecord(session) {
         : session.inactiveThemeProfile,
     appIdentity: normalizeSessionAppIdentity(session.appIdentity),
     tags: Array.isArray(session.tags) ? session.tags.slice() : session.tags,
+    quickSendUsage: cloneQuickSendUsageEntries(session.quickSendUsage),
     meta: session.meta && typeof session.meta === "object" ? { ...session.meta } : session.meta,
     pluginBadges: Array.isArray(session.pluginBadges) ? session.pluginBadges.map((badge) => ({ ...badge })) : [],
     artifacts: Array.isArray(session.artifacts)
@@ -384,7 +386,8 @@ function withSessionActivityDefaults(session) {
       : [],
     appIdentity: normalizeSessionAppIdentity(session.appIdentity),
     meta: normalizeSessionMeta(session.meta),
-    tags: normalizeSessionTags(session.tags)
+    tags: normalizeSessionTags(session.tags),
+    quickSendUsage: pruneQuickSendUsageEntries(session.quickSendUsage)
   };
   normalizedSession.lifecycleState = deriveSessionLifecycleState(normalizedSession.state, normalizedSession);
   return normalizedSession;

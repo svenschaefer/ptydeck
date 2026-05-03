@@ -26,5 +26,5 @@ Completed work belongs in `CHANGELOG.md`.
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
 - `BE` ownership role (active): deliver `QLT-260`, `QLT-261`, and `QLT-262`.
 - `FE` ownership role (active): deliver `QLT-263`, `QLT-264`, and `QLT-265`.
-- `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
+- `PLAT` ownership role is currently inactive.

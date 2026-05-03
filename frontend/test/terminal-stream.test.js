@@ -62,6 +62,44 @@ test("sendInputWithConfiguredTerminator submits only the delayed CR when cr_dela
   assert.deepEqual(writes, [{ sessionId: "s1", payload: "\r" }]);
 });
 
+test("sendInputWithConfiguredTerminator forwards optional API request metadata on both direct and delayed-submit paths", async () => {
+  const writes = [];
+  await sendInputWithConfiguredTerminator(
+    async (sessionId, payload, requestOptions) => {
+      writes.push({ sessionId, payload, requestOptions });
+    },
+    "s1",
+    "deploy\n",
+    "cr_delay",
+    {
+      normalizeMode: (mode) => mode,
+      delayedSubmitMs: 0,
+      apiRequestOptions: {
+        customCommandUsage: {
+          lookupKey: "project::deploy"
+        }
+      }
+    }
+  );
+
+  assert.deepEqual(writes, [
+    {
+      sessionId: "s1",
+      payload: "deploy",
+      requestOptions: {
+        customCommandUsage: {
+          lookupKey: "project::deploy"
+        }
+      }
+    },
+    {
+      sessionId: "s1",
+      payload: "\r",
+      requestOptions: undefined
+    }
+  ]);
+});
+
 test("normalizeCustomCommandPayloadForShell escapes only unmatched single quotes", () => {
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'unterminated"), "echo \\'unterminated");
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'ok'"), "echo 'ok'");

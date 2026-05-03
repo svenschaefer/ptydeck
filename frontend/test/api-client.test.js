@@ -555,6 +555,30 @@ test("api client calls input endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/input");
   assert.equal(calls[0].options.method, "POST");
   assert.equal(calls[0].options.headers["content-type"], "application/json");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { data: "pwd\n" });
+});
+
+test("api client forwards optional custom-command usage metadata on input requests", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return { ok: true, status: 204, json: async () => ({}) };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.sendInput("abc", "pwd\n", {
+    customCommandUsage: {
+      lookupKey: "project::deploy"
+    }
+  });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    data: "pwd\n",
+    customCommandUsage: {
+      lookupKey: "project::deploy"
+    }
+  });
 });
 
 test("api client surfaces backend ErrorResponse on non-2xx", async () => {

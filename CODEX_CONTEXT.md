@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-02 (`v0.4.0-H163` promoted; fresh repo-wide quality evidence captured; quick-send overlay UX refined)
+Last updated: 2026-05-03 (`v0.4.0-H164` completed; quick-send authority moved server-side; `v0.4.0-H163` returned as the active quality wave)
 
 ## Current Product Truth
 
@@ -142,15 +142,14 @@ The source-of-truth documents now mean:
 
 Large stack-replacement evaluations are not part of the current or deferred project outlook. Future work should extend the existing runtime shape in place unless `SAS` explicitly reopens that direction.
 
-## Session Quick Send Favorites Baseline
+## Session Quick Send Favorites Current Contract
 
-On 2026-05-01, `v0.4.0-H161` completed as a frontend-local operator-UX feature wave for per-session quick-send favorites.
+`v0.4.0-H161` introduced the hover-local operator UX for per-session quick-send favorites on 2026-05-01. `v0.4.0-H164` then replaced the temporary browser-local authority with the intended backend-authoritative session model on 2026-05-03.
 
-Delivered contract:
+Current contract:
 
-- The feature tracks custom-command usage per terminal session, keyed by `sessionId` plus the existing custom-command `lookupKey`.
-- The browser-local persistence key is `ptydeck.session-quick-send-usage.v1`.
-- Ranking should prefer highest total send count first and use recency only as a deterministic tie-breaker.
+- The feature tracks custom-command usage per terminal session, keyed by the backend session id plus the existing custom-command `lookupKey`.
+- Ranking remains highest total send count first, with recency only as the deterministic tie-breaker.
 - The visible UI target is a subtle session-card hover surface, not a new persistent control pane or settings panel.
 - The hover surface should still read as an intentional feature, not as an unlabeled raw button tray:
   - render a compact heading such as `Send to Session`
@@ -168,12 +167,13 @@ Delivered contract:
   - the browser clipboard cannot be read
   - the session is exited or unrestored
   - the runtime is in read-only mode
-- Custom-command usage is recorded both from direct quick-send clicks and from normal slash-command custom-command execution, so the ranking stays aligned with actual operator sends.
-- The quick-send store is now included in the browser rollback snapshot source set handled by `frontend/src/public/startup-backup-runtime-controller.js`.
-- The delivered baseline intentionally stays browser-local and frontend-first:
-  - no backend schema change
-  - no persistence change in `backend/src/persistence.js`
-  - no new REST or WebSocket contract
+- Custom-command usage is recorded both from direct quick-send clicks and from normal slash-command custom-command execution, but only when the send goes through the existing authoritative `POST /api/v1/sessions/{sessionId}/input` path with `customCommandUsage.lookupKey`.
+- The backend persists the resulting `quickSendUsage` array in normal session state, restores it across runtime restarts, and exposes it through the normal session REST/WS contract for authenticated controllers.
+- Read-only share spectators must not receive quick-send ranking data; spectator-facing session payloads now sanitize `quickSendUsage` to `[]`.
+- Browser-local quick-send persistence has been removed:
+  - no `localStorage` authority
+  - no startup-backup quick-send snapshot source
+  - no origin-local quick-send divergence between domain-first and IP-first opens
 - The delivered implementation reuses these existing seams:
   - `frontend/src/public/send-history-runtime-controller.js`
   - `frontend/src/public/command-discovery-ranking.js`
@@ -223,7 +223,7 @@ The validated `H162` closeout hotspot snapshot is:
 - `frontend/src/public/command-executor.js` and `frontend/src/public/app-runtime-composition-controller.js` remain large authority surfaces, but no further follow-up was promoted after `H162`.
 - Transport-only messaging remains intentionally unpromoted; the third messaging attempt is still deferred behind `MSG-201` through `MSG-205` in `TODO-OUTLOOK.md`.
 
-## Repo-Wide Quality Review Follow-Up (`v0.4.0-H163` promoted)
+## Repo-Wide Quality Review Follow-Up (`v0.4.0-H163` active)
 
 On 2026-05-02, a fresh repo-wide review was rerun after the session quick-send overlay UX refinement so the next quality wave is based on the current tree instead of only on the earlier `H162` closeout snapshot.
 
@@ -304,7 +304,7 @@ Any future automatic outbound rebuild must start from these constraints:
 ## Current Planning State
 
 - `TODO.md`: active promoted tasks are `QLT-260` through `QLT-265`.
-- `ROADMAP.md`: active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
+- `ROADMAP.md`: latest completed wave is `v0.4.0-H164`; active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.

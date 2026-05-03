@@ -256,6 +256,18 @@ function isTerminalAppIdentity(value) {
   );
 }
 
+function isQuickSendUsageEntry(value) {
+  return (
+    isObject(value) &&
+    typeof value.lookupKey === "string" &&
+    value.lookupKey.trim().length > 0 &&
+    Number.isInteger(value.count) &&
+    value.count > 0 &&
+    Number.isInteger(value.lastUsedAt) &&
+    value.lastUsedAt >= 0
+  );
+}
+
 function hasDefinedField(body, fieldNames) {
   return fieldNames.some((fieldName) => body[fieldName] !== undefined);
 }
@@ -662,6 +674,14 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (!isObject(body) || typeof body.data !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'data' must be a string.");
+    }
+    if (body.customCommandUsage !== undefined) {
+      if (!isObject(body.customCommandUsage)) {
+        throw new ApiError(400, "ValidationError", "Field 'customCommandUsage' must be an object.");
+      }
+      if (typeof body.customCommandUsage.lookupKey !== "string" || !body.customCommandUsage.lookupKey.trim()) {
+        throw new ApiError(400, "ValidationError", "Field 'customCommandUsage.lookupKey' must be a non-empty string.");
+      }
     }
   }
 
@@ -1226,6 +1246,8 @@ function isSession(value) {
     isInputSafetyProfile(value.inputSafetyProfile) &&
     Array.isArray(value.tags) &&
     value.tags.every((entry) => typeof entry === "string") &&
+    (value.quickSendUsage === undefined ||
+      (Array.isArray(value.quickSendUsage) && value.quickSendUsage.every((entry) => isQuickSendUsageEntry(entry)))) &&
     isSessionControlState(value.controlState) &&
     isThemeProfile(value.activeThemeProfile) &&
     isThemeProfile(value.inactiveThemeProfile) &&

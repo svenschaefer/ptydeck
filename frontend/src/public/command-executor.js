@@ -82,8 +82,10 @@ export function createCommandExecutor(options = {}) {
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator;
   const recordCommandSubmission =
     typeof options.recordCommandSubmission === "function" ? options.recordCommandSubmission : () => null;
-  const recordCustomCommandUsage =
-    typeof options.recordCustomCommandUsage === "function" ? options.recordCustomCommandUsage : () => false;
+  const buildCustomCommandUsageApiOptions =
+    typeof options.buildCustomCommandUsageApiOptions === "function"
+      ? options.buildCustomCommandUsageApiOptions
+      : () => undefined;
   const normalizeCustomCommandPayloadForShell = options.normalizeCustomCommandPayloadForShell;
   const normalizeSessionTags = options.normalizeSessionTags;
   const normalizeThemeProfile = options.normalizeThemeProfile;
@@ -773,7 +775,7 @@ export function createCommandExecutor(options = {}) {
     getSessionSendTerminator,
     normalizeSendTerminatorMode,
     delayedSubmitMs,
-    recordCustomCommandUsage,
+    buildCustomCommandUsageApiOptions,
     recordCommandSubmission,
     normalizeCustomCommandPayloadForShell,
     formatSessionToken,
