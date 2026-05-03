@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, and preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates and seed the SSH draft on missing trust; `v0.4.0-H165` is closed with no active promoted wave)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, and preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates and seed the SSH draft on missing trust; `v0.4.0-H166` is now the active promoted wave for SSH operator-experience polish)
 
 ## Current Product Truth
 
@@ -83,6 +83,11 @@ Current contract:
 - Saved-profile SSH launches and one-shot `/ssh ...` launches both reuse the same frontend trust/secret gates in the connection-profile runtime seam instead of maintaining separate SSH launch contracts.
 - When a one-shot `/ssh ...` launch hits a target with no trusted host key yet, the frontend seeds the `Connections` draft with that attempted SSH launch, auto-probes host keys for the same host/port, and stops with trust guidance so the operator can trust the right key and rerun the same command.
 - The first-connect workflow still requires an explicit host-key trust entry before a saved-profile or one-shot SSH launch succeeds; host-key fetch/review/trust remains a `Manage -> Connections` UI action rather than a slash-command-only path.
+- The active follow-up wave `v0.4.0-H166` is explicitly scoped to the remaining operator-experience gaps in this SSH baseline:
+  - secret-backed one-shot and saved-profile SSH launches still depend on the shared `Connections` runtime-secret field and fall back to `window.prompt` instead of one dedicated masked launch-secret flow
+  - host-key trust lifecycle still stops at a UI-only first-connect handoff instead of a complete command-plane path
+  - host-key rotation is fail-closed technically but still needs an explicit guided replace flow and old/new fingerprint comparison
+  - one-shot `/ssh ...` still exposes a narrower launch contract than saved connection profiles and needs final doc/help alignment once the promoted parity flags land
 
 ## Messaging Files Intentionally Kept
 

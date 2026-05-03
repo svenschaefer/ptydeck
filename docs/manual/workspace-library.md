@@ -22,7 +22,7 @@ Useful slash companions:
 /connection list
 /ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
 /connection draft new ops-ssh
-/connection save
+/connection save ops-ssh
 /connection apply ops-ssh
 ```
 

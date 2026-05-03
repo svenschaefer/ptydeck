@@ -56,7 +56,7 @@
 <pre><code class="language-text">/connection list
 /ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
 /connection draft new ops-ssh
-/connection save
+/connection save ops-ssh
 /connection apply ops-ssh</code></pre>
 
 <p><code>/ssh ...</code> now starts a one-shot SSH session without first saving a connection profile, but the first launch for a new SSH target still depends on a trusted host-key entry. ptydeck fetches the presented host keys and stops if none is trusted yet; the host-key fetch/review/trust step still lives in the <code>Connections</code> UI instead of a slash-command-only workflow.</p>
