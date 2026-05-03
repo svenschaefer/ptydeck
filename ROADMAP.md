@@ -14,25 +14,30 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - none
+  - `v0.4.0-H167` Repo-Wide Quality and Coverage Follow-Up
 - Queued next waves:
   - none
 
 ## Active Wave Order
 
-- none
+- `QLT-266` Owner `BE`
+- `QLT-267` Owner `BE`
+- `QLT-268` Owner `FE`
+- `QLT-269` Owner `FE`
+- `QLT-270` Owner `FE`
+- `QLT-271` Owner `FE`
 
 ## Wave Dependencies
 
-- none
+- `QLT-268 -> QLT-271`
 
 ## Wave Exit Criteria
 
-- secret-backed SSH launches no longer depend on a hidden Connections-form field or `window.prompt`
-- one-shot `/ssh ...` missing-trust handling is available through an explicit command-plane lifecycle instead of a UI-only stop point
-- `Connections` exposes a deliberate first-connect and host-key-rotation flow with explicit trust/replace guidance
-- one-shot `/ssh ...` help, docs, and runtime flags are aligned on the shipped contract
-- focused regression coverage proves secret-backed launch, trust lifecycle, rotation conflict handling, and shipped slash-command contract behavior
+- the next backend authority seam is extracted from `backend/src/runtime.js` and covered with direct deterministic regressions
+- `backend/src/session-manager.js` restart/reconnect/persistence/error-path coverage is tightened and one remaining lifecycle helper seam is isolated
+- the next frontend runtime-composition and command-dispatch seams are extracted from `frontend/src/public/app-runtime-composition-controller.js` and `frontend/src/public/command-executor.js`
+- the remaining SSH operator lifecycle branch gaps in `frontend/src/public/connection-profile-runtime-controller.js` are closed with direct regressions
+- shared runtime-state and session-terminal interaction coverage is tightened across `frontend/src/public/store.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`
 
 ## Sequencing Rules
 
