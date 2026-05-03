@@ -241,6 +241,121 @@ test("telegram transport fails closed on malformed API responses and normalizes 
   assert.deepEqual(JSON.parse(requests[1].options.body), { chat_id: "-1001", name: "ptydeck" });
 });
 
+test("telegram transport normalizes optional payload fields and default polling semantics deterministically", async () => {
+  const requests = [];
+  const transport = createTelegramTransport({
+    botToken: "bot-token",
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, options });
+      if (url.endsWith("/getUpdates")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, result: null };
+          }
+        };
+      }
+      if (url.endsWith("/createForumTopic")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, result: { message_thread_id: 71 } };
+          }
+        };
+      }
+      if (url.endsWith("/editForumTopic")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, result: true };
+          }
+        };
+      }
+      if (url.endsWith("/answerCallbackQuery") || url.endsWith("/setMyCommands")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, result: true };
+          }
+        };
+      }
+      return {
+        ok: true,
+        async json() {
+          return { ok: true, result: {} };
+        }
+      };
+    }
+  });
+
+  const sent = await transport.sendMessage({
+    chatId: "1001",
+    messageThreadId: 9,
+    text: "hello",
+    replyMarkup: { inline_keyboard: [[]] }
+  });
+  const edited = await transport.editMessage({
+    chatId: "1001",
+    messageId: 41,
+    messageThreadId: 9,
+    text: "updated",
+    replyMarkup: { remove_keyboard: true }
+  });
+  const updates = await transport.getUpdates({ timeoutSeconds: "bad", limit: 0, allowedUpdates: [] });
+  await transport.answerCallbackQuery({ callbackQueryId: "cb-2" });
+  const created = await transport.createForumTopic({
+    chatId: "-1001",
+    name: "   ",
+    iconColor: 0x123456,
+    iconCustomEmojiId: " emoji "
+  });
+  const editedTopic = await transport.editForumTopic({
+    chatId: "-1001",
+    messageThreadId: 7,
+    iconCustomEmojiId: ""
+  });
+  const synced = await transport.setMyCommands({
+    commands: [{ command: " DOCU ", description: "  Custom command  " }]
+  });
+
+  assert.equal(sent.messageId, null);
+  assert.equal(edited.messageId, 41);
+  assert.deepEqual(updates, []);
+  assert.equal(created.messageThreadId, 71);
+  assert.equal(created.name, "ptydeck");
+  assert.equal(editedTopic.ok, true);
+  assert.equal(synced, true);
+  assert.deepEqual(JSON.parse(requests[0].options.body), {
+    chat_id: "1001",
+    message_thread_id: 9,
+    text: "hello",
+    reply_markup: { inline_keyboard: [[]] }
+  });
+  assert.deepEqual(JSON.parse(requests[1].options.body), {
+    chat_id: "1001",
+    message_id: 41,
+    message_thread_id: 9,
+    text: "updated",
+    reply_markup: { remove_keyboard: true }
+  });
+  assert.deepEqual(JSON.parse(requests[2].options.body), { timeout: 3 });
+  assert.deepEqual(JSON.parse(requests[3].options.body), { callback_query_id: "cb-2" });
+  assert.deepEqual(JSON.parse(requests[4].options.body), {
+    chat_id: "-1001",
+    name: "ptydeck",
+    icon_color: 0x123456,
+    icon_custom_emoji_id: "emoji"
+  });
+  assert.deepEqual(JSON.parse(requests[5].options.body), {
+    chat_id: "-1001",
+    message_thread_id: 7,
+    icon_custom_emoji_id: ""
+  });
+  assert.deepEqual(JSON.parse(requests[6].options.body), {
+    commands: [{ command: "docu", description: "Custom command" }]
+  });
+});
+
 test("telegram adapter syncs published commands and uses the synced catalog for inbound parsing", async () => {
   const commandSyncCalls = [];
   const inboundCalls = [];
@@ -432,6 +547,82 @@ test("telegram adapter records non-text inbound observations without dispatching
     assert.equal(status.inboundTrace.recent.length >= 1, true);
     assert.equal(status.inboundTrace.recent.at(-1).reason, "non_text_message");
     assert.equal(status.inboundTrace.recent.at(-1).phase, "ignored");
+  } finally {
+    await adapter.stop();
+  }
+});
+
+test("telegram adapter routes double-slash literals as input and ignores unsupported callback payloads", async () => {
+  let served = false;
+  const inboundCalls = [];
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      },
+      async getUpdates({ timeoutSeconds }) {
+        if (timeoutSeconds === 0) {
+          return [];
+        }
+        if (!served) {
+          served = true;
+          return [
+            {
+              update_id: 51,
+              callback_query: {
+                id: "cb-51",
+                data: "ptydeck:replay:bad selector",
+                from: { id: 42, username: "sven" },
+                message: {
+                  chat: { id: -100200300, type: "supergroup", title: "ptydeck" }
+                }
+              }
+            },
+            {
+              update_id: 52,
+              message: {
+                chat: { id: -100200300, type: "supergroup", title: "ptydeck" },
+                from: { id: 42, username: "sven" },
+                text: "//status"
+              }
+            }
+          ];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand(command) {
+      inboundCalls.push(command);
+      return { ok: true, text: "literal input" };
+    }
+  });
+
+  try {
+    await waitFor(() => inboundCalls.length >= 1, 1500);
+    assert.equal(inboundCalls[0].command.action, "input");
+    assert.equal(inboundCalls[0].text, "/status");
+    const status = adapter.getStatus();
+    assert.equal(status.inboundObservedTotal >= 2, true);
+    assert.equal(status.inboundHandledTotal, 1);
+    assert.equal(
+      status.inboundTrace.recent.some((entry) => entry.reason === "unsupported_callback" && entry.phase === "ignored"),
+      true
+    );
   } finally {
     await adapter.stop();
   }

@@ -247,6 +247,62 @@ test("messaging runtime normalization helpers fail closed on malformed targets a
   );
 });
 
+test("messaging runtime helpers cover empty payloads, invalid discord targets, and attention creation branches", () => {
+  assert.equal(normalizeMessagingInboundInputPayload(42), "");
+  assert.deepEqual(normalizeMessagingTopicBindings("invalid"), []);
+  assert.deepEqual(
+    normalizeMessagingTargets(
+      [
+        {
+          adapterId: "discord",
+          channelId: "ops-room",
+          webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token"
+        }
+      ],
+      { includeAdapterId: true }
+    ),
+    []
+  );
+  assert.deepEqual(
+    applyMessagingMessagePolicy(
+      { threadKey: "attention", text: "failed", severity: "error" },
+      {}
+    ),
+    { action: "new", messageKey: "attention", reason: "attention_new" }
+  );
+  assert.deepEqual(
+    applyMessagingMessagePolicy(
+      { threadKey: "status", text: "summary", comparableText: "summary", deliveryBlockKey: "block-1" },
+      { messageCreated: true, lastComparableText: "summary", lastDeliveryBlockKey: "block-1" }
+    ),
+    { action: "suppress", messageKey: "status", reason: "duplicate_signature" }
+  );
+});
+
+test("transport-only messaging runtime stays fail-closed when no adapter mapping is configured", async () => {
+  const runtime = createMessagingRuntime({
+    logDebug() {}
+  });
+
+  const session = createSession({ id: "s-none", name: "no-target" });
+  assert.equal(await runtime.ensureSessionTarget(session, { traceId: "none-1", correlationId: "none-1" }), null);
+
+  await runtime.start();
+  try {
+    runtime.prepareForRuntimeStart();
+    await runtime.observeSessionActivityStarted({ sessionId: session.id, trace: { traceId: "started-1", correlationId: "started-1" } });
+    runtime.markRuntimeReady();
+
+    const status = runtime.buildStatusSummary();
+    assert.equal(status.enabled, false);
+    assert.equal(status.deliveryEnabled, false);
+    assert.equal(status.adapters.length, 2);
+    assert.equal(status.trace.recent.some((entry) => entry.type === "session.activity.started"), true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("transport-only messaging runtime reports adapter status and captures session traces", async () => {
   const telegram = createTelegramTransportStub();
   const runtime = createMessagingRuntime({

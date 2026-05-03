@@ -78,3 +78,41 @@ test("telegram command catalog enforces publish limits and records overflow dete
   assert.deepEqual(catalog.publishedCommands, [{ command: "alpha", description: "project custom command; plain; /alpha" }]);
   assert.deepEqual(catalog.skippedCommands, [{ name: "beta", reason: "telegram_command_limit" }]);
 });
+
+test("telegram command catalog preserves scoped template descriptions and digit-prefixed names deterministically", () => {
+  const catalog = buildTelegramCommandCatalog({
+    customCommands: [
+      { name: "deploy", content: "echo {{param:env}}\n", scope: "project", kind: "template", templateVariables: [] },
+      { name: "deploy", content: "echo {{param:env}}\n", scope: "session", sessionId: "s-1", kind: "template", templateVariables: [] },
+      { name: "99", content: "echo 99\n", scope: "global", kind: "plain" }
+    ]
+  });
+
+  assert.equal(resolveTelegramCommandCatalogEntry(catalog, "deploy")?.description, "scoped custom command; template; /deploy");
+  assert.equal(resolveTelegramCommandCatalogEntry(catalog, "c_99")?.customCommandName, "99");
+});
+
+test("telegram command catalog normalization trims entries, preserves non-custom actions, and truncates descriptions", () => {
+  const catalog = normalizeTelegramCommandCatalog({
+    entries: [
+      {
+        telegramCommand: " DOCU ",
+        action: " CUSTOM ",
+        customCommandName: " DocU ",
+        description: ` ${"x".repeat(300)} `
+      },
+      {
+        telegramCommand: "status",
+        action: "status",
+        description: "  Status command  "
+      }
+    ]
+  });
+
+  assert.equal(catalog.entries.length, 2);
+  assert.equal(catalog.entries[0].telegramCommand, "docu");
+  assert.equal(catalog.entries[0].customCommandName, "docu");
+  assert.equal(catalog.entries[0].description.length, 256);
+  assert.equal(catalog.entries[1].action, "status");
+  assert.equal(resolveTelegramCommandCatalogEntry(catalog, "DOCU")?.telegramCommand, "docu");
+});

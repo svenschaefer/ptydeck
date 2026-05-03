@@ -14,15 +14,16 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Latest completed wave in this segment:
+  - `v0.4.0-H163` Repo-Wide Quality and Coverage Follow-Up
   - `v0.4.0-H164` Server-Authoritative Session Quick-Send Favorites
 - Active wave:
-  - `v0.4.0-H163` Repo-Wide Quality and Coverage Follow-Up
+  - none
 - Queued next waves:
   - none
 
 ## Active Wave Order
 
-1. `QLT-261` Owner `BE`: harden the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
+1. none
 
 ## Wave Dependencies
 
@@ -30,9 +31,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Exit Criteria
 
-- all `QLT-261` is implemented and validated
-- validated root, backend, and frontend coverage lanes still pass `npm run test:coverage:check`
-- `TODO.md` and `ROADMAP.md` continue to reflect the explicit split between open tasks and sequencing state
+- no active wave is currently promoted
 
 ## Sequencing Rules
 

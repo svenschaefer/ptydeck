@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildDeliveryEventFromMessageIntent,
+  buildFallbackSessionLabel,
   createDefaultMessageIntentDecision,
+  normalizeLineBreaks,
+  truncateDisplayText,
   truncateMiddleNormalizedText,
   truncateStructuredMessageText
 } from "../src/delivery-adapter-utils.js";
@@ -64,6 +67,40 @@ test("delivery adapter utils build structured delivery events and default decisi
     reason: "message_intent_default"
   });
   assert.deepEqual(createDefaultMessageIntentDecision(event, { messageCreated: true }), {
+    action: "update",
+    messageKey: "status",
+    reason: "message_intent_default"
+  });
+});
+
+test("delivery adapter utils normalize labels and degenerate truncation branches deterministically", () => {
+  assert.equal(normalizeLineBreaks("\r\nalpha\r\nbeta \r\n"), "alpha\nbeta");
+  assert.equal(truncateStructuredMessageText("alpha", 1), "…");
+  assert.equal(truncateStructuredMessageText(" \n\t ", 5), "");
+  assert.equal(truncateDisplayText(" alpha   beta gamma ", 5), "al…ma");
+  assert.equal(buildFallbackSessionLabel({ quickIdToken: "7", shell: "bash" }), "[7] bash");
+  assert.equal(buildFallbackSessionLabel({ id: "session-9" }), "session-9");
+});
+
+test("delivery adapter utils derive fallback delivery metadata without a session label", () => {
+  const intent = createMessageIntent({
+    intentKind: "attention-notice",
+    text: "alpha beta gamma"
+  });
+
+  const event = buildDeliveryEventFromMessageIntent(intent, {
+    formatSessionLabel: () => "",
+    maxEventSummaryLength: 1,
+    nowFn: () => 456
+  });
+
+  assert.equal(event.occurredAt, 456);
+  assert.equal(event.summary, "…");
+  assert.equal(event.text, "…");
+  assert.equal(event.deliverySignal, "attention-notice");
+  assert.equal(event.aggregationReason, "attention-notice");
+  assert.equal(event.deliveryBlockKey, "status");
+  assert.deepEqual(createDefaultMessageIntentDecision(event, { messageId: 42 }), {
     action: "update",
     messageKey: "status",
     reason: "message_intent_default"

@@ -129,3 +129,48 @@ test("terminal messaging core normalizes descriptor and intent payload metadata 
   assert.deepEqual(intent.routing, Object.freeze({ deliveryBlockKey: "block-4", active: true, retryCount: 1 }));
   assert.deepEqual(intent.metadata, Object.freeze({ actor: "operator", muted: false, attempts: 3 }));
 });
+
+test("terminal messaging core rejects missing descriptor identities and falls back for invalid optional containers", () => {
+  assert.throws(() => createDeliveryAdapterDescriptor({ adapterId: "", channel: "telegram" }), /requires adapterId and channel/);
+  assert.throws(() => createDeliveryAdapterDescriptor({ adapterId: "telegram", channel: "" }), /requires adapterId and channel/);
+
+  const deliveryAdapter = createDeliveryAdapterDescriptor({
+    adapterId: " telegram ",
+    channel: " ops-room ",
+    capabilities: "invalid",
+    metadata: ["invalid"]
+  });
+
+  assert.deepEqual(deliveryAdapter, {
+    entityType: "DeliveryAdapter",
+    adapterId: "telegram",
+    channel: "ops-room",
+    capabilities: Object.freeze([]),
+    metadata: Object.freeze({})
+  });
+});
+
+test("terminal messaging core applies default intent fields when optional metadata is malformed or blank", () => {
+  const intent = createMessageIntent({
+    sessionId: " session-5 ",
+    intentKind: " ",
+    eventType: "",
+    severity: "",
+    threadKey: " ",
+    text: "  Multi   word  summary  ",
+    format: "",
+    comparableText: "",
+    routing: null,
+    metadata: null
+  });
+
+  assert.equal(intent.sessionId, "session-5");
+  assert.equal(intent.intentKind, "status-update");
+  assert.equal(intent.eventType, "session.output.summary");
+  assert.equal(intent.severity, "info");
+  assert.equal(intent.threadKey, "status");
+  assert.equal(intent.format, "plain_text");
+  assert.equal(intent.comparableText, "multi word summary");
+  assert.deepEqual(intent.routing, Object.freeze({}));
+  assert.deepEqual(intent.metadata, Object.freeze({}));
+});

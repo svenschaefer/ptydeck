@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (`QLT-260`, `QLT-262`, `QLT-263`, `QLT-264`, and `QLT-265` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
+Last updated: 2026-05-03 (`QLT-261` completed; `v0.4.0-H163` is now closed and no active wave is currently promoted)
 
 ## Current Product Truth
 
@@ -223,17 +223,17 @@ The validated `H162` closeout hotspot snapshot is:
 - `frontend/src/public/command-executor.js` and `frontend/src/public/app-runtime-composition-controller.js` remain large authority surfaces, but no further follow-up was promoted after `H162`.
 - Transport-only messaging remains intentionally unpromoted; the third messaging attempt is still deferred behind `MSG-201` through `MSG-205` in `TODO-OUTLOOK.md`.
 
-## Repo-Wide Quality Review Follow-Up (`v0.4.0-H163` active)
+## Repo-Wide Quality Review Follow-Up (`v0.4.0-H163` completed)
 
-On 2026-05-02, a fresh repo-wide review was rerun after the session quick-send overlay UX refinement so the next quality wave is based on the current tree instead of only on the earlier `H162` closeout snapshot.
+On 2026-05-02, a fresh repo-wide review was rerun after the session quick-send overlay UX refinement so the next quality wave was based on the current tree instead of only on the earlier `H162` closeout snapshot. On 2026-05-03, the last promoted backend messaging slice (`QLT-261`) was completed and `H163` was fully closed.
 
-Validated top-line coverage on the current `H163` active tree:
+Validated top-line coverage on the `H163` closeout tree:
 
 - root tooling: `92.82%` line / `77.09%` branch
-- backend: `95.25%` line / `88.66%` branch
+- backend: `95.35%` line / `89.17%` branch
 - frontend: `96.93%` line / `89.65%` branch
 
-Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
+Most relevant hotspots that were promoted into `TODO.md` / `ROADMAP.md` for this wave:
 
 - `backend/src/runtime.js`: `6444` lines, `80.49%` line / `71.72%` branch
 - `backend/src/ssh-host-key-probe.js`: `247` lines, `89.88%` line / `89.01%` branch
@@ -281,7 +281,23 @@ Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 
 Remaining promoted `H163` tasks:
 
-- `QLT-261` hardens the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
+- none; `H163` is fully closed.
+
+`QLT-261` is now complete. The shipped transport-only messaging baseline has materially tighter direct regression coverage without widening the product surface:
+
+- `backend/test/delivery-adapter-utils.test.js` now covers fallback session labels plus degenerate truncation and metadata fallback branches.
+- `backend/test/terminal-messaging-core.test.js` now covers missing descriptor identities, malformed optional containers, and default intent-field fallback behavior.
+- `backend/test/telegram-command-surface.test.js` now covers scoped template descriptions, digit-prefixed names, normalization trimming, and description truncation.
+- `backend/test/discord-adapter.test.js` now covers fetch prerequisites, webhook normalization variants, status-only API fallbacks, and fail-closed disabled/invalid-intent/suppressed/unmapped branches.
+- `backend/test/messaging-runtime.test.js` now covers empty payloads, invalid Discord targets, attention creation helpers, and fail-closed runtime behavior when no adapter mapping is configured.
+- `backend/test/telegram-adapter.test.js` now covers optional payload normalization, default polling semantics, double-slash literal input routing, and ignored unsupported callback payloads.
+- The focused hotspot snapshot after the task is:
+  - `backend/src/delivery-adapter-utils.js`: `98.51%` line / `78.57%` branch
+  - `backend/src/terminal-messaging-core.js`: `98.17%` line / `97.67%` branch
+  - `backend/src/telegram-command-surface.js`: `93.03%` line / `84.00%` branch
+  - `backend/src/discord-adapter.js`: `96.04%` line / `70.18%` branch
+  - `backend/src/messaging-runtime.js`: `92.14%` line / `80.69%` branch
+  - `backend/src/telegram-adapter.js`: `91.22%` line / `82.97%` branch
 
 Not promoted from the fresh review:
 
@@ -330,8 +346,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: the active promoted task is `QLT-261`.
-- `ROADMAP.md`: latest completed wave is `v0.4.0-H164`; active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
+- `TODO.md`: no active promoted task is currently open.
+- `ROADMAP.md`: latest completed wave is `v0.4.0-H163`; no active wave and no queued next wave are currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.

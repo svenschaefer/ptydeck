@@ -370,3 +370,117 @@ test("discord adapter validates targets, falls back from edit to send, and recor
   assert.equal(status.targetTrace.recent[0].outcome, "target_invalid");
   assert.equal(status.targetTrace.recent[1].outcome, "target_validated");
 });
+
+test("discord transport validates fetch prerequisites, normalizes webhook variants, and falls back on status-only API errors", async () => {
+  assert.throws(() => createDiscordTransport({ fetchImpl: null }), /requires a fetch implementation/);
+
+  const requests = [];
+  const transport = createDiscordTransport({
+    apiBaseUrl: "https://discord.example.test/custom",
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, options });
+      return {
+        ok: true,
+        async json() {
+          return {};
+        }
+      };
+    }
+  });
+
+  const sent = await transport.sendMessage({
+    webhookUrl: "https://discord.example.test/api/webhooks/123/token",
+    threadId: 44,
+    text: "hello"
+  });
+
+  assert.equal(sent.messageId, "");
+  assert.equal(
+    requests[0].url,
+    "https://discord.example.test/api/webhooks/123/token?wait=true&thread_id=44"
+  );
+
+  await assert.rejects(
+    () =>
+      transport.editMessage({
+        webhookUrl: "https://discord.example.test/api/webhooks/123/token",
+        text: "updated"
+      }),
+    /valid webhookUrl and messageId/
+  );
+
+  const failingTransport = createDiscordTransport({
+    apiBaseUrl: "https://discord.example.test/api/v10",
+    fetchImpl: async () => ({
+      ok: false,
+      status: 502,
+      async json() {
+        throw new Error("invalid json");
+      }
+    })
+  });
+
+  await assert.rejects(
+    () =>
+      failingTransport.sendMessage({
+        webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+        text: "hello"
+      }),
+    /status 502/
+  );
+});
+
+test("discord adapter handles disabled, invalid-intent, suppressed, empty, and unmapped branches deterministically", async () => {
+  const disabled = createDiscordAdapter();
+  const disabledTarget = await disabled.ensureTarget({ channelId: "ops-room", webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token" });
+  assert.equal(disabledTarget.ok, false);
+  assert.equal(disabledTarget.reason, "disabled");
+
+  const adapter = createDiscordAdapter({
+    configured: true,
+    deliveryEnabled: true,
+    configuredTargets: 0,
+    transport: {
+      async sendMessage() {
+        throw new Error("send should not run");
+      },
+      async editMessage() {
+        throw new Error("edit should not run");
+      }
+    }
+  });
+
+  const validTarget = {
+    channelId: "ops-room",
+    chatId: "ops-room",
+    threadId: 77,
+    messageThreadId: 77,
+    webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token"
+  };
+
+  const invalidIntent = await adapter.handleMessageIntent({ target: validTarget, intent: null });
+  const suppressed = await adapter.handleEvent({
+    target: validTarget,
+    text: "ignored",
+    decision: { action: "suppress", messageKey: "status", reason: "duplicate_signature" }
+  });
+  const empty = await adapter.handleEvent({
+    target: validTarget,
+    text: "   ",
+    decision: { action: "new", messageKey: "status", reason: "status_new" }
+  });
+  const unmapped = await adapter.handleEvent({
+    target: { channelId: "ops-room" },
+    text: "hello",
+    decision: { action: "new", messageKey: "status", reason: "status_new" }
+  });
+
+  assert.equal(invalidIntent.reason, "invalid_intent");
+  assert.equal(suppressed.reason, "suppressed");
+  assert.equal(empty.reason, "empty");
+  assert.equal(unmapped.reason, "unmapped");
+  assert.equal(
+    adapter.renderMetricLines().includes('ptydeck_messaging_adapter_configured_targets{adapter="discord"} 0'),
+    true
+  );
+});
