@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`, delegate session REST routing out of `backend/src/runtime.js` into `backend/src/runtime-session-dispatch.js`, isolate restart payload shaping from `backend/src/session-manager.js` into `backend/src/session-manager-lifecycle.js`, extract trusted-local handoff/layout composition out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-trusted-local-composition.js`, extract SSH trust/launch lifecycle authority out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-ssh-lifecycle.js`, extract `/settings` command dispatch out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-settings-handlers.js`, and tighten direct runtime-state/session-terminal coverage across `frontend/src/public/store.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`; `v0.4.0-H167` is now fully closed)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`, delegate session REST routing out of `backend/src/runtime.js` into `backend/src/runtime-session-dispatch.js`, isolate restart payload shaping from `backend/src/session-manager.js` into `backend/src/session-manager-lifecycle.js`, extract trusted-local handoff/layout composition out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-trusted-local-composition.js`, extract SSH trust/launch lifecycle authority out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-ssh-lifecycle.js`, extract `/settings` command dispatch out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-settings-handlers.js`, and tighten direct runtime-state/session-terminal coverage across `frontend/src/public/store.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`; fresh review evidence now promotes `v0.4.0-H168` for the remaining backend runtime/session-manager and frontend composition/command/profile/store/terminal monolith hotspots)
 
 ## Current Product Truth
 
@@ -381,6 +381,41 @@ Not promoted from the fresh review:
 - `scripts/lib/coverage-report.mjs` (`91.69%` line / `85.22%` branch) and `scripts/scaffold-ui-module.mjs` (`97.66%` line / `84.38%` branch) remain above the current root threshold and were not promoted into a near-term tooling wave.
 - The transport-only messaging baseline was not promoted again in this pass because its critical coverage hotspots were already addressed in `H163`, while the deferred third-attempt messaging chain remains parked in `TODO-OUTLOOK.md`.
 
+## Repo-Wide Quality Review Follow-Up (`v0.4.0-H168` active)
+
+On 2026-05-03, a fresh repo-wide quality and coverage review was rerun after the `H167` closeout so the next wave is based on the current tree instead of the just-closed hotspot snapshot alone.
+
+Validated top-line coverage on the review tree:
+
+- root tooling: `92.82%` line / `77.09%` branch
+- backend: `95.42%` line / `89.35%` branch
+- frontend: `97.02%` line / `89.59%` branch
+
+Relevant hotspots promoted into `TODO.md` / `ROADMAP.md`:
+
+- `backend/src/runtime.js`: `6136` lines, `79.50%` line / `70.08%` branch
+- `backend/src/session-manager.js`: `2037` lines, `96.12%` line / `79.08%` branch
+- `frontend/src/public/app-runtime-composition-controller.js`: `1863` lines, `88.89%` line / `70.00%` branch
+- `frontend/src/public/command-executor.js`: `1236` lines, `86.57%` line / `75.78%` branch
+- `frontend/src/public/connection-profile-runtime-controller.js`: `1695` lines, `95.16%` line / `76.10%` branch
+- `frontend/src/public/store.js`: `1193` lines, `93.38%` line / `80.85%` branch
+- `frontend/src/public/ui/session-terminal-runtime-controller.js`: `824` lines, `90.66%` line / `83.57%` branch
+
+Promoted `H168` tasks:
+
+- `QLT-272` Owner `BE`: extract the next HTTP/startup/runtime-authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
+- `QLT-273` Owner `BE`: isolate one more restart/reconnect/persistence lifecycle helper seam from `backend/src/session-manager.js` and harden the remaining manager branch gaps.
+- `QLT-274` Owner `FE`: extract the next bootstrap/handoff/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
+- `QLT-275` Owner `FE`: extract the next operator command/discovery seam from `frontend/src/public/command-executor.js` and add direct deterministic regressions for the extracted path.
+- `QLT-276` Owner `FE`: isolate the next SSH/profile/workspace operator seam from `frontend/src/public/connection-profile-runtime-controller.js` and close the remaining branch gaps with direct regressions.
+- `QLT-277` Owner `FE`: harden shared runtime-state and terminal-interaction coverage across `frontend/src/public/store.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js`.
+
+Not promoted from the fresh review:
+
+- `scripts/analyze-pty-write-eintr.mjs` (`77.17%` line / `43.48%` branch) and `scripts/analyze-startup-timeline.mjs` (`80.77%` line / `49.09%` branch) remain intentionally unpromoted because they are retained diagnostics, not live product/runtime authority paths.
+- `scripts/lib/coverage-report.mjs` (`91.69%` line / `85.22%` branch) and `scripts/scaffold-ui-module.mjs` (`97.66%` line / `84.38%` branch) remain above the current root threshold and were not promoted into a near-term tooling wave.
+- The transport-only messaging baseline was not promoted again in this pass because the current quality pressure is concentrated in the backend and frontend monolith seams above, while the third-attempt messaging chain remains deferred in `TODO-OUTLOOK.md`.
+
 ## Documentation Cleanup Baseline
 
 The 2026-04-23 documentation cleanup established these current rules:
@@ -421,8 +456,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active promoted task is currently open.
-- `ROADMAP.md`: no active wave and no queued next wave are currently promoted.
+- `TODO.md`: active promoted tasks are `QLT-272` through `QLT-277`.
+- `ROADMAP.md`: active wave is `v0.4.0-H168`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
