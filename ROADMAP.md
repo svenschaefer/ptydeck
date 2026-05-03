@@ -24,15 +24,12 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Active Wave Order
 
-1. `SSH-311` Owner `FE`: slash-command SSH host-key lifecycle management and missing-trust command-plane recovery
-2. `SSH-312` Owner `FE`: first-connect and host-key-rotation UX polish in `Connections`
-3. `SSH-313` Owner `FE`: one-shot `/ssh ...` launch parity and shipped doc/help alignment
-4. `SSH-314` Owner `QA`: regression coverage for the promoted SSH operator-experience contract
+1. `SSH-312` Owner `FE`: first-connect and host-key-rotation UX polish in `Connections`
+2. `SSH-313` Owner `FE`: one-shot `/ssh ...` launch parity and shipped doc/help alignment
+3. `SSH-314` Owner `QA`: regression coverage for the promoted SSH operator-experience contract
 
 ## Wave Dependencies
 
-- `SSH-311 -> SSH-312`
-- `SSH-311 -> SSH-314`
 - `SSH-312 -> SSH-314`
 - `SSH-313 -> SSH-314`
 

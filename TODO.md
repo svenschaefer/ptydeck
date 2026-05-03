@@ -14,7 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `SSH-311` Owner `FE`: Add explicit slash-command host-key lifecycle management for SSH targets (`probe`, `list`, `trust`, `delete`) and route missing-trust one-shot `/ssh ...` failures into that command-plane workflow instead of a UI-only dead end.
 - [ ] `SSH-312` Owner `FE`: Polish the `Connections` SSH trust UX for first-connect and host-key rotation, including a surfaced trust section, explicit old/new fingerprint comparison, and a guided replace flow for `409 SshHostKeyTrustConflict`.
 - [ ] `SSH-313` Owner `FE`: Expand one-shot `/ssh ...` launch parity with essential launch flags for deck, start directory, and startup command, then align README/manual/generated command help with the actual shipped contract.
 - [ ] `SSH-314` Owner `QA`: Add focused regression coverage for secret-backed one-shot SSH launches, command-plane host-key trust lifecycle, host-key rotation conflict handling, and the expanded `/ssh ...` command/help/documentation contract.

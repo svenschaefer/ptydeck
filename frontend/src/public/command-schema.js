@@ -501,21 +501,46 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     insertText: "ssh",
     label: "/ssh",
     kind: "command",
-    description: "start a one-shot SSH session without first saving a connection profile",
+    description: "start one-shot SSH sessions and manage SSH host-key trust",
     example: "/ssh ops@example.com --key ~/.ssh/id_ed25519",
-    summary: "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive",
+    summary:
+      "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]",
     usage: [
       "/ssh <target>",
       "/ssh <target> --key <path>",
       "/ssh <target> --password",
       "/ssh <target> --keyboard-interactive",
-      "/ssh <target> [-l|--user <username>] [-p|--port <port>]"
+      "/ssh <target> [-l|--user <username>] [-p|--port <port>]",
+      "/ssh hostkey list [target]",
+      "/ssh hostkey probe <target>",
+      "/ssh hostkey trust <target> [keyType|fingerprint]",
+      "/ssh hostkey delete <target> [keyType|fingerprint]"
     ],
     notes: [
       "Target syntax is `[user@]host[:port]`. You can override the parsed username or port with `-l` / `--user` and `-p` / `--port`.",
       "Private-key auth is the default. Use `-i` / `--key <path>` to pin an explicit key path, `--password` for password auth, or `--keyboard-interactive` for keyboard-interactive auth.",
-      "If no trusted SSH host key exists for the target, ptydeck fetches the presented host keys and stops. Trust the matching key in `Manage -> Connections`, then rerun the `/ssh ...` command."
-    ]
+      "If no trusted SSH host key exists for the target, use `/ssh hostkey probe <target>` to fetch the presented keys, verify the fingerprint, then `/ssh hostkey trust <target> <keyType|fingerprint>` before rerunning `/ssh ...`."
+    ],
+    subcommands: {
+      hostkey: {
+        insertText: "hostkey",
+        label: "/ssh hostkey",
+        kind: "subcommand",
+        description: "manage SSH host-key trust for one-shot and saved SSH targets",
+        example: "/ssh hostkey probe carpo.uberspace.de:22",
+        key: "slash:ssh:hostkey",
+        usage: [
+          "/ssh hostkey list [target]",
+          "/ssh hostkey probe <target>",
+          "/ssh hostkey trust <target> [keyType|fingerprint]",
+          "/ssh hostkey delete <target> [keyType|fingerprint]"
+        ],
+        notes: [
+          "The target syntax matches `/ssh`: `[user@]host[:port]`. Username is ignored for trust storage; trust is keyed by host, port, and host-key type.",
+          "Run `/ssh hostkey probe <target>` first. If multiple fetched or trusted keys exist for the target, specify one by key type or fingerprint."
+        ]
+      }
+    }
   }),
   replay: freezeCommandDefinition({
     key: "slash:replay",

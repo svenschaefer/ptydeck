@@ -136,6 +136,14 @@ export function createCommandExecutor(options = {}) {
   const applyLayoutProfile = typeof options.applyLayoutProfile === "function" ? options.applyLayoutProfile : async () => "";
   const applyConnectionProfile = typeof options.applyConnectionProfile === "function" ? options.applyConnectionProfile : async () => "";
   const launchConnectionLaunch = typeof options.launchConnectionLaunch === "function" ? options.launchConnectionLaunch : async () => "";
+  const listSshTrustEntriesForTarget =
+    typeof options.listSshTrustEntriesForTarget === "function" ? options.listSshTrustEntriesForTarget : async () => [];
+  const probeSshHostKeysForTarget =
+    typeof options.probeSshHostKeysForTarget === "function" ? options.probeSshHostKeysForTarget : async () => ({ target: null, candidates: [], feedback: "" });
+  const saveSshTrustEntryForTarget =
+    typeof options.saveSshTrustEntryForTarget === "function" ? options.saveSshTrustEntryForTarget : async () => ({ target: null, entry: null, feedback: "" });
+  const deleteSshTrustEntryForTarget =
+    typeof options.deleteSshTrustEntryForTarget === "function" ? options.deleteSshTrustEntryForTarget : async () => ({ target: null, entry: null, feedback: "" });
   const renameLayoutProfile = typeof options.renameLayoutProfile === "function" ? options.renameLayoutProfile : async () => "";
   const renameConnectionProfile = typeof options.renameConnectionProfile === "function" ? options.renameConnectionProfile : async () => "";
   const duplicateConnectionProfile =
@@ -718,6 +726,10 @@ export function createCommandExecutor(options = {}) {
     resetConnectionProfileDraft,
     applyConnectionProfile,
     launchConnectionLaunch,
+    listSshTrustEntriesForTarget,
+    probeSshHostKeysForTarget,
+    saveSshTrustEntryForTarget,
+    deleteSshTrustEntryForTarget,
     duplicateConnectionProfile,
     renameConnectionProfile,
     deleteConnectionProfile,

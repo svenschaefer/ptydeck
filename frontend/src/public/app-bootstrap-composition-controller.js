@@ -263,6 +263,13 @@ export function createAppBootstrapCompositionController(options = {}) {
       applyConnectionProfile: (profileId) => connectionProfileRuntimeController?.applyProfileById?.(profileId) || "",
       launchConnectionLaunch: (launch, launchOptions) =>
         connectionProfileRuntimeController?.launchConnectionLaunch?.(launch, launchOptions) || "",
+      listSshTrustEntriesForTarget: (target) => connectionProfileRuntimeController?.listSshTrustEntriesForTarget?.(target) || [],
+      probeSshHostKeysForTarget: (target, runtimeOptions) =>
+        connectionProfileRuntimeController?.probeSshHostKeysForTarget?.(target, runtimeOptions) || { target: null, candidates: [], feedback: "" },
+      saveSshTrustEntryForTarget: (target, selectorText, runtimeOptions) =>
+        connectionProfileRuntimeController?.saveTrustEntryForTarget?.(target, selectorText, runtimeOptions) || { target: null, entry: null, feedback: "" },
+      deleteSshTrustEntryForTarget: (target, selectorText, runtimeOptions) =>
+        connectionProfileRuntimeController?.deleteTrustEntryForTarget?.(target, selectorText, runtimeOptions) || { target: null, entry: null, feedback: "" },
       renameLayoutProfile: (profileId, name) => layoutProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
       renameConnectionProfile: (profileId, name) => connectionProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
       duplicateConnectionProfile: (profileId, name) => connectionProfileRuntimeController?.duplicateProfileById?.(profileId, name) || "",

@@ -528,7 +528,7 @@
 
 <h2 id="ssh">/ssh</h2>
 
-<p>start a one-shot SSH session without first saving a connection profile</p>
+<p>start one-shot SSH sessions and manage SSH host-key trust</p>
 
 <h3 id="usage-22">Usage</h3>
 
@@ -538,6 +538,10 @@
 <li><code>/ssh &lt;target&gt; --password</code></li>
 <li><code>/ssh &lt;target&gt; --keyboard-interactive</code></li>
 <li><code>/ssh &lt;target&gt; [-l|--user &lt;username&gt;] [-p|--port &lt;port&gt;]</code></li>
+<li><code>/ssh hostkey list [target]</code></li>
+<li><code>/ssh hostkey probe &lt;target&gt;</code></li>
+<li><code>/ssh hostkey trust &lt;target&gt; [keyType|fingerprint]</code></li>
+<li><code>/ssh hostkey delete &lt;target&gt; [keyType|fingerprint]</code></li>
 </ul>
 
 <h3 id="notes-9">Notes</h3>
@@ -545,8 +549,17 @@
 <ul>
 <li>Target syntax is <code>[user@]host[:port]</code>. You can override the parsed username or port with <code>-l</code> / <code>--user</code> and <code>-p</code> / <code>--port</code>.</li>
 <li>Private-key auth is the default. Use <code>-i</code> / <code>--key &lt;path&gt;</code> to pin an explicit key path, <code>--password</code> for password auth, or <code>--keyboard-interactive</code> for keyboard-interactive auth.</li>
-<li>If no trusted SSH host key exists for the target, ptydeck fetches the presented host keys and stops. Trust the matching key in <code>Manage -&gt; Connections</code>, then rerun the <code>/ssh ...</code> command.</li>
+<li>If no trusted SSH host key exists for the target, use <code>/ssh hostkey probe &lt;target&gt;</code> to fetch the presented keys, verify the fingerprint, then <code>/ssh hostkey trust &lt;target&gt; &lt;keyType|fingerprint&gt;</code> before rerunning <code>/ssh ...</code>.</li>
 </ul>
+
+<h3 id="subcommands-9">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+
+</tbody>
+</table>
 
 <h2 id="swap">/swap</h2>
 
@@ -594,7 +607,7 @@
 <li>Use <code>@&lt;sessionSelector&gt; /transfer upload [path]</code> or <code>@&lt;sessionSelector&gt; /transfer download &lt;path&gt;</code> to route file transfer to another session without switching.</li>
 </ul>
 
-<h3 id="subcommands-9">Subcommands</h3>
+<h3 id="subcommands-10">Subcommands</h3>
 
 <table>
 <thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
@@ -626,7 +639,7 @@
 <li><code>/workspace group clear</code></li>
 </ul>
 
-<h3 id="subcommands-10">Subcommands</h3>
+<h3 id="subcommands-11">Subcommands</h3>
 
 <table>
 <thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
@@ -719,6 +732,7 @@
 <li><a class="handbook-page-toc-link" href="#ssh">/ssh</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-22">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#notes-9">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-9">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#swap">/swap</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-23">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-9">Aliases</a></li>
@@ -728,10 +742,10 @@
 <li><a class="handbook-page-toc-link" href="#transfer">/transfer</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-25">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#notes-10">Notes</a></li>
-<li><a class="handbook-page-toc-link" href="#subcommands-9">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-10">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#workspace">/workspace</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-26">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#subcommands-10">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-11">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#help-topics">Help Topics</a></li>
 </ul>
       </aside>

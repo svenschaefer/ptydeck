@@ -79,6 +79,11 @@ export function formatSshTargetSpec(target) {
   return `${username ? `${username}@` : ""}${host}:${port}`;
 }
 
+function formatSshHostKeyRecord(record, { includeTarget = false } = {}) {
+  const targetPrefix = includeTarget ? `${formatSshTargetSpec(record)} ` : "";
+  return `${targetPrefix}${record.keyType} · ${record.fingerprintSha256}`;
+}
+
 export function parseSshCommandArgs(args = [], options = {}) {
   const defaultPort = Number.isInteger(options.defaultPort) ? options.defaultPort : 22;
   const tokens = Array.isArray(args) ? args : [];
@@ -290,6 +295,14 @@ export function createCommandExecutorDomainHandlers(options = {}) {
     typeof options.applyConnectionProfile === "function" ? options.applyConnectionProfile : async () => "";
   const launchConnectionLaunch =
     typeof options.launchConnectionLaunch === "function" ? options.launchConnectionLaunch : async () => "";
+  const listSshTrustEntriesForTarget =
+    typeof options.listSshTrustEntriesForTarget === "function" ? options.listSshTrustEntriesForTarget : async () => [];
+  const probeSshHostKeysForTarget =
+    typeof options.probeSshHostKeysForTarget === "function" ? options.probeSshHostKeysForTarget : async () => ({ target: null, candidates: [], feedback: "" });
+  const saveSshTrustEntryForTarget =
+    typeof options.saveSshTrustEntryForTarget === "function" ? options.saveSshTrustEntryForTarget : async () => ({ target: null, entry: null, feedback: "" });
+  const deleteSshTrustEntryForTarget =
+    typeof options.deleteSshTrustEntryForTarget === "function" ? options.deleteSshTrustEntryForTarget : async () => ({ target: null, entry: null, feedback: "" });
   const duplicateConnectionProfile =
     typeof options.duplicateConnectionProfile === "function" ? options.duplicateConnectionProfile : async () => "";
   const renameConnectionProfile =
@@ -563,6 +576,10 @@ export function createCommandExecutorDomainHandlers(options = {}) {
 
   async function executeSshCommand(context = {}) {
     const args = Array.isArray(context.args) ? context.args : [];
+    const subcommand = normalizeKeyword(args[0]);
+    if (subcommand === "hostkey") {
+      return executeSshHostKeyCommand({ ...context, args: args.slice(1) });
+    }
     const parsed = parseSshCommandArgs(args);
     if (!parsed.ok) {
       return parsed.usage ? formatUsage("ssh") : parsed.error;
@@ -583,6 +600,97 @@ export function createCommandExecutorDomainHandlers(options = {}) {
       name: `SSH ${formatSshTargetSpec(parsed.value)}`,
       seedDraftOnMissingTrust: true
     });
+  }
+
+  async function executeSshHostKeyCommand(context = {}) {
+    const args = Array.isArray(context.args) ? context.args : [];
+    const action = normalizeKeyword(args[0]);
+    const rest = args.slice(1);
+    const parseTarget = (token) => {
+      const parsed = parseSshTargetToken(token);
+      if (parsed.error) {
+        return { target: null, error: parsed.error };
+      }
+      return {
+        target: {
+          host: parsed.host,
+          port: parsed.port
+        },
+        error: ""
+      };
+    };
+
+    if (!action || action === "list") {
+      if (rest.length > 1) {
+        return formatUsage("ssh", "hostkey");
+      }
+      if (rest.length === 0) {
+        const entries = await listSshTrustEntriesForTarget(null);
+        if (!Array.isArray(entries) || entries.length === 0) {
+          return "No trusted SSH host keys available.";
+        }
+        return ["Trusted SSH host keys:"].concat(entries.map((entry) => `- ${formatSshHostKeyRecord(entry, { includeTarget: true })}`)).join("\n");
+      }
+      const parsedTarget = parseTarget(rest[0]);
+      if (parsedTarget.error) {
+        return parsedTarget.error;
+      }
+      const entries = await listSshTrustEntriesForTarget(parsedTarget.target);
+      if (!Array.isArray(entries) || entries.length === 0) {
+        return `No trusted SSH host keys stored for ${formatSshTargetSpec(parsedTarget.target)}.`;
+      }
+      return [`Trusted SSH host keys for ${formatSshTargetSpec(parsedTarget.target)}:`]
+        .concat(entries.map((entry) => `- ${formatSshHostKeyRecord(entry)}`))
+        .join("\n");
+    }
+
+    if (action === "probe") {
+      if (rest.length !== 1) {
+        return formatUsage("ssh", "hostkey");
+      }
+      const parsedTarget = parseTarget(rest[0]);
+      if (parsedTarget.error) {
+        return parsedTarget.error;
+      }
+      const result = await probeSshHostKeysForTarget(parsedTarget.target, { silent: true });
+      const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+      if (candidates.length === 0) {
+        return `No SSH host keys were returned for ${formatSshTargetSpec(parsedTarget.target)}.`;
+      }
+      return [
+        `Fetched ${candidates.length} SSH host key(s) for ${formatSshTargetSpec(parsedTarget.target)}:`,
+        ...candidates.map((candidate) => `- ${formatSshHostKeyRecord(candidate)}`),
+        `Trust one with \`/ssh hostkey trust ${formatSshTargetSpec(parsedTarget.target)} <keyType|fingerprint>\`.`
+      ].join("\n");
+    }
+
+    if (action === "trust") {
+      if (rest.length < 1 || rest.length > 2) {
+        return formatUsage("ssh", "hostkey");
+      }
+      const parsedTarget = parseTarget(rest[0]);
+      if (parsedTarget.error) {
+        return parsedTarget.error;
+      }
+      const selector = normalizeText(rest[1]);
+      const result = await saveSshTrustEntryForTarget(parsedTarget.target, selector, { silent: true });
+      return result?.feedback || `Trusted SSH host key for ${formatSshTargetSpec(parsedTarget.target)}.`;
+    }
+
+    if (action === "delete") {
+      if (rest.length < 1 || rest.length > 2) {
+        return formatUsage("ssh", "hostkey");
+      }
+      const parsedTarget = parseTarget(rest[0]);
+      if (parsedTarget.error) {
+        return parsedTarget.error;
+      }
+      const selector = normalizeText(rest[1]);
+      const result = await deleteSshTrustEntryForTarget(parsedTarget.target, selector, { silent: true });
+      return result?.feedback || `Deleted trusted SSH host key for ${formatSshTargetSpec(parsedTarget.target)}.`;
+    }
+
+    return formatUsage("ssh", "hostkey");
   }
 
   async function executeWorkspaceCommand(context = {}) {
@@ -814,6 +922,7 @@ export function createCommandExecutorDomainHandlers(options = {}) {
     executeLayoutCommand,
     executeConnectionCommand,
     executeSshCommand,
+    executeSshHostKeyCommand,
     executeWorkspaceCommand,
     executeBroadcastCommand,
     executeShareCommand

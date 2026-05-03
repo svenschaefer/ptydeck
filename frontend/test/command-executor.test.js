@@ -63,6 +63,10 @@ function createExecutor(overrides = {}) {
     resolveWorkspacePreset: overrides.resolveWorkspacePreset || (() => ({ preset: null, error: "Unknown workspace preset." })),
     createWorkspacePresetFromCurrent: overrides.createWorkspacePresetFromCurrent || (async () => ""),
     launchConnectionLaunch: overrides.launchConnectionLaunch || (async () => ""),
+    listSshTrustEntriesForTarget: overrides.listSshTrustEntriesForTarget || (async () => []),
+    probeSshHostKeysForTarget: overrides.probeSshHostKeysForTarget || (async () => ({ target: null, candidates: [], feedback: "" })),
+    saveSshTrustEntryForTarget: overrides.saveSshTrustEntryForTarget || (async () => ({ target: null, entry: null, feedback: "" })),
+    deleteSshTrustEntryForTarget: overrides.deleteSshTrustEntryForTarget || (async () => ({ target: null, entry: null, feedback: "" })),
     applyWorkspacePreset: overrides.applyWorkspacePreset || (async () => ""),
     renameWorkspacePreset: overrides.renameWorkspacePreset || (async () => ""),
     deleteWorkspacePreset: overrides.deleteWorkspacePreset || (async () => ""),
@@ -128,7 +132,7 @@ test("command executor help and usage strings derive from declarative schema met
   const sshUsage = await executor.execute({ command: "ssh", args: [], raw: "/ssh" });
   assert.equal(
     sshUsage,
-    "Usage: /ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>]"
+    "Usage: /ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>] | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]"
   );
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
@@ -187,7 +191,7 @@ test("command executor help and usage strings derive from declarative schema met
 
   const sshHelp = await executor.execute({ command: "help", args: ["ssh"], raw: "/help ssh" });
   assert.match(sshHelp, /Usage: \/ssh <target> \| \/ssh <target> --key <path>/);
-  assert.match(sshHelp, /Manage -> Connections/);
+  assert.match(sshHelp, /\/ssh hostkey probe <target>/);
 
   const customPreviewUsage = await executor.execute({ command: "custom", args: ["preview"], raw: "/custom preview" });
   assert.equal(
@@ -246,6 +250,81 @@ test("command executor routes one-shot ssh launches through the shared connectio
         seedDraftOnMissingTrust: true
       }
     ]
+  ]);
+});
+
+test("command executor routes SSH host-key lifecycle commands through the shared trust seams", async () => {
+  const calls = [];
+  const executor = createExecutor({
+    listSshTrustEntriesForTarget: async (target) => {
+      calls.push(["list", target]);
+      return [
+        {
+          id: "trust-rsa",
+          host: target.host,
+          port: target.port,
+          keyType: "ssh-rsa",
+          fingerprintSha256: "SHA256:rsa"
+        }
+      ];
+    },
+    probeSshHostKeysForTarget: async (target) => {
+      calls.push(["probe", target]);
+      return {
+        target,
+        candidates: [
+          {
+            id: "probe-rsa",
+            host: target.host,
+            port: target.port,
+            keyType: "ssh-rsa",
+            fingerprintSha256: "SHA256:rsa"
+          }
+        ]
+      };
+    },
+    saveSshTrustEntryForTarget: async (target, selector, runtimeOptions) => {
+      calls.push(["trust", target, selector, runtimeOptions]);
+      return {
+        target,
+        feedback: `Trusted SSH host key for ${target.host}:${target.port} (ssh-rsa · SHA256:rsa).`
+      };
+    },
+    deleteSshTrustEntryForTarget: async (target, selector, runtimeOptions) => {
+      calls.push(["delete", target, selector, runtimeOptions]);
+      return {
+        target,
+        feedback: `Deleted trusted SSH host key for ${target.host}:${target.port} (ssh-rsa).`
+      };
+    }
+  });
+
+  assert.equal(
+    await executor.execute({ command: "ssh", args: ["hostkey", "list", "carpo.uberspace.de:22"], raw: "/ssh hostkey list carpo.uberspace.de:22" }),
+    ["Trusted SSH host keys for carpo.uberspace.de:22:", "- ssh-rsa · SHA256:rsa"].join("\n")
+  );
+  assert.equal(
+    await executor.execute({ command: "ssh", args: ["hostkey", "probe", "carpo.uberspace.de:22"], raw: "/ssh hostkey probe carpo.uberspace.de:22" }),
+    [
+      "Fetched 1 SSH host key(s) for carpo.uberspace.de:22:",
+      "- ssh-rsa · SHA256:rsa",
+      "Trust one with `/ssh hostkey trust carpo.uberspace.de:22 <keyType|fingerprint>`."
+    ].join("\n")
+  );
+  assert.equal(
+    await executor.execute({ command: "ssh", args: ["hostkey", "trust", "carpo.uberspace.de:22", "ssh-rsa"], raw: "/ssh hostkey trust carpo.uberspace.de:22 ssh-rsa" }),
+    "Trusted SSH host key for carpo.uberspace.de:22 (ssh-rsa · SHA256:rsa)."
+  );
+  assert.equal(
+    await executor.execute({ command: "ssh", args: ["hostkey", "delete", "carpo.uberspace.de:22", "ssh-rsa"], raw: "/ssh hostkey delete carpo.uberspace.de:22 ssh-rsa" }),
+    "Deleted trusted SSH host key for carpo.uberspace.de:22 (ssh-rsa)."
+  );
+
+  assert.deepEqual(calls, [
+    ["list", { host: "carpo.uberspace.de", port: 22 }],
+    ["probe", { host: "carpo.uberspace.de", port: 22 }],
+    ["trust", { host: "carpo.uberspace.de", port: 22 }, "ssh-rsa", { silent: true }],
+    ["delete", { host: "carpo.uberspace.de", port: 22 }, "ssh-rsa", { silent: true }]
   ]);
 });
 

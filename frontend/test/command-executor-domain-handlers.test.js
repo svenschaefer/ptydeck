@@ -172,6 +172,122 @@ test("command executor domain handlers parse and route one-shot ssh launches det
   ]);
 });
 
+test("command executor domain handlers expose SSH host-key lifecycle commands through extracted seams", async () => {
+  const calls = [];
+  const handlers = createCommandExecutorDomainHandlers({
+    defaultDeckId: "default",
+    formatUsage: (command, subcommand = "") => `usage:${command}:${subcommand}`,
+    listSshTrustEntriesForTarget: async (target) => {
+      calls.push(["list", target]);
+      if (!target) {
+        return [
+          {
+            id: "trust-rsa",
+            host: "carpo.uberspace.de",
+            port: 22,
+            keyType: "ssh-rsa",
+            fingerprintSha256: "SHA256:rsa"
+          }
+        ];
+      }
+      return [
+        {
+          id: "trust-ed25519",
+          host: target.host,
+          port: target.port,
+          keyType: "ssh-ed25519",
+          fingerprintSha256: "SHA256:ed25519"
+        }
+      ];
+    },
+    probeSshHostKeysForTarget: async (target) => {
+      calls.push(["probe", target]);
+      return {
+        target,
+        candidates: [
+          {
+            id: "probe-rsa",
+            host: target.host,
+            port: target.port,
+            keyType: "ssh-rsa",
+            fingerprintSha256: "SHA256:rsa"
+          },
+          {
+            id: "probe-ed25519",
+            host: target.host,
+            port: target.port,
+            keyType: "ssh-ed25519",
+            fingerprintSha256: "SHA256:ed25519"
+          }
+        ]
+      };
+    },
+    saveSshTrustEntryForTarget: async (target, selector, runtimeOptions) => {
+      calls.push(["trust", target, selector, runtimeOptions]);
+      return {
+        target,
+        entry: {
+          id: "trust-rsa",
+          host: target.host,
+          port: target.port,
+          keyType: "ssh-rsa",
+          fingerprintSha256: "SHA256:rsa"
+        },
+        feedback: `Trusted SSH host key for ${target.host}:${target.port} (ssh-rsa · SHA256:rsa).`
+      };
+    },
+    deleteSshTrustEntryForTarget: async (target, selector, runtimeOptions) => {
+      calls.push(["delete", target, selector, runtimeOptions]);
+      return {
+        target,
+        entry: {
+          id: "trust-rsa",
+          host: target.host,
+          port: target.port,
+          keyType: "ssh-rsa",
+          fingerprintSha256: "SHA256:rsa"
+        },
+        feedback: `Deleted trusted SSH host key for ${target.host}:${target.port} (ssh-rsa).`
+      };
+    }
+  });
+
+  assert.equal(
+    await handlers.executeSshCommand({ args: ["hostkey", "list"] }),
+    ["Trusted SSH host keys:", "- carpo.uberspace.de:22 ssh-rsa · SHA256:rsa"].join("\n")
+  );
+  assert.equal(
+    await handlers.executeSshCommand({ args: ["hostkey", "list", "carpo.uberspace.de:22"] }),
+    ["Trusted SSH host keys for carpo.uberspace.de:22:", "- ssh-ed25519 · SHA256:ed25519"].join("\n")
+  );
+  assert.equal(
+    await handlers.executeSshCommand({ args: ["hostkey", "probe", "carpo.uberspace.de:22"] }),
+    [
+      "Fetched 2 SSH host key(s) for carpo.uberspace.de:22:",
+      "- ssh-rsa · SHA256:rsa",
+      "- ssh-ed25519 · SHA256:ed25519",
+      "Trust one with `/ssh hostkey trust carpo.uberspace.de:22 <keyType|fingerprint>`."
+    ].join("\n")
+  );
+  assert.equal(
+    await handlers.executeSshCommand({ args: ["hostkey", "trust", "carpo.uberspace.de:22", "ssh-rsa"] }),
+    "Trusted SSH host key for carpo.uberspace.de:22 (ssh-rsa · SHA256:rsa)."
+  );
+  assert.equal(
+    await handlers.executeSshCommand({ args: ["hostkey", "delete", "carpo.uberspace.de:22", "ssh-rsa"] }),
+    "Deleted trusted SSH host key for carpo.uberspace.de:22 (ssh-rsa)."
+  );
+  assert.equal(await handlers.executeSshCommand({ args: ["hostkey", "probe"] }), "usage:ssh:hostkey");
+
+  assert.deepEqual(calls, [
+    ["list", null],
+    ["list", { host: "carpo.uberspace.de", port: 22 }],
+    ["probe", { host: "carpo.uberspace.de", port: 22 }],
+    ["trust", { host: "carpo.uberspace.de", port: 22 }, "ssh-rsa", { silent: true }],
+    ["delete", { host: "carpo.uberspace.de", port: 22 }, "ssh-rsa", { silent: true }]
+  ]);
+});
+
 test("command executor domain handlers manage workspace and broadcast paths through extracted seams", async () => {
   const calls = [];
   const handlers = createCommandExecutorDomainHandlers({

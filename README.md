@@ -154,7 +154,15 @@ Start a one-shot SSH session without first saving a profile:
 /ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
 ```
 
-The first launch for a new SSH target still requires a trusted host key through `Manage -> Connections`.
+The first launch for a new SSH target still requires a trusted host key. You can manage it either through `/ssh hostkey ...` or in `Manage -> Connections`.
+You can now manage that trust lifecycle directly in the command plane:
+
+```text
+/ssh hostkey probe carpo.uberspace.de:22
+/ssh hostkey trust carpo.uberspace.de:22 ssh-ed25519
+/ssh hostkey list carpo.uberspace.de:22
+```
+
 When you use `/ssh ... --password` or `/ssh ... --keyboard-interactive`, ptydeck now asks for the runtime secret in one masked launch dialog right before start instead of relying on an inline Connections form field.
 
 Edit session settings through typed slash commands:

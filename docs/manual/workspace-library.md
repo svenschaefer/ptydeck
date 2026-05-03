@@ -21,12 +21,14 @@ Useful slash companions:
 ```text
 /connection list
 /ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
+/ssh hostkey probe carpo.uberspace.de:22
+/ssh hostkey trust carpo.uberspace.de:22 ssh-ed25519
 /connection draft new ops-ssh
 /connection save ops-ssh
 /connection apply ops-ssh
 ```
 
-`/ssh ...` now starts a one-shot SSH session without first saving a connection profile, but the first launch for a new SSH target still depends on a trusted host-key entry. ptydeck fetches the presented host keys and stops if none is trusted yet; the host-key fetch/review/trust step still lives in the `Connections` UI instead of a slash-command-only workflow.
+`/ssh ...` now starts a one-shot SSH session without first saving a connection profile, and the SSH host-key lifecycle is also available in the command plane. Use `/ssh hostkey probe <target>` to fetch the presented keys, verify the fingerprint, then `/ssh hostkey trust <target> <keyType|fingerprint>` before rerunning `/ssh ...`. The `Connections` UI still shows the same trust state for saved-profile workflows.
 
 For password or keyboard-interactive SSH auth, both saved-profile launches and one-shot `/ssh ...` launches now request the runtime secret in one masked launch dialog right before start. The secret is not stored in the saved profile, browser state, or backend persistence.
 

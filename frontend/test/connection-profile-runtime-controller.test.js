@@ -991,6 +991,7 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
 
   const firstLaunchFeedback = await controller.applyProfileById("ops-guided").catch((error) => error.message);
   assert.match(firstLaunchFeedback, /No trusted host key is stored/);
+  assert.match(firstLaunchFeedback, /\/ssh hostkey trust ops-new\.example:22 <keyType\|fingerprint>/);
   assert.deepEqual(calls.find((entry) => entry[0] === "probe-trust")?.[1], {
     host: "ops-new.example",
     port: 22
@@ -1081,26 +1082,28 @@ test("connection profile runtime controller seeds the SSH draft when a one-shot 
     defaultThemeProfile: createThemeProfile("#090909")
   });
 
-  await assert.rejects(
-    () =>
-      controller.launchConnectionLaunch(
-        {
-          kind: "ssh",
-          deckId: "ops",
-          shell: "ssh",
-          startCwd: "~",
-          startCommand: "",
-          env: {},
-          tags: [],
-          activeThemeProfile: createThemeProfile("#111111"),
-          inactiveThemeProfile: createThemeProfile("#121212"),
-          remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
-          remoteAuth: { method: "privateKey", privateKeyPath: "~/.ssh/id_ed25519" }
-        },
-        { name: "SSH ixpqtwnk@carpo.uberspace.de:22", seedDraftOnMissingTrust: true }
-      ),
-    /No trusted host key is stored for carpo\.uberspace\.de:22/
-  );
+  const missingTrustMessage = await controller
+    .launchConnectionLaunch(
+      {
+        kind: "ssh",
+        deckId: "ops",
+        shell: "ssh",
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: [],
+        activeThemeProfile: createThemeProfile("#111111"),
+        inactiveThemeProfile: createThemeProfile("#121212"),
+        remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
+        remoteAuth: { method: "privateKey", privateKeyPath: "~/.ssh/id_ed25519" }
+      },
+      { name: "SSH ixpqtwnk@carpo.uberspace.de:22", seedDraftOnMissingTrust: true }
+    )
+    .then(() => "")
+    .catch((error) => error.message);
+
+  assert.match(missingTrustMessage, /No trusted host key is stored for carpo\.uberspace\.de:22/);
+  assert.match(missingTrustMessage, /\/ssh hostkey trust carpo\.uberspace\.de:22 <keyType\|fingerprint>/);
 
   assert.deepEqual(calls.filter((entry) => entry[0] === "probe-trust"), [
     ["probe-trust", { host: "carpo.uberspace.de", port: 22 }]
@@ -1109,6 +1112,107 @@ test("connection profile runtime controller seeds the SSH draft when a one-shot 
   assert.equal(ui.draftNameInputEl.value, "SSH ixpqtwnk@carpo.uberspace.de:22");
   assert.equal(controller.getDraftState()?.launch?.remoteConnection?.host, "carpo.uberspace.de");
   assert.equal(ui.sshTrustFingerprintInputEl.value, "SHA256:created");
+});
+
+test("connection profile runtime controller exposes target-based SSH host-key list, probe, trust, and delete flows", async () => {
+  const calls = [];
+  const ui = createConnectionProfileUiRefs();
+  const trustEntries = [
+    {
+      id: "trust-ed25519",
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-ed25519",
+      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+      fingerprintSha256: "SHA256:existing"
+    },
+    {
+      id: "trust-rsa",
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCexisting",
+      fingerprintSha256: "SHA256:rsa"
+    }
+  ];
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async listSshTrustEntries() {
+        calls.push(["list-trust"]);
+        return trustEntries.slice();
+      },
+      async probeSshHostKeys(payload) {
+        calls.push(["probe-trust", payload]);
+        return [
+          {
+            host: payload.host,
+            port: payload.port,
+            keyType: "ssh-rsa",
+            publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCnew",
+            fingerprintSha256: "SHA256:new-rsa"
+          }
+        ];
+      },
+      async createSshTrustEntry(payload) {
+        calls.push(["create-trust", payload]);
+        const created = {
+          id: "trust-new-rsa",
+          host: payload.host,
+          port: payload.port,
+          keyType: payload.keyType,
+          publicKey: payload.publicKey,
+          fingerprintSha256: "SHA256:new-rsa"
+        };
+        trustEntries.push(created);
+        return created;
+      },
+      async deleteSshTrustEntry(entryId) {
+        calls.push(["delete-trust", entryId]);
+        const index = trustEntries.findIndex((entry) => entry.id === entryId);
+        if (index >= 0) {
+          trustEntries.splice(index, 1);
+        }
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  assert.equal((await controller.listSshTrustEntriesForTarget({ host: "carpo.uberspace.de", port: 22 })).length, 2);
+
+  const probeResult = await controller.probeSshHostKeysForTarget({ host: "carpo.uberspace.de", port: 22 }, { silent: true });
+  assert.equal(probeResult.candidates.length, 1);
+  assert.equal(probeResult.candidates[0].fingerprintSha256, "SHA256:new-rsa");
+
+  const trustResult = await controller.saveTrustEntryForTarget({ host: "carpo.uberspace.de", port: 22 }, "ssh-rsa", { silent: true });
+  assert.match(trustResult.feedback, /Trusted SSH host key for carpo\.uberspace\.de:22/);
+
+  const deleteResult = await controller.deleteTrustEntryForTarget({ host: "carpo.uberspace.de", port: 22 }, "SHA256:rsa", {
+    silent: true
+  });
+  assert.match(deleteResult.feedback, /Deleted trusted SSH host key for carpo\.uberspace\.de:22 \(ssh-rsa\)\./);
+
+  await assert.rejects(
+    () => controller.deleteTrustEntryForTarget({ host: "carpo.uberspace.de", port: 22 }, "", { silent: true }),
+    /Multiple trusted SSH host keys are stored/
+  );
+
+  assert.deepEqual(calls, [
+    ["list-trust"],
+    ["probe-trust", { host: "carpo.uberspace.de", port: 22 }],
+    ["create-trust", {
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCnew"
+    }],
+    ["list-trust"],
+    ["list-trust"],
+    ["delete-trust", "trust-rsa"],
+    ["list-trust"],
+    ["list-trust"]
+  ]);
 });
 
 test("connection profile runtime controller rejects malformed SSH trust create payloads deterministically", async () => {
