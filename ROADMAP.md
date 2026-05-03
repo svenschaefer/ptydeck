@@ -14,17 +14,9 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H167` Repo-Wide Quality and Coverage Follow-Up
+  - none
 - Queued next waves:
   - none
-
-## Active Wave Order
-
-- `QLT-269` Owner `FE`
-
-## Wave Exit Criteria
-
-- the next frontend command-dispatch seam is extracted from `frontend/src/public/command-executor.js`
 
 ## Sequencing Rules
 
