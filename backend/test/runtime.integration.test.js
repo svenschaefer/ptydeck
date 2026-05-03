@@ -5928,7 +5928,7 @@ test("ssh trust entries persist, render managed known_hosts, and reject conflict
     const knownHostsRaw = await readFile(knownHostsPath, "utf8");
     assert.equal(
       knownHostsRaw,
-      "[example.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM\n"
+      "[example.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=\n"
     );
 
     const reuseRes = await fetch(`${baseUrlA}/ssh-trust-entries`, {
@@ -6146,11 +6146,12 @@ test("runtime restore normalizes invalid persisted ssh trust entries before rend
     assert.equal(entries[0].host, "example.internal");
     assert.equal(entries[0].port, 22);
     assert.equal(entries[0].keyType, "ssh-ed25519");
+    assert.equal(entries[0].publicKey, "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=");
 
     const knownHostsRaw = await readFile(knownHostsPath, "utf8");
     assert.equal(
       knownHostsRaw,
-      "example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM\n"
+      "example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=\n"
     );
   } finally {
     await runtime.stop();
@@ -6473,7 +6474,7 @@ test("runtime exposes ssh-host-key-probe through the backend contract", async ()
         host: "example.internal",
         port: 2222,
         keyType: "ssh-ed25519",
-        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=",
         fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
       }
     ]);

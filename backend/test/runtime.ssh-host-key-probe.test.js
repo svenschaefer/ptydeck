@@ -25,7 +25,7 @@ test("parseSshKeyscanOutput normalizes and deduplicates fetched host keys", () =
       host: "example.internal",
       port: 2222,
       keyType: "ssh-ed25519",
-      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=",
       fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
     },
     {
@@ -57,7 +57,7 @@ test("probeSshHostKeysWithKeyscan converts ssh-keyscan output into probe candida
       host: "example.internal",
       port: 2222,
       keyType: "ssh-ed25519",
-      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=",
       fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
     }
   ]);
@@ -85,7 +85,7 @@ test("SSH host-key probe normalizers trim inputs, default ports, and reject inva
       host: "example.internal",
       port: 2222,
       keyType: "ssh-ed25519",
-      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=",
       fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
     }
   );

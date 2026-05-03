@@ -88,10 +88,11 @@ function normalizeSshTrustEntryPublicKey(value, fieldPath, { strict = true } = {
     if (decoded.length === 0) {
       throw new Error("empty");
     }
-    const canonical = decoded.toString("base64").replace(/=+$/u, "");
-    if (canonical !== normalized.replace(/=+$/u, "")) {
+    const canonical = decoded.toString("base64");
+    if (canonical.replace(/=+$/u, "") !== normalized.replace(/=+$/u, "")) {
       throw new Error("mismatch");
     }
+    return canonical;
   } catch {
     if (strict) {
       throw new ApiError(
@@ -102,8 +103,6 @@ function normalizeSshTrustEntryPublicKey(value, fieldPath, { strict = true } = {
     }
     return "";
   }
-
-  return normalized.replace(/=+$/u, "");
 }
 
 export function computeSshTrustFingerprintSha256(publicKey) {
