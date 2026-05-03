@@ -155,6 +155,7 @@ Start a one-shot SSH session without first saving a profile:
 ```
 
 The first launch for a new SSH target still requires a trusted host key through `Manage -> Connections`.
+When you use `/ssh ... --password` or `/ssh ... --keyboard-interactive`, ptydeck now asks for the runtime secret in one masked launch dialog right before start instead of relying on an inline Connections form field.
 
 Edit session settings through typed slash commands:
 

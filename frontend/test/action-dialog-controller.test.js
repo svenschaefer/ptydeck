@@ -9,6 +9,8 @@ function createElement() {
     textContent: "",
     value: "",
     placeholder: "",
+    type: "text",
+    autocomplete: "",
     hidden: false,
     open: false,
     classList: {
@@ -143,7 +145,55 @@ test("action dialog controller supports prompt fallback, null fallback, and conf
     "Notebook"
   );
   assert.equal(await nullController.requestText({ title: "Layout Name" }), null);
+  assert.equal(await nullController.requestSecret({ title: "SSH Runtime Secret" }), null);
   assert.equal(await nullController.confirm({ title: "Delete" }), false);
+});
+
+test("action dialog controller supports masked secret requests without falling back to browser prompt", async () => {
+  const dialogEl = createElement();
+  const titleEl = createElement();
+  const messageEl = createElement();
+  const inputWrapEl = createElement();
+  const inputLabelEl = createElement();
+  const inputEl = createElement();
+  const confirmBtn = createElement();
+  const cancelBtn = createElement();
+  const closeBtn = createElement();
+  let promptUsed = false;
+  const controller = createActionDialogController({
+    windowRef: {
+      prompt() {
+        promptUsed = true;
+        return "should-not-be-used";
+      },
+      requestAnimationFrame(callback) {
+        callback();
+      }
+    },
+    dialogEl,
+    titleEl,
+    messageEl,
+    inputWrapEl,
+    inputLabelEl,
+    inputEl,
+    confirmBtn,
+    cancelBtn,
+    closeBtn
+  });
+
+  const pending = controller.requestSecret({
+    title: "SSH Runtime Secret",
+    message: "Enter the secret.",
+    inputLabel: "Runtime Secret",
+    confirmLabel: "Launch SSH"
+  });
+  assert.equal(inputEl.type, "password");
+  assert.equal(inputEl.autocomplete, "current-password");
+  inputEl.value = "pw-1";
+  confirmBtn.emit("click");
+  assert.equal(await pending, "pw-1");
+  assert.equal(promptUsed, false);
+  assert.equal(inputEl.type, "text");
 });
 
 test("action dialog controller resolves prior requests deterministically and handles cancel, close, and enter-key submit", async () => {

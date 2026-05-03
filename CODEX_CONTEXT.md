@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, and preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates and seed the SSH draft on missing trust; `v0.4.0-H166` is now the active promoted wave for SSH operator-experience polish)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, and preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates and seed the SSH draft on missing trust; secret-backed SSH launches now request their runtime secret only through one shared masked action-dialog seam instead of the old hidden Connections field or `window.prompt`; `v0.4.0-H166` remains the active promoted wave for the remaining SSH operator-experience polish)
 
 ## Current Product Truth
 
@@ -81,10 +81,13 @@ Current contract:
 - This also closes the follow-up live bug where OpenSSH was reading the managed file but rejected the rendered trusted RSA line with `parse error in hostkeys file` because the persisted host-key blob had been normalized to unpadded base64 instead of the canonical padded wire form.
 - The command plane now exposes one-shot SSH launches through `/ssh <target>`, with optional `-l` / `--user`, `-p` / `--port`, `-i` / `--key`, `--password`, and `--keyboard-interactive` options.
 - Saved-profile SSH launches and one-shot `/ssh ...` launches both reuse the same frontend trust/secret gates in the connection-profile runtime seam instead of maintaining separate SSH launch contracts.
+- Secret-backed SSH launches now request their runtime secret only through the shared masked action dialog:
+  - `frontend/src/public/ui/action-dialog-controller.js` now exposes `requestSecret(...)` with password-type input and no browser-prompt fallback for secrets.
+  - `frontend/src/public/connection-profile-runtime-controller.js` now treats that dialog as the sole runtime-secret authority seam for saved-profile and one-shot `/ssh --password` / `/ssh --keyboard-interactive` launches.
+  - The old hidden `Connections` runtime-secret field is no longer part of the operator-visible or launch-authoritative product path, and `frontend/src/public/connection-profile-runtime-actions.js` no longer preserves hidden inline secret state across `Save and Launch`.
 - When a one-shot `/ssh ...` launch hits a target with no trusted host key yet, the frontend seeds the `Connections` draft with that attempted SSH launch, auto-probes host keys for the same host/port, and stops with trust guidance so the operator can trust the right key and rerun the same command.
 - The first-connect workflow still requires an explicit host-key trust entry before a saved-profile or one-shot SSH launch succeeds; host-key fetch/review/trust remains a `Manage -> Connections` UI action rather than a slash-command-only path.
 - The active follow-up wave `v0.4.0-H166` is explicitly scoped to the remaining operator-experience gaps in this SSH baseline:
-  - secret-backed one-shot and saved-profile SSH launches still depend on the shared `Connections` runtime-secret field and fall back to `window.prompt` instead of one dedicated masked launch-secret flow
   - host-key trust lifecycle still stops at a UI-only first-connect handoff instead of a complete command-plane path
   - host-key rotation is fail-closed technically but still needs an explicit guided replace flow and old/new fingerprint comparison
   - one-shot `/ssh ...` still exposes a narrower launch contract than saved connection profiles and needs final doc/help alignment once the promoted parity flags land

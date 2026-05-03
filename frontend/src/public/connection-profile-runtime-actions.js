@@ -260,11 +260,7 @@ export function createConnectionProfileRuntimeActions(options = {}) {
   }
 
   async function saveAndLaunchDraftFlow() {
-    const inlineRuntimeSecret = typeof runtimeSecretInputEl?.value === "string" ? runtimeSecretInputEl.value : "";
     const feedback = await saveDraftById();
-    if (runtimeSecretInputEl && inlineRuntimeSecret && !runtimeSecretInputEl.value) {
-      runtimeSecretInputEl.value = inlineRuntimeSecret;
-    }
     const profile = getSelectedProfile();
     if (!profile) {
       setCommandFeedback(feedback);

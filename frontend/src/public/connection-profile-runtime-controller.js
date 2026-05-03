@@ -571,6 +571,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const setError = typeof options.setError === "function" ? options.setError : () => {};
   const getErrorMessage = typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_, fallback) => fallback;
+  const requestSecret = typeof options.requestSecret === "function" ? options.requestSecret : null;
   const formatSessionToken = typeof options.formatSessionToken === "function" ? options.formatSessionToken : (sessionId) => String(sessionId || "");
   const formatSessionDisplayName =
     typeof options.formatSessionDisplayName === "function" ? options.formatSessionDisplayName : (session) => session?.name || String(session?.id || "");
@@ -937,12 +938,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
     }
     const method = normalizeLower(launch?.remoteAuth?.method);
     if (method === "password") {
-      return "Password auth stores only the method. The password is requested each time you launch the saved profile.";
+      return "Password auth stores only the method. The password is requested in a masked launch dialog each time you start this SSH connection.";
     }
     if (method === "keyboardinteractive") {
-      return "Keyboard-interactive auth stores only the method. The challenge secret is requested each time you launch the saved profile.";
+      return "Keyboard-interactive auth stores only the method. The challenge secret is requested in a masked launch dialog each time you start this SSH connection.";
     }
-    return "Private-key auth stores only the optional key path. No SSH secret is stored in the saved profile.";
+    return "Private-key auth stores only the optional key path. No SSH secret is stored in the saved profile or one-shot launch payload.";
   }
 
   function getSshSecretHint(launch) {
@@ -950,8 +951,25 @@ export function createConnectionProfileRuntimeController(options = {}) {
       return "";
     }
     return authMethodRequiresSecret(launch?.remoteAuth)
-      ? "Launching this SSH profile will prompt for a runtime secret."
-      : "Launching this SSH profile will use key-based auth without prompting for a runtime secret.";
+      ? "Launching this SSH connection will request a masked runtime secret right before start."
+      : "Launching this SSH connection will use key-based auth without prompting for a runtime secret.";
+  }
+
+  function describeSshLaunchContext(profile) {
+    const launch = profile?.launch;
+    const target = formatSshTarget(launch?.remoteConnection?.host, launch?.remoteConnection?.port, launch?.remoteConnection?.username);
+    const profileId = normalizeText(profile?.id);
+    const profileName = normalizeText(profile?.name);
+    if (profileId && profileName) {
+      return {
+        label: `saved SSH profile [${profileId}] ${profileName}`,
+        target
+      };
+    }
+    return {
+      label: `SSH target ${target}`,
+      target
+    };
   }
 
   function getCurrentSshTrustTarget() {
@@ -1029,7 +1047,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
     const currentLaunch = cloneDraftLaunch(getDraftLaunchFromInputs());
     const isSsh = normalizeLower(currentLaunch.kind) === "ssh";
     const authMethod = normalizeLower(currentLaunch?.remoteAuth?.method) || "privatekey";
-    const requiresSecret = authMethodRequiresSecret(currentLaunch?.remoteAuth);
     if (summaryEl) {
       summaryEl.textContent = selectedProfile
         ? formatConnectionProfileSummary(selectedProfile)
@@ -1048,14 +1065,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
       secretHintEl.textContent = getSshSecretHint(currentLaunch);
     }
     if (runtimeSecretFieldEl) {
-      runtimeSecretFieldEl.hidden = !isSsh || !requiresSecret;
+      runtimeSecretFieldEl.hidden = true;
     }
     if (runtimeSecretInputEl) {
-      runtimeSecretInputEl.hidden = !isSsh || !requiresSecret;
-      runtimeSecretInputEl.disabled = !isSsh || !requiresSecret;
-      if (!requiresSecret) {
-        runtimeSecretInputEl.value = "";
-      }
+      runtimeSecretInputEl.hidden = true;
+      runtimeSecretInputEl.disabled = true;
+      runtimeSecretInputEl.value = "";
     }
     if (draftLaunchTextareaEl) {
       draftLaunchTextareaEl.readOnly = true;
@@ -1425,19 +1440,23 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (!authMethodRequiresSecret(profile?.launch?.remoteAuth)) {
       return { ok: true, remoteSecret: undefined, cancelled: false };
     }
-    const inlineSecret = normalizeText(runtimeSecretInputEl?.value);
-    if (runtimeSecretInputEl) {
-      if (!inlineSecret) {
-        throw new Error("Enter the SSH runtime secret before launching this saved profile.");
-      }
-      return { ok: true, remoteSecret: inlineSecret, cancelled: false };
+    if (!requestSecret) {
+      throw new Error("SSH runtime-secret prompt is unavailable.");
     }
-    const secret = windowRef?.prompt?.(`SSH secret for connection profile '${profile.name}'`, "");
+    const context = describeSshLaunchContext(profile);
+    const secret = await requestSecret({
+      title: "SSH Runtime Secret",
+      message: `Enter the SSH runtime secret for ${context.label} (${context.target}).`,
+      inputLabel: "Runtime Secret",
+      placeholder: "Required only for password or keyboard-interactive SSH launches",
+      confirmLabel: "Launch SSH",
+      cancelLabel: "Cancel"
+    });
     if (secret === null || secret === undefined) {
       return { ok: false, remoteSecret: undefined, cancelled: true };
     }
     if (!String(secret).trim()) {
-      throw new Error("SSH secret is required for password and keyboard-interactive connection profiles.");
+      throw new Error("SSH secret is required for password and keyboard-interactive SSH launches.");
     }
     return { ok: true, remoteSecret: String(secret), cancelled: false };
   }
@@ -1450,7 +1469,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     const host = normalizeText(launch?.remoteConnection?.host);
     const port = Number.parseInt(String(launch?.remoteConnection?.port ?? 22), 10);
     if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error("Enter an SSH host and port before launching this saved profile.");
+      throw new Error("Enter an SSH host and port before launching this SSH connection.");
     }
     const matchingTrustEntries = sshTrustEntries.filter((entry) => entry.host === host && entry.port === port);
     if (matchingTrustEntries.length > 0) {

@@ -378,10 +378,6 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   let activeSessionId = "s-local";
   const controller = createConnectionProfileRuntimeController({
     windowRef: {
-      prompt(message) {
-        calls.push(["prompt", message]);
-        return "secret-1";
-      },
       confirm() {
         calls.push(["confirm"]);
         return true;
@@ -490,6 +486,10 @@ test("connection profile runtime controller manages backend-backed lifecycle and
       return true;
     },
     setCommandFeedback: (message) => calls.push(["feedback", message]),
+    requestSecret: async (options) => {
+      calls.push(["request-secret", options.title, options.message]);
+      return "secret-1";
+    },
     requestRender: () => calls.push(["render"]),
     formatSessionToken: (sessionId) => sessionId === "s-local" ? "1" : "8",
     formatSessionDisplayName: (session) => session?.name || session?.id || "",
@@ -550,13 +550,20 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   });
   assert.match(ui.draftStatusEl.textContent, /Editing saved profile \[local-dev\]/i);
 
-  ui.runtimeSecretInputEl.value = "secret-1";
   const applyFeedback = await controller.applyProfileById("ops-ssh");
   assert.equal(applyFeedback, "Started session [8] Ops SSH from connection profile [ops-ssh] Ops SSH.");
   assert.deepEqual(calls.find((entry) => entry[0] === "create-session")?.[1], {
     connectionProfileId: "ops-ssh",
     remoteSecret: "secret-1"
   });
+  assert.ok(
+    calls.some(
+      (entry) =>
+        entry[0] === "request-secret" &&
+        entry[1] === "SSH Runtime Secret" &&
+        /saved SSH profile \[ops-ssh\] Ops SSH/.test(entry[2])
+    )
+  );
   assert.equal(ui.runtimeSecretInputEl.value, "");
   assert.ok(calls.some((entry) => entry[0] === "set-active-deck" && entry[1] === "ops"));
   assert.ok(calls.some((entry) => entry[0] === "set-active-session" && entry[1] === "s-created"));
@@ -621,7 +628,7 @@ test("connection profile runtime controller hides SSH-only and auth-specific fie
   ui.draftRemoteAuthMethodSelectEl.value = "password";
   ui.draftRemoteAuthMethodSelectEl.dispatch("change");
   assert.equal(ui.draftRemotePrivateKeyFieldEl.hidden, true);
-  assert.equal(ui.runtimeSecretFieldEl.hidden, false);
+  assert.equal(ui.runtimeSecretFieldEl.hidden, true);
 });
 
 test("connection profile runtime controller updates saved drafts instead of creating duplicates", async () => {
@@ -681,13 +688,10 @@ test("connection profile runtime controller updates saved drafts instead of crea
 test("connection profile runtime controller reports apply cancellation when secret prompt is dismissed", async () => {
   const calls = [];
   const ui = createConnectionProfileUiRefs();
-  ui.runtimeSecretInputEl = null;
   const controller = createConnectionProfileRuntimeController({
-    windowRef: {
-      prompt() {
-        calls.push(["prompt"]);
-        return null;
-      }
+    requestSecret: async () => {
+      calls.push(["request-secret"]);
+      return null;
     },
     documentRef: createDocumentRef(),
     ...ui,
@@ -737,6 +741,7 @@ test("connection profile runtime controller reports apply cancellation when secr
   const feedback = await controller.applyProfileById("ops-ssh");
   assert.equal(feedback, "Connection profile apply cancelled for [ops-ssh] Ops SSH.");
   assert.equal(calls.some((entry) => entry[0] === "create-session"), false);
+  assert.equal(calls.some((entry) => entry[0] === "request-secret"), true);
 });
 
 test("connection profile runtime controller sanitizes malformed reload payloads and clears stale trust state after trust refresh failure", async () => {
@@ -854,6 +859,7 @@ test("connection profile runtime controller sanitizes malformed reload payloads 
 
 test("connection profile runtime controller supports guided SSH drafts, save-and-launch, and SSH trust entry management", async () => {
   const calls = [];
+  const secretRequests = [];
   const trustEntries = [
     {
       id: "trust-1",
@@ -869,6 +875,10 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
     windowRef: {},
     documentRef: createDocumentRef(),
     ...ui,
+    requestSecret: async (options) => {
+      secretRequests.push(options);
+      return "runtime-secret";
+    },
     api: {
       async createConnectionProfile(payload) {
         calls.push(["create", payload]);
@@ -975,7 +985,6 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   ui.draftRemoteUsernameInputEl.value = "ops";
   ui.draftRemoteAuthMethodSelectEl.value = "password";
   ui.draftRemotePrivateKeyPathInputEl.value = "";
-  ui.runtimeSecretInputEl.value = "runtime-secret";
 
   const saveFeedback = await controller.saveDraftById();
   assert.match(saveFeedback, /Saved connection profile \[ops-guided\] Guided SSH\./);
@@ -1001,7 +1010,6 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
     publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAcreated"
   });
 
-  ui.runtimeSecretInputEl.value = "runtime-secret";
   const combinedFeedback = await controller.saveAndLaunchDraftFlow();
   assert.match(combinedFeedback, /Updated connection profile \[ops-guided\] Guided SSH\./);
   assert.match(combinedFeedback, /Started session \[s-ssh\] Guided SSH from connection profile \[ops-guided\] Guided SSH\./);
@@ -1032,9 +1040,10 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
     connectionProfileId: "ops-guided",
     remoteSecret: "runtime-secret"
   });
-  assert.equal(calls.some((entry) => entry[0] === "prompt"), false);
+  assert.equal(secretRequests.length, 1);
+  assert.match(secretRequests[0].message, /saved SSH profile \[ops-guided\] Guided SSH/);
   assert.match(ui.authHintEl.textContent, /Password auth/i);
-  assert.match(ui.secretHintEl.textContent, /runtime secret/i);
+  assert.match(ui.secretHintEl.textContent, /masked runtime secret/i);
 
   ui.sshTrustSelectEl.value = "trust-1";
   ui.sshTrustSelectEl.dispatch("change");
@@ -1316,25 +1325,21 @@ test("connection profile runtime controller surfaces secret and probing precondi
         ];
       }
     },
+    requestSecret: null,
     defaultThemeProfile: createThemeProfile("#090909")
   });
 
   await inlineSecretController.loadProfiles();
   await assert.rejects(
     () => inlineSecretController.applyProfileById("ops-inline"),
-    /Enter the SSH runtime secret before launching this saved profile/
+    /SSH runtime-secret prompt is unavailable/
   );
 
   const promptUi = createConnectionProfileUiRefs();
-  promptUi.runtimeSecretInputEl = null;
   const promptController = createConnectionProfileRuntimeController({
-    windowRef: {
-      prompt() {
-        return "   ";
-      }
-    },
     documentRef: createDocumentRef(),
     ...promptUi,
+    requestSecret: async () => "   ",
     api: {
       async listConnectionProfiles() {
         return [
@@ -1376,14 +1381,14 @@ test("connection profile runtime controller surfaces secret and probing precondi
   await promptController.loadProfiles();
   await assert.rejects(
     () => promptController.applyProfileById("ops-prompt"),
-    /SSH secret is required for password and keyboard-interactive connection profiles/
+    /SSH secret is required for password and keyboard-interactive SSH launches/
   );
 
   const invalidHostUi = createConnectionProfileUiRefs();
-  invalidHostUi.runtimeSecretInputEl.value = "secret";
   const invalidHostController = createConnectionProfileRuntimeController({
     documentRef: createDocumentRef(),
     ...invalidHostUi,
+    requestSecret: async () => "secret",
     api: {
       async listConnectionProfiles() {
         return [
@@ -1416,14 +1421,14 @@ test("connection profile runtime controller surfaces secret and probing precondi
   await invalidHostController.loadProfiles();
   await assert.rejects(
     () => invalidHostController.applyProfileById("ops-invalid"),
-    /Enter an SSH host and port before launching this saved profile/
+    /Enter an SSH host and port before launching this SSH connection/
   );
 
   const probingUi = createConnectionProfileUiRefs();
-  probingUi.runtimeSecretInputEl.value = "secret";
   const probingController = createConnectionProfileRuntimeController({
     documentRef: createDocumentRef(),
     ...probingUi,
+    requestSecret: async () => "secret",
     api: {
       async listConnectionProfiles() {
         return [

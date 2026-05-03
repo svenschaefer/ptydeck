@@ -28,6 +28,8 @@ Useful slash companions:
 
 `/ssh ...` now starts a one-shot SSH session without first saving a connection profile, but the first launch for a new SSH target still depends on a trusted host-key entry. ptydeck fetches the presented host keys and stops if none is trusted yet; the host-key fetch/review/trust step still lives in the `Connections` UI instead of a slash-command-only workflow.
 
+For password or keyboard-interactive SSH auth, both saved-profile launches and one-shot `/ssh ...` launches now request the runtime secret in one masked launch dialog right before start. The secret is not stored in the saved profile, browser state, or backend persistence.
+
 ## Workspace Presets
 
 Use the `Workspace Presets` tab when you want to persist the visible workspace shape and reapply it later.

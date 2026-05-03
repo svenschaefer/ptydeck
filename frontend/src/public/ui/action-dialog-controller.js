@@ -54,6 +54,8 @@ export function createActionDialogController(options = {}) {
     if (inputEl) {
       inputEl.value = "";
       inputEl.placeholder = "";
+      inputEl.type = "text";
+      inputEl.autocomplete = "";
     }
     if (inputWrapEl) {
       inputWrapEl.hidden = true;
@@ -77,15 +79,17 @@ export function createActionDialogController(options = {}) {
     request.resolve(value);
   }
 
-  function scheduleFocus(mode) {
+  function scheduleFocus(config = {}) {
     const schedule =
       typeof windowRef?.requestAnimationFrame === "function"
         ? windowRef.requestAnimationFrame.bind(windowRef)
         : (callback) => globalThis.setTimeout(callback, 0);
     schedule(() => {
-      if (mode === "text" && inputEl?.focus) {
+      if (config.mode === "text" && inputEl?.focus) {
         inputEl.focus();
-        inputEl.select?.();
+        if (config.selectOnFocus !== false) {
+          inputEl.select?.();
+        }
         return;
       }
       confirmBtn?.focus?.();
@@ -120,17 +124,20 @@ export function createActionDialogController(options = {}) {
         }
         inputEl.value = String(config.defaultValue || "");
         inputEl.placeholder = String(config.placeholder || "");
+        inputEl.type = String(config.inputType || "text");
+        inputEl.autocomplete = String(config.autocomplete || "");
       } else if (inputWrapEl) {
         inputWrapEl.hidden = true;
       }
       setDialogOpen(dialogEl, true);
-      scheduleFocus(config.mode);
+      scheduleFocus(config);
     });
   }
 
-  async function requestText(config = {}) {
+  async function requestInput(config = {}) {
+    const inputType = String(config.inputType || "text");
     if (!hasDialogUi()) {
-      if (typeof windowRef?.prompt === "function") {
+      if (inputType !== "password" && typeof windowRef?.prompt === "function") {
         const result = windowRef.prompt(String(config.message || config.title || "Value"), String(config.defaultValue || ""));
         return result === null || result === undefined ? null : String(result);
       }
@@ -138,7 +145,25 @@ export function createActionDialogController(options = {}) {
     }
     return startRequest({
       ...config,
-      mode: "text"
+      mode: "text",
+      inputType,
+      selectOnFocus: config.selectOnFocus !== false
+    });
+  }
+
+  async function requestText(config = {}) {
+    return requestInput({
+      ...config,
+      inputType: "text"
+    });
+  }
+
+  async function requestSecret(config = {}) {
+    return requestInput({
+      ...config,
+      inputType: "password",
+      autocomplete: "current-password",
+      selectOnFocus: false
     });
   }
 
@@ -201,7 +226,9 @@ export function createActionDialogController(options = {}) {
   });
 
   return {
+    requestInput,
     requestText,
+    requestSecret,
     confirm
   };
 }

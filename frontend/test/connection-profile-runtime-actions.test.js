@@ -471,7 +471,7 @@ test("connection profile runtime actions fail closed on missing inputs and keep 
     await boundedActions.saveAndLaunchDraftFlow(),
     "Saved connection profile [draft] Draft."
   );
-  assert.equal(runtimeSecretInputEl.value, "inline-secret");
+  assert.equal(runtimeSecretInputEl.value, "");
   assert.deepEqual(feedback, [
     ["command", "Saved connection profile [draft] Draft."],
     ["status", "Saved connection profile [draft] Draft."]

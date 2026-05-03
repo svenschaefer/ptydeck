@@ -925,6 +925,7 @@ connectionProfileRuntimeController = createConnectionProfileRuntimeController({
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  requestSecret: (options) => actionDialogController?.requestSecret(options),
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
   requestRender: () => appCommandUiFacadeController?.render?.(),
