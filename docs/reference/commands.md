@@ -27,7 +27,7 @@ Generated from `frontend/src/public/command-schema.js` and `frontend/src/public/
 | `/settings` | inspect or manage session settings | `/settings show`<br>`/settings apply <json>`<br>`/settings startup show`<br>`/settings startup cwd <path>`<br>`/settings startup command <text...>`<br>`/settings startup env <json>`<br>`/settings startup tags <tag[,tag...]>`<br>`/settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay>`<br>`/settings note show`<br>`/settings note set <text...>`<br>`/settings note clear`<br>`/settings theme show [active|inactive]`<br>`/settings theme preset <active|inactive> <theme>`<br>`/settings theme set <active|inactive> <key> <#rrggbb>`<br>`/settings theme reset <active|inactive>`<br>`/settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...>`<br>`/settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources>`<br>`/settings input-safety show`<br>`/settings input-safety set <field> <value>`<br>`/settings mouse-forwarding show`<br>`/settings mouse-forwarding set <off|application>` | - |
 | `/share` | manage read-only spectator shares for sessions and decks | `/share`<br>`/share session`<br>`/share deck [deckSelector]`<br>`/share revoke <shareId>` | - |
 | `/size` | set deck terminal size | `/size <cols> <rows>`<br>`/size c<cols>`<br>`/size r<rows>` | - |
-| `/ssh` | start one-shot SSH sessions and manage SSH host-key trust | `/ssh <target>`<br>`/ssh <target> --key <path>`<br>`/ssh <target> --password`<br>`/ssh <target> --keyboard-interactive`<br>`/ssh <target> [-l|--user <username>] [-p|--port <port>]`<br>`/ssh hostkey list [target]`<br>`/ssh hostkey probe <target>`<br>`/ssh hostkey trust <target> [keyType|fingerprint]`<br>`/ssh hostkey delete <target> [keyType|fingerprint]` | - |
+| `/ssh` | start one-shot SSH sessions and manage SSH host-key trust | `/ssh <target>`<br>`/ssh <target> --key <path>`<br>`/ssh <target> --password`<br>`/ssh <target> --keyboard-interactive`<br>`/ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>]`<br>`/ssh hostkey list [target]`<br>`/ssh hostkey probe <target>`<br>`/ssh hostkey trust <target> [keyType|fingerprint]`<br>`/ssh hostkey delete <target> [keyType|fingerprint]` | - |
 | `/swap` | swap quick ids between two sessions | `/swap <selectorA> <selectorB>` | `/session.swap` |
 | `/switch` | switch active session | `/switch <sessionSelector>` | `/session.switch` |
 | `/transfer` | upload or download bounded files for one session | `/transfer upload [path]`<br>`/transfer download <path>` | - |
@@ -427,7 +427,7 @@ start one-shot SSH sessions and manage SSH host-key trust
 - `/ssh <target> --key <path>`
 - `/ssh <target> --password`
 - `/ssh <target> --keyboard-interactive`
-- `/ssh <target> [-l|--user <username>] [-p|--port <port>]`
+- `/ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>]`
 - `/ssh hostkey list [target]`
 - `/ssh hostkey probe <target>`
 - `/ssh hostkey trust <target> [keyType|fingerprint]`
@@ -437,6 +437,7 @@ start one-shot SSH sessions and manage SSH host-key trust
 
 - Target syntax is `[user@]host[:port]`. You can override the parsed username or port with `-l` / `--user` and `-p` / `--port`.
 - Private-key auth is the default. Use `-i` / `--key <path>` to pin an explicit key path, `--password` for password auth, or `--keyboard-interactive` for keyboard-interactive auth.
+- Use `--deck <deckSelector>` to choose the destination deck explicitly, `--cwd <path>` for the starting directory, and `--command <command>` for a startup command. Quote multi-word commands so they stay one slash-command argument.
 - If no trusted SSH host key exists for the target, use `/ssh hostkey probe <target>` to fetch the presented keys, verify the fingerprint, then `/ssh hostkey trust <target> <keyType|fingerprint>` before rerunning `/ssh ...`.
 
 ### Subcommands

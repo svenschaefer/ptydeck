@@ -13,25 +13,18 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Current Execution Status
 
-- Latest completed wave in this segment:
-  - `v0.4.0-H163` Repo-Wide Quality and Coverage Follow-Up
-  - `v0.4.0-H164` Server-Authoritative Session Quick-Send Favorites
-  - `v0.4.0-H165` Direct SSH Launch and Trust Consistency
 - Active wave:
-  - `v0.4.0-H166` SSH Operator Experience Polish
+  - none
 - Queued next waves:
   - none
 
 ## Active Wave Order
 
-1. `SSH-312` Owner `FE`: first-connect and host-key-rotation UX polish in `Connections`
-2. `SSH-313` Owner `FE`: one-shot `/ssh ...` launch parity and shipped doc/help alignment
-3. `SSH-314` Owner `QA`: regression coverage for the promoted SSH operator-experience contract
+- none
 
 ## Wave Dependencies
 
-- `SSH-312 -> SSH-314`
-- `SSH-313 -> SSH-314`
+- none
 
 ## Wave Exit Criteria
 

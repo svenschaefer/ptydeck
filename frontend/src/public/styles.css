@@ -2460,6 +2460,12 @@ dialog:not([open]) {
   gap: 12px;
 }
 
+.workspace-manager-section-heading {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
 .workspace-manager-section-title {
   margin: 0;
   font-size: 11px;
@@ -2583,6 +2589,11 @@ dialog:not([open]) {
   line-height: 1.45;
 }
 
+.workspace-manager-inline-note-tight {
+  font-size: 11px;
+  color: #8ea7bf;
+}
+
 .workspace-manager-inline-confirm {
   display: grid;
   gap: 8px;
@@ -2597,6 +2608,11 @@ dialog:not([open]) {
   border: 1px solid #243245;
   border-radius: 10px;
   background: rgba(15, 21, 31, 0.75);
+}
+
+.workspace-manager-ssh-trust-compare {
+  background: rgba(17, 26, 38, 0.9);
+  border-color: #314662;
 }
 
 .workspace-manager-detail {

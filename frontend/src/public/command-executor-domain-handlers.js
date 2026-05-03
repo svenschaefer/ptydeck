@@ -96,6 +96,9 @@ export function parseSshCommandArgs(args = [], options = {}) {
   let port = null;
   let authMethod = "privateKey";
   let privateKeyPath = "";
+  let deckToken = "";
+  let startCwd = "";
+  let startCommand = "";
 
   for (let index = 0; index < tokens.length; index += 1) {
     const token = normalizeText(tokens[index]);
@@ -155,6 +158,30 @@ export function parseSshCommandArgs(args = [], options = {}) {
       privateKeyPath = next.value;
       continue;
     }
+    if (token === "--deck") {
+      const next = readValue("SSH deck");
+      if (next.error) {
+        return { ok: false, usage: false, error: next.error };
+      }
+      deckToken = next.value;
+      continue;
+    }
+    if (token === "--cwd") {
+      const next = readValue("SSH start directory");
+      if (next.error) {
+        return { ok: false, usage: false, error: next.error };
+      }
+      startCwd = next.value;
+      continue;
+    }
+    if (token === "--command") {
+      const next = readValue("SSH startup command");
+      if (next.error) {
+        return { ok: false, usage: false, error: next.error };
+      }
+      startCommand = next.value;
+      continue;
+    }
     if (token === "--password") {
       if (authMethod !== "privateKey" || privateKeyPath) {
         return {
@@ -196,7 +223,10 @@ export function parseSshCommandArgs(args = [], options = {}) {
       port: port ?? parsedTarget.port,
       username: username || parsedTarget.username,
       authMethod,
-      privateKeyPath
+      privateKeyPath,
+      deckToken,
+      startCwd,
+      startCommand
     }
   };
 }
@@ -211,8 +241,8 @@ export function buildSshConnectionLaunch(spec, options = {}) {
     kind: "ssh",
     deckId,
     shell: "ssh",
-    startCwd: "~",
-    startCommand: "",
+    startCwd: normalizeText(spec.startCwd) || "~",
+    startCommand: typeof spec.startCommand === "string" ? spec.startCommand : "",
     env: {},
     tags: [],
     themeProfile,
@@ -585,9 +615,17 @@ export function createCommandExecutorDomainHandlers(options = {}) {
       return parsed.usage ? formatUsage("ssh") : parsed.error;
     }
     const activeDeckId = normalizeText(getActiveDeck()?.id) || defaultDeckId;
+    let launchDeckId = activeDeckId;
+    if (normalizeText(parsed.value.deckToken)) {
+      const resolvedDeck = resolveDeckToken(parsed.value.deckToken);
+      if (resolvedDeck?.error || !resolvedDeck?.deck) {
+        return resolvedDeck?.error || `Unknown deck: ${parsed.value.deckToken}`;
+      }
+      launchDeckId = normalizeText(resolvedDeck.deck.id) || activeDeckId;
+    }
     const launch = normalizeConnectionProfileLaunch(
       buildSshConnectionLaunch(parsed.value, {
-        deckId: activeDeckId,
+        deckId: launchDeckId,
         defaultDeckId,
         defaultThemeProfile,
         normalizeThemeProfile

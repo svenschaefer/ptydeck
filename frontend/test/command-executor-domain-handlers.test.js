@@ -72,7 +72,23 @@ test("command executor domain handlers parse and route one-shot ssh launches det
       port: 2222,
       username: "ixpqtwnk",
       authMethod: "password",
-      privateKeyPath: ""
+      privateKeyPath: "",
+      deckToken: "",
+      startCwd: "",
+      startCommand: ""
+    }
+  });
+  assert.deepEqual(parseSshCommandArgs(["carpo.uberspace.de", "--deck", "ops", "--cwd", "/srv/app", "--command", "tmux a || tmux"]), {
+    ok: true,
+    value: {
+      host: "carpo.uberspace.de",
+      port: 22,
+      username: "",
+      authMethod: "privateKey",
+      privateKeyPath: "",
+      deckToken: "ops",
+      startCwd: "/srv/app",
+      startCommand: "tmux a || tmux"
     }
   });
   assert.equal(
@@ -80,6 +96,7 @@ test("command executor domain handlers parse and route one-shot ssh launches det
     "SSH auth method flags are mutually exclusive. Use either private-key, password, or keyboard-interactive auth."
   );
   assert.equal(parseSshCommandArgs(["carpo.uberspace.de", "--port", "70000"]).error, "SSH port must be an integer between 1 and 65535.");
+  assert.equal(parseSshCommandArgs(["carpo.uberspace.de", "--deck"]).error, "SSH deck value is required.");
   assert.equal(parseSshCommandArgs(["carpo.uberspace.de", "--wat"]).error, "Unknown SSH option: --wat");
 
   assert.deepEqual(
@@ -89,7 +106,9 @@ test("command executor domain handlers parse and route one-shot ssh launches det
         port: 22,
         username: "ixpqtwnk",
         authMethod: "privateKey",
-        privateKeyPath: "~/.ssh/id_ed25519"
+        privateKeyPath: "~/.ssh/id_ed25519",
+        startCwd: "/srv/app",
+        startCommand: "tmux a || tmux"
       },
       {
         deckId: "ops",
@@ -102,8 +121,8 @@ test("command executor domain handlers parse and route one-shot ssh launches det
       kind: "ssh",
       deckId: "ops",
       shell: "ssh",
-      startCwd: "~",
-      startCommand: "",
+      startCwd: "/srv/app",
+      startCommand: "tmux a || tmux",
       env: {},
       tags: [],
       themeProfile: { background: "#111111" },
@@ -126,6 +145,8 @@ test("command executor domain handlers parse and route one-shot ssh launches det
     defaultDeckId: "default",
     formatUsage: (command, subcommand = "") => `usage:${command}:${subcommand}`,
     getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    resolveDeckToken: (token) =>
+      token === "infra" ? { deck: { id: "infra", name: "Infra" }, error: "" } : { deck: null, error: `Unknown deck: ${token}` },
     normalizeThemeProfile: (profile) => profile || {},
     defaultThemeProfile: { background: "#111111" },
     normalizeConnectionProfileLaunch: (launch) => launch,
@@ -137,18 +158,31 @@ test("command executor domain handlers parse and route one-shot ssh launches det
 
   assert.equal(await handlers.executeSshCommand({ args: [] }), "usage:ssh:");
   assert.equal(await handlers.executeSshCommand({ args: ["carpo.uberspace.de", "--wat"] }), "Unknown SSH option: --wat");
+  assert.equal(await handlers.executeSshCommand({ args: ["carpo.uberspace.de", "--deck", "missing"] }), "Unknown deck: missing");
   assert.equal(
-    await handlers.executeSshCommand({ args: ["ixpqtwnk@carpo.uberspace.de", "--key", "~/.ssh/id_ed25519"] }),
+    await handlers.executeSshCommand({
+      args: [
+        "ixpqtwnk@carpo.uberspace.de",
+        "--key",
+        "~/.ssh/id_ed25519",
+        "--deck",
+        "infra",
+        "--cwd",
+        "/srv/app",
+        "--command",
+        "tmux a || tmux"
+      ]
+    }),
     "ssh-launched"
   );
   assert.deepEqual(launchCalls, [
     [
       {
         kind: "ssh",
-        deckId: "ops",
+        deckId: "infra",
         shell: "ssh",
-        startCwd: "~",
-        startCommand: "",
+        startCwd: "/srv/app",
+        startCommand: "tmux a || tmux",
         env: {},
         tags: [],
         themeProfile: { background: "#111111" },

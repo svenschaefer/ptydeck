@@ -55,13 +55,16 @@
 
 <pre><code class="language-text">/connection list
 /ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
+/ssh ixpqtwnk@carpo.uberspace.de --deck infra --cwd /srv/app --command &quot;tmux a || tmux&quot; --key ~/.ssh/id_ed25519
 /ssh hostkey probe carpo.uberspace.de:22
 /ssh hostkey trust carpo.uberspace.de:22 ssh-ed25519
 /connection draft new ops-ssh
 /connection save ops-ssh
 /connection apply ops-ssh</code></pre>
 
-<p><code>/ssh ...</code> now starts a one-shot SSH session without first saving a connection profile, and the SSH host-key lifecycle is also available in the command plane. Use <code>/ssh hostkey probe &lt;target&gt;</code> to fetch the presented keys, verify the fingerprint, then <code>/ssh hostkey trust &lt;target&gt; &lt;keyType|fingerprint&gt;</code> before rerunning <code>/ssh ...</code>. The <code>Connections</code> UI still shows the same trust state for saved-profile workflows.</p>
+<p><code>/ssh ...</code> now starts a one-shot SSH session without first saving a connection profile, and the SSH host-key lifecycle is also available in the command plane. Use <code>/ssh hostkey probe &lt;target&gt;</code> to fetch the presented keys, verify the fingerprint, then <code>/ssh hostkey trust &lt;target&gt; &lt;keyType|fingerprint&gt;</code> before rerunning <code>/ssh ...</code>. One-shot SSH launches can now also pin the destination deck with <code>--deck &lt;deckSelector&gt;</code>, set the starting directory with <code>--cwd &lt;path&gt;</code>, and attach one startup command with <code>--command &lt;command&gt;</code>.</p>
+
+<p>The <code>Connections</code> UI keeps the SSH trust section visible for SSH drafts. On first connect it now shows the fetch/verify/trust guidance inline, and when a fetched key conflicts with an existing trusted key of the same type it renders an explicit old/new fingerprint comparison plus <code>Replace Trusted Key</code> for the verified rotation case.</p>
 
 <p>For password or keyboard-interactive SSH auth, both saved-profile launches and one-shot <code>/ssh ...</code> launches now request the runtime secret in one masked launch dialog right before start. The secret is not stored in the saved profile, browser state, or backend persistence.</p>
 

@@ -426,66 +426,116 @@
                     placeholder="Only required when the selected SSH auth method prompts at launch"
                   />
                 </div>
-                <details class="workspace-manager-advanced workspace-manager-ssh-trust-advanced">
-                  <summary>Advanced host-key trust</summary>
-                  <div class="workspace-manager-advanced-body">
-                    <div class="workspace-manager-subsection workspace-manager-subsection-card">
-                      <div class="workspace-manager-section-head">
-                        <p class="workspace-manager-section-title">Trusted Host Keys</p>
-                        <p id="connection-profile-ssh-trust-status" class="workspace-manager-status"></p>
-                      </div>
-                      <p class="workspace-manager-inline-note">
-                        For a new SSH target, fetch the presented host keys, verify the fingerprint you expect, then trust the selected key before launching. Trusted host keys are stored separately from the saved connection profile.
-                      </p>
-                      <div class="workspace-manager-actions">
-                        <button id="connection-profile-ssh-trust-probe" type="button">Fetch Host Keys</button>
-                        <button id="connection-profile-ssh-trust-save" type="button">Trust Selected Key</button>
-                        <button id="connection-profile-ssh-trust-refresh" type="button">Refresh Trusted Keys</button>
-                        <button id="connection-profile-ssh-trust-delete" type="button">Delete Trusted Key</button>
-                      </div>
-                      <label class="workspace-manager-field" for="connection-profile-ssh-probe-select">Fetched Host Keys</label>
-                      <select
-                        id="connection-profile-ssh-probe-select"
-                        class="workspace-manager-select"
-                        aria-label="Fetched SSH host keys for this SSH target"
-                      ></select>
-                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-select">Trusted Host Keys</label>
-                      <select
-                        id="connection-profile-ssh-trust-select"
-                        class="workspace-manager-select"
-                        aria-label="Trusted host keys for this SSH target"
-                      ></select>
-                      <div class="workspace-manager-form-grid">
-                        <div class="workspace-manager-field-block">
-                          <label class="workspace-manager-field" for="connection-profile-ssh-trust-key-type">Selected Key Type</label>
-                          <input
-                            id="connection-profile-ssh-trust-key-type"
-                            class="workspace-manager-input"
-                            type="text"
-                            readonly
-                          />
-                        </div>
-                        <div class="workspace-manager-field-block">
-                          <label class="workspace-manager-field" for="connection-profile-ssh-trust-fingerprint">Selected Fingerprint</label>
-                          <input
-                            id="connection-profile-ssh-trust-fingerprint"
-                            class="workspace-manager-input"
-                            type="text"
-                            readonly
-                          />
-                        </div>
-                      </div>
-                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-public-key">Selected Public Key</label>
-                      <textarea
-                        id="connection-profile-ssh-trust-public-key"
-                        class="workspace-manager-textarea workspace-manager-textarea-compact"
-                        rows="3"
-                        spellcheck="false"
+                <section id="connection-profile-ssh-trust-section" class="workspace-manager-subsection workspace-manager-subsection-card">
+                  <div class="workspace-manager-section-head">
+                    <div class="workspace-manager-section-heading">
+                      <p class="workspace-manager-section-title">SSH Host-Key Trust</p>
+                      <p id="connection-profile-ssh-trust-guidance" class="workspace-manager-inline-note workspace-manager-inline-note-tight"></p>
+                    </div>
+                    <p id="connection-profile-ssh-trust-status" class="workspace-manager-status"></p>
+                  </div>
+                  <div class="workspace-manager-actions">
+                    <button id="connection-profile-ssh-trust-probe" type="button">Fetch Host Keys</button>
+                    <button id="connection-profile-ssh-trust-save" type="button">Trust Selected Key</button>
+                    <button id="connection-profile-ssh-trust-refresh" type="button">Refresh Trusted Keys</button>
+                    <button id="connection-profile-ssh-trust-delete" type="button">Delete Trusted Key</button>
+                  </div>
+                  <label class="workspace-manager-field" for="connection-profile-ssh-probe-select">Fetched Host Keys</label>
+                  <select
+                    id="connection-profile-ssh-probe-select"
+                    class="workspace-manager-select"
+                    aria-label="Fetched SSH host keys for this SSH target"
+                  ></select>
+                  <label class="workspace-manager-field" for="connection-profile-ssh-trust-select">Trusted Host Keys</label>
+                  <select
+                    id="connection-profile-ssh-trust-select"
+                    class="workspace-manager-select"
+                    aria-label="Trusted host keys for this SSH target"
+                  ></select>
+                  <div class="workspace-manager-form-grid">
+                    <div class="workspace-manager-field-block">
+                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-key-type">Selected Key Type</label>
+                      <input
+                        id="connection-profile-ssh-trust-key-type"
+                        class="workspace-manager-input"
+                        type="text"
                         readonly
-                      ></textarea>
+                      />
+                    </div>
+                    <div class="workspace-manager-field-block">
+                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-fingerprint">Selected Fingerprint</label>
+                      <input
+                        id="connection-profile-ssh-trust-fingerprint"
+                        class="workspace-manager-input"
+                        type="text"
+                        readonly
+                      />
                     </div>
                   </div>
-                </details>
+                  <label class="workspace-manager-field" for="connection-profile-ssh-trust-public-key">Selected Public Key</label>
+                  <textarea
+                    id="connection-profile-ssh-trust-public-key"
+                    class="workspace-manager-textarea workspace-manager-textarea-compact"
+                    rows="3"
+                    spellcheck="false"
+                    readonly
+                  ></textarea>
+                  <section
+                    id="connection-profile-ssh-trust-compare"
+                    class="workspace-manager-subsection workspace-manager-subsection-card workspace-manager-ssh-trust-compare"
+                    hidden
+                  >
+                    <div class="workspace-manager-section-head">
+                      <p class="workspace-manager-section-title">Host-Key Rotation Review</p>
+                      <p id="connection-profile-ssh-trust-compare-status" class="workspace-manager-status"></p>
+                    </div>
+                    <p class="workspace-manager-inline-note workspace-manager-inline-note-tight">
+                      The selected fetched host key conflicts with the currently trusted key for the same target and key type.
+                      Verify both fingerprints against your server before replacing the stored trust entry.
+                    </p>
+                    <div class="workspace-manager-form-grid">
+                      <div class="workspace-manager-field-block">
+                        <label class="workspace-manager-field" for="connection-profile-ssh-trust-current-key-type">Trusted Key Type</label>
+                        <input
+                          id="connection-profile-ssh-trust-current-key-type"
+                          class="workspace-manager-input"
+                          type="text"
+                          readonly
+                        />
+                      </div>
+                      <div class="workspace-manager-field-block">
+                        <label class="workspace-manager-field" for="connection-profile-ssh-trust-current-fingerprint">Trusted Fingerprint</label>
+                        <input
+                          id="connection-profile-ssh-trust-current-fingerprint"
+                          class="workspace-manager-input"
+                          type="text"
+                          readonly
+                        />
+                      </div>
+                      <div class="workspace-manager-field-block">
+                        <label class="workspace-manager-field" for="connection-profile-ssh-trust-candidate-key-type">Fetched Key Type</label>
+                        <input
+                          id="connection-profile-ssh-trust-candidate-key-type"
+                          class="workspace-manager-input"
+                          type="text"
+                          readonly
+                        />
+                      </div>
+                      <div class="workspace-manager-field-block">
+                        <label class="workspace-manager-field" for="connection-profile-ssh-trust-candidate-fingerprint">Fetched Fingerprint</label>
+                        <input
+                          id="connection-profile-ssh-trust-candidate-fingerprint"
+                          class="workspace-manager-input"
+                          type="text"
+                          readonly
+                        />
+                      </div>
+                    </div>
+                    <div class="workspace-manager-actions">
+                      <button id="connection-profile-ssh-trust-replace" type="button">Replace Trusted Key</button>
+                    </div>
+                  </section>
+                </section>
               </section>
               <details class="workspace-manager-advanced">
                 <summary>Advanced launch options</summary>

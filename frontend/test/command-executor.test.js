@@ -132,7 +132,7 @@ test("command executor help and usage strings derive from declarative schema met
   const sshUsage = await executor.execute({ command: "ssh", args: [], raw: "/ssh" });
   assert.equal(
     sshUsage,
-    "Usage: /ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>] | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]"
+    "Usage: /ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>] | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]"
   );
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
@@ -191,6 +191,7 @@ test("command executor help and usage strings derive from declarative schema met
 
   const sshHelp = await executor.execute({ command: "help", args: ["ssh"], raw: "/help ssh" });
   assert.match(sshHelp, /Usage: \/ssh <target> \| \/ssh <target> --key <path>/);
+  assert.match(sshHelp, /--deck <deckSelector>/);
   assert.match(sshHelp, /\/ssh hostkey probe <target>/);
 
   const customPreviewUsage = await executor.execute({ command: "custom", args: ["preview"], raw: "/custom preview" });
@@ -207,6 +208,8 @@ test("command executor routes one-shot ssh launches through the shared connectio
   const launchCalls = [];
   const executor = createExecutor({
     getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    resolveDeckToken: (selector) =>
+      selector === "infra" ? { deck: { id: "infra", name: "Infra" }, error: "" } : { deck: null, error: `Unknown deck: ${selector}` },
     normalizeThemeProfile: (profile) => profile || {},
     launchConnectionLaunch: async (launch, launchOptions) => {
       launchCalls.push([launch, launchOptions]);
@@ -217,8 +220,26 @@ test("command executor routes one-shot ssh launches through the shared connectio
   assert.equal(
     await executor.execute({
       command: "ssh",
-      args: ["ixpqtwnk@carpo.uberspace.de", "--key", "~/.ssh/id_ed25519"],
-      raw: "/ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519"
+      args: ["ixpqtwnk@carpo.uberspace.de", "--deck", "missing"],
+      raw: "/ssh ixpqtwnk@carpo.uberspace.de --deck missing"
+    }),
+    "Unknown deck: missing"
+  );
+  assert.equal(
+    await executor.execute({
+      command: "ssh",
+      args: [
+        "ixpqtwnk@carpo.uberspace.de",
+        "--key",
+        "~/.ssh/id_ed25519",
+        "--deck",
+        "infra",
+        "--cwd",
+        "/srv/app",
+        "--command",
+        "tmux a || tmux"
+      ],
+      raw: "/ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519 --deck infra --cwd /srv/app --command \"tmux a || tmux\""
     }),
     "launched:carpo.uberspace.de:privateKey"
   );
@@ -226,10 +247,10 @@ test("command executor routes one-shot ssh launches through the shared connectio
     [
       {
         kind: "ssh",
-        deckId: "ops",
+        deckId: "infra",
         shell: "ssh",
-        startCwd: "~",
-        startCommand: "",
+        startCwd: "/srv/app",
+        startCommand: "tmux a || tmux",
         env: {},
         tags: [],
         themeProfile: { background: "#111111" },

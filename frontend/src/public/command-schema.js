@@ -502,15 +502,15 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/ssh",
     kind: "command",
     description: "start one-shot SSH sessions and manage SSH host-key trust",
-    example: "/ssh ops@example.com --key ~/.ssh/id_ed25519",
+    example: "/ssh ops@example.com --deck ops --cwd /srv/app --command \"tmux a || tmux\" --key ~/.ssh/id_ed25519",
     summary:
-      "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]",
+      "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>] | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]",
     usage: [
       "/ssh <target>",
       "/ssh <target> --key <path>",
       "/ssh <target> --password",
       "/ssh <target> --keyboard-interactive",
-      "/ssh <target> [-l|--user <username>] [-p|--port <port>]",
+      "/ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>]",
       "/ssh hostkey list [target]",
       "/ssh hostkey probe <target>",
       "/ssh hostkey trust <target> [keyType|fingerprint]",
@@ -519,6 +519,7 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     notes: [
       "Target syntax is `[user@]host[:port]`. You can override the parsed username or port with `-l` / `--user` and `-p` / `--port`.",
       "Private-key auth is the default. Use `-i` / `--key <path>` to pin an explicit key path, `--password` for password auth, or `--keyboard-interactive` for keyboard-interactive auth.",
+      "Use `--deck <deckSelector>` to choose the destination deck explicitly, `--cwd <path>` for the starting directory, and `--command <command>` for a startup command. Quote multi-word commands so they stay one slash-command argument.",
       "If no trusted SSH host key exists for the target, use `/ssh hostkey probe <target>` to fetch the presented keys, verify the fingerprint, then `/ssh hostkey trust <target> <keyType|fingerprint>` before rerunning `/ssh ...`."
     ],
     subcommands: {

@@ -21,6 +21,7 @@ Useful slash companions:
 ```text
 /connection list
 /ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
+/ssh ixpqtwnk@carpo.uberspace.de --deck infra --cwd /srv/app --command "tmux a || tmux" --key ~/.ssh/id_ed25519
 /ssh hostkey probe carpo.uberspace.de:22
 /ssh hostkey trust carpo.uberspace.de:22 ssh-ed25519
 /connection draft new ops-ssh
@@ -28,7 +29,9 @@ Useful slash companions:
 /connection apply ops-ssh
 ```
 
-`/ssh ...` now starts a one-shot SSH session without first saving a connection profile, and the SSH host-key lifecycle is also available in the command plane. Use `/ssh hostkey probe <target>` to fetch the presented keys, verify the fingerprint, then `/ssh hostkey trust <target> <keyType|fingerprint>` before rerunning `/ssh ...`. The `Connections` UI still shows the same trust state for saved-profile workflows.
+`/ssh ...` now starts a one-shot SSH session without first saving a connection profile, and the SSH host-key lifecycle is also available in the command plane. Use `/ssh hostkey probe <target>` to fetch the presented keys, verify the fingerprint, then `/ssh hostkey trust <target> <keyType|fingerprint>` before rerunning `/ssh ...`. One-shot SSH launches can now also pin the destination deck with `--deck <deckSelector>`, set the starting directory with `--cwd <path>`, and attach one startup command with `--command <command>`.
+
+The `Connections` UI keeps the SSH trust section visible for SSH drafts. On first connect it now shows the fetch/verify/trust guidance inline, and when a fetched key conflicts with an existing trusted key of the same type it renders an explicit old/new fingerprint comparison plus `Replace Trusted Key` for the verified rotation case.
 
 For password or keyboard-interactive SSH auth, both saved-profile launches and one-shot `/ssh ...` launches now request the runtime secret in one masked launch dialog right before start. The secret is not stored in the saved profile, browser state, or backend persistence.
 

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, and preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates, request runtime secrets only through one shared masked action-dialog seam, and expose slash-command host-key lifecycle management plus missing-trust recovery through `/ssh hostkey ...`; `v0.4.0-H166` remains the active promoted wave for the remaining SSH operator-experience polish)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, and extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`; `v0.4.0-H166` is now completed)
 
 ## Current Product Truth
 
@@ -79,7 +79,7 @@ Current contract:
 - This prevents OpenSSH from preferring an untrusted host-key algorithm, such as `ssh-ed25519`, over a different already-trusted key type, such as `ssh-rsa`, under strict host-key checking.
 - This also closes the live dev/runtime bug where the backend trust store and rendered `backend/data/ssh_known_hosts` file were correct, but OpenSSH still failed strict host-key checking because a relative `data/ssh_known_hosts` path was being resolved in the wrong working directory.
 - This also closes the follow-up live bug where OpenSSH was reading the managed file but rejected the rendered trusted RSA line with `parse error in hostkeys file` because the persisted host-key blob had been normalized to unpadded base64 instead of the canonical padded wire form.
-- The command plane now exposes one-shot SSH launches through `/ssh <target>`, with optional `-l` / `--user`, `-p` / `--port`, `-i` / `--key`, `--password`, and `--keyboard-interactive` options.
+- The command plane now exposes one-shot SSH launches through `/ssh <target>`, with optional `-l` / `--user`, `-p` / `--port`, `-i` / `--key`, `--password`, `--keyboard-interactive`, `--deck`, `--cwd`, and `--command` options.
 - Saved-profile SSH launches and one-shot `/ssh ...` launches both reuse the same frontend trust/secret gates in the connection-profile runtime seam instead of maintaining separate SSH launch contracts.
 - Secret-backed SSH launches now request their runtime secret only through the shared masked action dialog:
   - `frontend/src/public/ui/action-dialog-controller.js` now exposes `requestSecret(...)` with password-type input and no browser-prompt fallback for secrets.
@@ -91,9 +91,12 @@ Current contract:
   - `/ssh hostkey trust <target> [keyType|fingerprint]`
   - `/ssh hostkey delete <target> [keyType|fingerprint]`
 - When a one-shot `/ssh ...` launch hits a target with no trusted host key yet, the frontend now auto-probes the host keys, keeps the attempted SSH launch in the `Connections` draft for UI continuity, and fails with command-plane recovery guidance that points directly at `/ssh hostkey probe ...`, `/ssh hostkey trust ...`, and `/ssh hostkey list ...`.
-- The active follow-up wave `v0.4.0-H166` is explicitly scoped to the remaining operator-experience gaps in this SSH baseline:
-  - host-key rotation is fail-closed technically but still needs an explicit guided replace flow and old/new fingerprint comparison
-  - one-shot `/ssh ...` still exposes a narrower launch contract than saved connection profiles and needs final doc/help alignment once the promoted parity flags land
+- The `Connections` SSH trust section is now a surfaced part of the normal SSH draft flow instead of an advanced-only disclosure:
+  - first-connect guidance is shown inline as soon as an SSH host/port is present
+  - fetched and trusted keys stay visible side by side with the selected fingerprint/public-key preview
+  - when a fetched key conflicts with an existing trusted key of the same type, the UI now renders explicit trusted-versus-fetched fingerprint comparison and a guided `Replace Trusted Key` action
+  - the replace flow deletes the old trust entry only long enough to create the new one and restores the previous trust entry automatically if replacement creation fails
+- README, the workspace-library manual, generated command help, and the generated handbook/reference artifacts are now aligned with the shipped `/ssh ...` contract, including the new `--deck`, `--cwd`, and `--command` flags plus the command-plane host-key lifecycle and surfaced rotation workflow.
 
 ## Messaging Files Intentionally Kept
 

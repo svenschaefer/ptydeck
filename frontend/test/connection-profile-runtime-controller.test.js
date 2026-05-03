@@ -89,15 +89,23 @@ function createConnectionProfileUiRefs() {
     runtimeSecretFieldEl: createElement("div"),
     runtimeSecretInputEl: createElement("input"),
     sshTrustStatusEl: createElement("p"),
+    sshTrustGuidanceEl: createElement("p"),
     sshTrustProbeBtn: createElement("button"),
     sshProbeSelectEl: createElement("select"),
     sshTrustSelectEl: createElement("select"),
     sshTrustKeyTypeInputEl: createElement("input"),
     sshTrustFingerprintInputEl: createElement("input"),
     sshTrustPublicKeyTextareaEl: createElement("textarea"),
+    sshTrustCompareEl: createElement("section"),
+    sshTrustCompareStatusEl: createElement("p"),
+    sshTrustCurrentKeyTypeInputEl: createElement("input"),
+    sshTrustCurrentFingerprintInputEl: createElement("input"),
+    sshTrustCandidateKeyTypeInputEl: createElement("input"),
+    sshTrustCandidateFingerprintInputEl: createElement("input"),
     sshTrustRefreshBtn: createElement("button"),
     sshTrustSaveBtn: createElement("button"),
     sshTrustDeleteBtn: createElement("button"),
+    sshTrustReplaceBtn: createElement("button"),
     deleteConfirmEl: createElement("div"),
     deleteConfirmMessageEl: createElement("p"),
     deleteConfirmBtn: createElement("button"),
@@ -997,6 +1005,8 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
     port: 22
   });
   assert.equal(calls.some((entry) => entry[0] === "create-session"), false);
+  assert.match(ui.sshTrustGuidanceEl.textContent, /First connect for ops-new\.example:22/);
+  assert.equal(ui.sshTrustCompareEl.hidden, true);
   assert.equal(ui.sshProbeSelectEl.value.includes("ssh-ed25519"), true);
   assert.equal(ui.sshTrustKeyTypeInputEl.value, "ssh-ed25519");
   assert.equal(ui.sshTrustFingerprintInputEl.value, "SHA256:created");
@@ -1111,6 +1121,7 @@ test("connection profile runtime controller seeds the SSH draft when a one-shot 
   assert.equal(ui.draftKindSelectEl.value, "ssh");
   assert.equal(ui.draftNameInputEl.value, "SSH ixpqtwnk@carpo.uberspace.de:22");
   assert.equal(controller.getDraftState()?.launch?.remoteConnection?.host, "carpo.uberspace.de");
+  assert.match(ui.sshTrustGuidanceEl.textContent, /First connect for carpo\.uberspace\.de:22/);
   assert.equal(ui.sshTrustFingerprintInputEl.value, "SHA256:created");
 });
 
@@ -1211,6 +1222,207 @@ test("connection profile runtime controller exposes target-based SSH host-key li
     ["list-trust"],
     ["delete-trust", "trust-rsa"],
     ["list-trust"],
+    ["list-trust"]
+  ]);
+});
+
+test("connection profile runtime controller renders SSH host-key rotation review and replaces the conflicting trust entry", async () => {
+  const calls = [];
+  const ui = createConnectionProfileUiRefs();
+  const trustEntries = [
+    {
+      id: "trust-rsa-old",
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCold",
+      fingerprintSha256: "SHA256:old-rsa"
+    }
+  ];
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async listSshTrustEntries() {
+        calls.push(["list-trust"]);
+        return trustEntries.slice();
+      },
+      async probeSshHostKeys(payload) {
+        calls.push(["probe-trust", payload]);
+        return [
+          {
+            host: payload.host,
+            port: payload.port,
+            keyType: "ssh-rsa",
+            publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCnew",
+            fingerprintSha256: "SHA256:new-rsa"
+          }
+        ];
+      },
+      async createSshTrustEntry(payload) {
+        calls.push(["create-trust", payload]);
+        if (trustEntries.some((entry) => entry.host === payload.host && entry.port === payload.port && entry.keyType === payload.keyType && entry.publicKey !== payload.publicKey)) {
+          const error = new Error("conflict");
+          error.status = 409;
+          error.error = "SshHostKeyTrustConflict";
+          throw error;
+        }
+        const created = {
+          id: "trust-rsa-new",
+          host: payload.host,
+          port: payload.port,
+          keyType: payload.keyType,
+          publicKey: payload.publicKey,
+          fingerprintSha256: "SHA256:new-rsa"
+        };
+        trustEntries.push(created);
+        return created;
+      },
+      async deleteSshTrustEntry(entryId) {
+        calls.push(["delete-trust", entryId]);
+        const index = trustEntries.findIndex((entry) => entry.id === entryId);
+        if (index >= 0) {
+          trustEntries.splice(index, 1);
+        }
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await controller.newDraftFlow("ssh");
+  ui.draftRemoteHostInputEl.value = "carpo.uberspace.de";
+  ui.draftRemoteHostInputEl.dispatch("input");
+  ui.draftRemotePortInputEl.value = "22";
+  ui.draftRemotePortInputEl.dispatch("input");
+  await controller.refreshSshTrustEntries({ silent: true });
+  await controller.probeSshHostKeysForTarget({ host: "carpo.uberspace.de", port: 22 }, { silent: true });
+
+  assert.equal(ui.sshTrustCompareEl.hidden, false);
+  assert.match(ui.sshTrustStatusEl.textContent, /Rotation candidate ready/);
+  assert.match(ui.sshTrustGuidanceEl.textContent, /Rotation review for carpo\.uberspace\.de:22/);
+  assert.equal(ui.sshTrustCurrentKeyTypeInputEl.value, "ssh-rsa");
+  assert.equal(ui.sshTrustCurrentFingerprintInputEl.value, "SHA256:old-rsa");
+  assert.equal(ui.sshTrustCandidateKeyTypeInputEl.value, "ssh-rsa");
+  assert.equal(ui.sshTrustCandidateFingerprintInputEl.value, "SHA256:new-rsa");
+  assert.equal(ui.sshTrustSaveBtn.disabled, true);
+  assert.equal(ui.sshTrustReplaceBtn.disabled, false);
+
+  const guidedConflictFeedback = await controller.saveTrustEntryFlow();
+  assert.match(guidedConflictFeedback, /rotation review required for carpo\.uberspace\.de:22/i);
+
+  const replaceFeedback = await controller.replaceTrustEntryFlow();
+  assert.match(replaceFeedback, /Replaced trusted SSH host key for carpo\.uberspace\.de:22 \(ssh-rsa, SHA256:old-rsa -> SHA256:new-rsa\)\./);
+  assert.equal(ui.sshTrustCompareEl.hidden, true);
+  assert.deepEqual(calls.slice(-6), [
+    ["list-trust"],
+    ["probe-trust", { host: "carpo.uberspace.de", port: 22 }],
+    ["create-trust", {
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCnew"
+    }],
+    ["delete-trust", "trust-rsa-old"],
+    ["create-trust", {
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCnew"
+    }],
+    ["list-trust"]
+  ]);
+});
+
+test("connection profile runtime controller restores the old SSH trust entry when replacement creation fails", async () => {
+  const calls = [];
+  const ui = createConnectionProfileUiRefs();
+  const trustEntries = [
+    {
+      id: "trust-rsa-old",
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCold",
+      fingerprintSha256: "SHA256:old-rsa"
+    }
+  ];
+  let createCount = 0;
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async listSshTrustEntries() {
+        calls.push(["list-trust"]);
+        return trustEntries.slice();
+      },
+      async probeSshHostKeys(payload) {
+        calls.push(["probe-trust", payload]);
+        return [
+          {
+            host: payload.host,
+            port: payload.port,
+            keyType: "ssh-rsa",
+            publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCnew",
+            fingerprintSha256: "SHA256:new-rsa"
+          }
+        ];
+      },
+      async createSshTrustEntry(payload) {
+        createCount += 1;
+        calls.push(["create-trust", createCount, payload]);
+        if (createCount === 1) {
+          throw new Error("backend create failed");
+        }
+        const restored = {
+          id: "trust-rsa-restored",
+          host: payload.host,
+          port: payload.port,
+          keyType: payload.keyType,
+          publicKey: payload.publicKey,
+          fingerprintSha256: "SHA256:old-rsa"
+        };
+        trustEntries.push(restored);
+        return restored;
+      },
+      async deleteSshTrustEntry(entryId) {
+        calls.push(["delete-trust", entryId]);
+        const index = trustEntries.findIndex((entry) => entry.id === entryId);
+        if (index >= 0) {
+          trustEntries.splice(index, 1);
+        }
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#090909"),
+    getErrorMessage: (error, fallback) => error?.message || fallback
+  });
+
+  await controller.newDraftFlow("ssh");
+  ui.draftRemoteHostInputEl.value = "carpo.uberspace.de";
+  ui.draftRemoteHostInputEl.dispatch("input");
+  ui.draftRemotePortInputEl.value = "22";
+  ui.draftRemotePortInputEl.dispatch("input");
+  await controller.refreshSshTrustEntries({ silent: true });
+  await controller.probeSshHostKeysForTarget({ host: "carpo.uberspace.de", port: 22 }, { silent: true });
+
+  await assert.rejects(
+    () => controller.replaceTrustEntryFlow(),
+    /Restored the previous trusted fingerprint SHA256:old-rsa\. backend create failed/
+  );
+  assert.deepEqual(calls.slice(-5), [
+    ["probe-trust", { host: "carpo.uberspace.de", port: 22 }],
+    ["delete-trust", "trust-rsa-old"],
+    ["create-trust", 1, {
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCnew"
+    }],
+    ["create-trust", 2, {
+      host: "carpo.uberspace.de",
+      port: 22,
+      keyType: "ssh-rsa",
+      publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQCold"
+    }],
     ["list-trust"]
   ]);
 });

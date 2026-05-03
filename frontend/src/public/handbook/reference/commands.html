@@ -537,7 +537,7 @@
 <li><code>/ssh &lt;target&gt; --key &lt;path&gt;</code></li>
 <li><code>/ssh &lt;target&gt; --password</code></li>
 <li><code>/ssh &lt;target&gt; --keyboard-interactive</code></li>
-<li><code>/ssh &lt;target&gt; [-l|--user &lt;username&gt;] [-p|--port &lt;port&gt;]</code></li>
+<li><code>/ssh &lt;target&gt; [-l|--user &lt;username&gt;] [-p|--port &lt;port&gt;] [--deck &lt;deckSelector&gt;] [--cwd &lt;path&gt;] [--command &lt;command&gt;]</code></li>
 <li><code>/ssh hostkey list [target]</code></li>
 <li><code>/ssh hostkey probe &lt;target&gt;</code></li>
 <li><code>/ssh hostkey trust &lt;target&gt; [keyType|fingerprint]</code></li>
@@ -549,6 +549,7 @@
 <ul>
 <li>Target syntax is <code>[user@]host[:port]</code>. You can override the parsed username or port with <code>-l</code> / <code>--user</code> and <code>-p</code> / <code>--port</code>.</li>
 <li>Private-key auth is the default. Use <code>-i</code> / <code>--key &lt;path&gt;</code> to pin an explicit key path, <code>--password</code> for password auth, or <code>--keyboard-interactive</code> for keyboard-interactive auth.</li>
+<li>Use <code>--deck &lt;deckSelector&gt;</code> to choose the destination deck explicitly, <code>--cwd &lt;path&gt;</code> for the starting directory, and <code>--command &lt;command&gt;</code> for a startup command. Quote multi-word commands so they stay one slash-command argument.</li>
 <li>If no trusted SSH host key exists for the target, use <code>/ssh hostkey probe &lt;target&gt;</code> to fetch the presented keys, verify the fingerprint, then <code>/ssh hostkey trust &lt;target&gt; &lt;keyType|fingerprint&gt;</code> before rerunning <code>/ssh ...</code>.</li>
 </ul>
 

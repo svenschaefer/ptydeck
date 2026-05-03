@@ -51,7 +51,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   );
   assert.equal(
     ssh.summary,
-    "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]"
+    "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>] | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]"
   );
   assert.equal(layout.summary, "/layout | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(
@@ -94,7 +94,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
     "/ssh <target> --key <path>",
     "/ssh <target> --password",
     "/ssh <target> --keyboard-interactive",
-    "/ssh <target> [-l|--user <username>] [-p|--port <port>]",
+    "/ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>]",
     "/ssh hostkey list [target]",
     "/ssh hostkey probe <target>",
     "/ssh hostkey trust <target> [keyType|fingerprint]",
@@ -145,7 +145,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   );
   assert.equal(
     getSlashCommandUsage("ssh"),
-    "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>] | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]"
+    "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>] | /ssh hostkey list [target] | /ssh hostkey probe <target> | /ssh hostkey trust <target> [keyType|fingerprint] | /ssh hostkey delete <target> [keyType|fingerprint]"
   );
   assert.equal(
     getSlashCommandUsage("ssh", "hostkey"),
@@ -231,6 +231,7 @@ test("command schema formats topic help text for commands and subcommands", () =
   const sshHelp = createCommandTopicHelpText("ssh", "", ["ssh", "help"]);
   assert.match(sshHelp, /^\/ssh$/m);
   assert.match(sshHelp, /Usage: \/ssh <target> \| \/ssh <target> --key <path>/);
+  assert.match(sshHelp, /--deck <deckSelector>/);
   assert.match(sshHelp, /Subcommands: hostkey/);
   assert.match(sshHelp, /Target syntax is `\[user@\]host\[:port\]`/);
 
@@ -262,7 +263,7 @@ test("command schema registry resolves declarative command definitions by name",
     "/ssh <target> --key <path>",
     "/ssh <target> --password",
     "/ssh <target> --keyboard-interactive",
-    "/ssh <target> [-l|--user <username>] [-p|--port <port>]",
+    "/ssh <target> [-l|--user <username>] [-p|--port <port>] [--deck <deckSelector>] [--cwd <path>] [--command <command>]",
     "/ssh hostkey list [target]",
     "/ssh hostkey probe <target>",
     "/ssh hostkey trust <target> [keyType|fingerprint]",
