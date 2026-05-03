@@ -102,7 +102,7 @@ test("command executor help and usage strings derive from declarative schema met
   const deckUsage = await executor.execute({ command: "deck", args: ["wat"], raw: "/deck wat" });
   assert.equal(
     deckUsage,
-    "Usage: /deck list | /deck new <name> | /deck rename <name> | /deck rename <deckSelector> <name> | /deck switch <deckSelector> | /deck delete [deckSelector] [force]"
+    "Usage: /deck | /deck new <name> | /deck rename <name> | /deck rename <deckSelector> <name> | /deck switch <deckSelector> | /deck delete [deckSelector] [force]"
   );
 
   const moveUsage = await executor.execute({ command: "move", args: ["1"], raw: "/move 1" });
@@ -120,23 +120,23 @@ test("command executor help and usage strings derive from declarative schema met
   const connectionUsage = await executor.execute({ command: "connection", args: ["wat"], raw: "/connection wat" });
   assert.equal(
     connectionUsage,
-    "Usage: /connection list | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft show | /connection draft new [name] | /connection draft active | /connection draft set <json> | /connection draft save [name] | /connection draft reset"
+    "Usage: /connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft show | /connection draft new [name] | /connection draft active | /connection draft set <json> | /connection draft save [name] | /connection draft reset"
   );
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
-  assert.equal(layoutUsage, "Usage: /layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
+  assert.equal(layoutUsage, "Usage: /layout | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
 
   const workspaceUsage = await executor.execute({ command: "workspace", args: ["wat"], raw: "/workspace wat" });
   assert.equal(
     workspaceUsage,
-    "Usage: /workspace list | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear"
+    "Usage: /workspace | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear"
   );
 
   const broadcastUsage = await executor.execute({ command: "broadcast", args: ["wat"], raw: "/broadcast wat" });
-  assert.equal(broadcastUsage, "Usage: /broadcast status | /broadcast off | /broadcast group [group]");
+  assert.equal(broadcastUsage, "Usage: /broadcast | /broadcast off | /broadcast group [group]");
 
   const shareUsage = await executor.execute({ command: "share", args: ["wat"], raw: "/share wat" });
-  assert.equal(shareUsage, "Usage: /share list | /share session | /share deck [deckSelector] | /share revoke <shareId>");
+  assert.equal(shareUsage, "Usage: /share | /share session | /share deck [deckSelector] | /share revoke <shareId>");
 
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
   assert.equal(
@@ -149,6 +149,7 @@ test("command executor help and usage strings derive from declarative schema met
 
   const shareTopicHelp = await executor.execute({ command: "help", args: ["share"], raw: "/help share" });
   assert.match(shareTopicHelp, /^\/share$/m);
+  assert.match(shareTopicHelp, /Bare `\/share` is shorthand for `\/share list`\./);
   assert.match(shareTopicHelp, /Subcommands: list session deck revoke/);
 
   const renameUsage = await executor.execute({ command: "rename", args: [], raw: "/rename" });
@@ -157,11 +158,24 @@ test("command executor help and usage strings derive from declarative schema met
   const settingsUsage = await executor.execute({ command: "settings", args: [], raw: "/settings" });
   assert.equal(
     settingsUsage,
-    "Usage: /settings show | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...> | /settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
+    "Usage: /settings show | /settings apply <json> | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...> | /settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
   );
+
+  const settingsHelp = await executor.execute({ command: "help", args: ["settings"], raw: "/help settings" });
+  assert.match(settingsHelp, /Usage: \/settings show \| \/settings apply <json>/);
+  assert.match(settingsHelp, /@<sessionSelector> \/settings \.\.\./);
 
   const customShowUsage = await executor.execute({ command: "custom", args: ["show"], raw: "/custom show" });
   assert.equal(customShowUsage, "Usage: /custom show [scope:global|scope:project|scope:session:<selector>] <name>");
+
+  const customUsage = await executor.execute({ command: "custom", args: ["wat"], raw: "/custom wat" });
+  assert.equal(
+    customUsage,
+    "Custom command definition error: unsupported"
+  );
+
+  const customHelp = await executor.execute({ command: "help", args: ["custom"], raw: "/help custom" });
+  assert.match(customHelp, /Usage: \/custom list \| \/custom show/);
 
   const customPreviewUsage = await executor.execute({ command: "custom", args: ["preview"], raw: "/custom preview" });
   assert.equal(

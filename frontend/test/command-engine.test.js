@@ -130,7 +130,7 @@ test("command engine derives schema-backed size and custom usage errors", () => 
   assert.deepEqual(engine.parseCustomDefinition("/custom"), {
     ok: false,
     error:
-      "Usage: /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text> | /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> + block"
+      "Usage: /custom list | /custom show [scope:global|scope:project|scope:session:<selector>] <name> | /custom preview [scope:global|scope:project|scope:session:<selector>] <name> [key=value ...] [-- <targetSelector>] | /custom remove [scope:global|scope:project|scope:session:<selector>] <name> | /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text> | /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> + block"
   });
 });
 

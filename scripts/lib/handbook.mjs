@@ -841,6 +841,12 @@ function buildCommandsReferenceMarkdown() {
     for (const usage of command.usage) {
       lines.push(`- ${formatCode(usage)}`);
     }
+    if (Array.isArray(command.notes) && command.notes.length > 0) {
+      lines.push("", "### Notes", "");
+      for (const note of command.notes) {
+        lines.push(`- ${note}`);
+      }
+    }
     if (aliases.length > 0) {
       lines.push("", `### Aliases`, "", aliases.map(formatCode).join(", "));
     }
@@ -854,6 +860,10 @@ function buildCommandsReferenceMarkdown() {
         lines.push(
           `| ${formatCode(subcommand.label)} | ${cleanInlineText(subcommand.description)}${
             subcommandAliases.length > 0 ? `<br>Aliases: ${subcommandAliases.map(formatCode).join(", ")}` : ""
+          }${
+            Array.isArray(subcommand.notes) && subcommand.notes.length > 0
+              ? `<br>Notes: ${subcommand.notes.map((note) => cleanInlineText(note)).join(" ")}`
+              : ""
           } | ${subcommand.usage.map(formatCode).join("<br>")} |`
         );
       }

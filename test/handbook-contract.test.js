@@ -57,6 +57,12 @@ test('generated command reference covers every canonical slash command', async (
   }
 });
 
+test('generated command reference includes promoted slash-command contract entries', () => {
+  const commandReference = fs.readFileSync(commandReferencePath, 'utf8');
+  assert.match(commandReference, /`\/settings apply <json>`/);
+  assert.match(commandReference, /`\/custom list`/);
+});
+
 test('documented slash-command examples resolve to known command topics', async () => {
   const { interpretComposerInput } = await loadModule('frontend/src/public/command-interpreter.js');
   const { createSlashCommandRegistry } = await loadModule('frontend/src/public/command-schema.js');
@@ -72,6 +78,12 @@ test('documented slash-command examples resolve to known command topics', async 
     assert.equal(parsed.kind, 'control', `Expected ${example} to resolve as a control command.`);
     assert.ok(registry.get(parsed.command), `Expected ${example} to resolve to a known slash command or alias.`);
   }
+});
+
+test('startup manual examples do not advertise the removed positional rename form', () => {
+  const startupManual = fs.readFileSync(path.join(manualDir, 'startup-and-sessions.md'), 'utf8');
+  assert.doesNotMatch(startupManual, /^\/rename\s+\S+\s+\S+$/m);
+  assert.match(startupManual, /@4 \/rename build-agent/);
 });
 
 test('main UI handbook entry and deep links resolve to generated handbook pages', () => {

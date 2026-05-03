@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (`v0.4.0-H164` completed; quick-send authority moved server-side; `v0.4.0-H163` returned as the active quality wave)
+Last updated: 2026-05-03 (`QLT-260` and `QLT-264` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
 
 ## Current Product Truth
 
@@ -227,15 +227,15 @@ The validated `H162` closeout hotspot snapshot is:
 
 On 2026-05-02, a fresh repo-wide review was rerun after the session quick-send overlay UX refinement so the next quality wave is based on the current tree instead of only on the earlier `H162` closeout snapshot.
 
-Validated top-line coverage on the `H163` promotion tree:
+Validated top-line coverage on the current `H163` active tree:
 
 - root tooling: `92.77%` line / `76.81%` branch
-- backend: `95.06%` line / `88.51%` branch
-- frontend: `96.84%` line / `89.30%` branch
+- backend: `95.15%` line / `88.54%` branch
+- frontend: `96.86%` line / `89.32%` branch
 
 Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 
-- `backend/src/runtime.js`: `6588` lines, `80.49%` line / `71.72%` branch
+- `backend/src/runtime.js`: `6444` lines, `80.49%` line / `71.72%` branch
 - `backend/src/ssh-host-key-probe.js`: `247` lines, `89.88%` line / `89.01%` branch
 - `backend/src/telegram-adapter.js`: `1423` lines, `91.22%` line / `79.45%` branch
 - `backend/src/messaging-runtime.js`: `1030` lines, `91.75%` line / `80.00%` branch
@@ -247,13 +247,21 @@ Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `89.32%` line / `81.91%` branch
 - `frontend/src/public/session-quick-send-runtime-controller.js`: `91.24%` line / `80.30%` branch
 
-Promoted `H163` tasks:
+`QLT-260` is now complete. `backend/src/runtime.js` delegates spectator/session visibility, filtered snapshot/event shaping, and read-only quick-send sanitization into the new `backend/src/runtime-session-authority.js` seam, which validates at `93.62%` line / `87.23%` branch coverage under direct tests in `backend/test/runtime-session-authority.test.js`.
 
-- `QLT-260` extracts the next startup/request/session-authority seam from `backend/src/runtime.js` and closes it with direct deterministic regressions.
+`QLT-264` is now complete. The slash-command product contract is now aligned across executor behavior, declarative schema, generated reference/help, and handbook examples:
+
+- `/settings apply <json>` and `/custom list` are now first-class schema/docs/help entries instead of executor-only behavior.
+- The shipped bare shorthands `/deck`, `/connection`, `/layout`, `/workspace`, `/broadcast`, and `/share` are now explicitly documented as accepted product syntax.
+- Free-text session commands such as `/rename`, `/note`, `/settings`, and `/transfer` are now treated as active-session commands by default, with direct-route `@<sessionSelector> /...` documented as the supported non-switch targeting form.
+- Commands that intentionally accept positional selectors, such as `/restart` and selector-taking replay forms, keep that positional grammar documented as part of the authoritative command surface.
+- The handbook no longer advertises the invalid positional `/rename 4 build-agent` form; it now documents the supported active-session and direct-route variants.
+
+Remaining promoted `H163` tasks:
+
 - `QLT-261` hardens the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
 - `QLT-262` hardens SSH/foreground/runtime reliability coverage across `backend/src/ssh-host-key-probe.js`, `backend/src/terminal-foreground-process.js`, and the retained runtime config/error-path helpers that gate them.
 - `QLT-263` extracts the next bootstrap/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and closes it with direct deterministic regressions.
-- `QLT-264` hardens operator command-entry coverage across `frontend/src/public/command-executor.js`, `frontend/src/public/command-composer-runtime-controller.js`, `frontend/src/public/command-completion.js`, and the retained command handler seams.
 - `QLT-265` hardens terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
 
 Not promoted from the fresh review:
@@ -303,7 +311,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-260` through `QLT-265`.
+- `TODO.md`: active promoted tasks are `QLT-261`, `QLT-262`, `QLT-263`, and `QLT-265`.
 - `ROADMAP.md`: latest completed wave is `v0.4.0-H164`; active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.

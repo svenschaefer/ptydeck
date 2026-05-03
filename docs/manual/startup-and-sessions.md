@@ -38,8 +38,15 @@ Use `Terminal Size` and `Saved Layouts` in the sidebar for the same operations t
 
 Use slash commands when you already know the session selector, or use the session card toolbar when you are working visually.
 
+Not every session-bound command uses the same targeting shape:
+
+- commands with an explicit selector slot, such as `/restart`, take selectors positionally
+- free-text commands such as `/rename`, `/note`, `/settings`, and `/transfer` target the active session by default; use `@<sessionSelector> /...` to route them to another session without switching
+
 ```text
-/rename 4 build-agent
+/switch 4
+/rename build-agent
+@4 /rename build-agent
 /restart 4
 ```
 

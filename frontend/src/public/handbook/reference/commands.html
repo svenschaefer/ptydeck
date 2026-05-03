@@ -40,13 +40,13 @@
 <table>
 <thead><tr><th>Command</th><th>Description</th><th>Usage</th><th>Aliases</th></tr></thead>
 <tbody>
-<tr><td><code>/broadcast</code></td><td>manage composer broadcast mode for workspace groups</td><td><code>/broadcast status</code><br><code>/broadcast off</code><br><code>/broadcast group [group]</code></td><td>-</td></tr>
+<tr><td><code>/broadcast</code></td><td>manage composer broadcast mode for workspace groups</td><td><code>/broadcast</code><br><code>/broadcast off</code><br><code>/broadcast group [group]</code></td><td>-</td></tr>
 <tr><td><code>/close</code></td><td>delete sessions</td><td><code>/close [selector[,selector...]]</code></td><td><code>/session.close</code></td></tr>
-<tr><td><code>/connection</code></td><td>manage saved connection profiles</td><td><code>/connection list</code><br><code>/connection new &lt;name&gt;</code><br><code>/connection save &lt;name&gt;</code><br><code>/connection show &lt;profile&gt;</code><br><code>/connection apply &lt;profile&gt;</code><br><code>/connection duplicate &lt;profile&gt; &lt;name&gt;</code><br><code>/connection rename &lt;profile&gt; &lt;name&gt;</code><br><code>/connection delete &lt;profile&gt;</code><br><code>/connection draft show</code><br><code>/connection draft new [name]</code><br><code>/connection draft active</code><br><code>/connection draft set &lt;json&gt;</code><br><code>/connection draft save [name]</code><br><code>/connection draft reset</code></td><td>-</td></tr>
-<tr><td><code>/deck</code></td><td>manage decks</td><td><code>/deck list</code><br><code>/deck new &lt;name&gt;</code><br><code>/deck rename &lt;name&gt;</code><br><code>/deck rename &lt;deckSelector&gt; &lt;name&gt;</code><br><code>/deck switch &lt;deckSelector&gt;</code><br><code>/deck delete [deckSelector] [force]</code></td><td>-</td></tr>
+<tr><td><code>/connection</code></td><td>manage saved connection profiles</td><td><code>/connection</code><br><code>/connection new &lt;name&gt;</code><br><code>/connection save &lt;name&gt;</code><br><code>/connection show &lt;profile&gt;</code><br><code>/connection apply &lt;profile&gt;</code><br><code>/connection duplicate &lt;profile&gt; &lt;name&gt;</code><br><code>/connection rename &lt;profile&gt; &lt;name&gt;</code><br><code>/connection delete &lt;profile&gt;</code><br><code>/connection draft show</code><br><code>/connection draft new [name]</code><br><code>/connection draft active</code><br><code>/connection draft set &lt;json&gt;</code><br><code>/connection draft save [name]</code><br><code>/connection draft reset</code></td><td>-</td></tr>
+<tr><td><code>/deck</code></td><td>manage decks</td><td><code>/deck</code><br><code>/deck new &lt;name&gt;</code><br><code>/deck rename &lt;name&gt;</code><br><code>/deck rename &lt;deckSelector&gt; &lt;name&gt;</code><br><code>/deck switch &lt;deckSelector&gt;</code><br><code>/deck delete [deckSelector] [force]</code></td><td>-</td></tr>
 <tr><td><code>/filter</code></td><td>filter visible terminals</td><td><code>/filter [id/tag[,id/tag...]]</code></td><td>-</td></tr>
 <tr><td><code>/help</code></td><td>show command help</td><td><code>/help</code><br><code>/help &lt;topic&gt;</code><br><code>/help &lt;topic&gt; &lt;subcommand&gt;</code></td><td>-</td></tr>
-<tr><td><code>/layout</code></td><td>manage persisted layout profiles</td><td><code>/layout list</code><br><code>/layout save &lt;name&gt;</code><br><code>/layout apply &lt;profile&gt;</code><br><code>/layout rename &lt;profile&gt; &lt;name&gt;</code><br><code>/layout delete &lt;profile&gt;</code></td><td>-</td></tr>
+<tr><td><code>/layout</code></td><td>manage persisted layout profiles</td><td><code>/layout</code><br><code>/layout save &lt;name&gt;</code><br><code>/layout apply &lt;profile&gt;</code><br><code>/layout rename &lt;profile&gt; &lt;name&gt;</code><br><code>/layout delete &lt;profile&gt;</code></td><td>-</td></tr>
 <tr><td><code>/list</code></td><td>list sessions</td><td><code>/list</code></td><td><code>/session.list</code></td></tr>
 <tr><td><code>/move</code></td><td>move sessions to a deck</td><td><code>/move &lt;sessionSelector&gt; &lt;deckSelector&gt;</code></td><td>-</td></tr>
 <tr><td><code>/new</code></td><td>create a new session</td><td><code>/new [shell]</code></td><td><code>/session.new</code></td></tr>
@@ -57,12 +57,12 @@
 <tr><td><code>/replay</code></td><td>view retained replay tails or preview/copy/paste normalized replay excerpts</td><td><code>/replay view</code><br><code>/replay export</code><br><code>/replay copy</code><br><code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code><br><code>/replay preview &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code><br><code>/replay paste &lt;sourceSelector&gt; &lt;targetSelector&gt; &lt;sliceSelector&gt;</code></td><td>-</td></tr>
 <tr><td><code>/restart</code></td><td>restart sessions</td><td><code>/restart [selector[,selector...]]</code></td><td><code>/session.restart</code></td></tr>
 <tr><td><code>/run</code></td><td>run a newline-separated slash-command script</td><td><code>/run + newline-separated slash commands</code><br><code>/cmd1 + newline + /cmd2</code></td><td>-</td></tr>
-<tr><td><code>/share</code></td><td>manage read-only spectator shares for sessions and decks</td><td><code>/share list</code><br><code>/share session</code><br><code>/share deck [deckSelector]</code><br><code>/share revoke &lt;shareId&gt;</code></td><td>-</td></tr>
+<tr><td><code>/share</code></td><td>manage read-only spectator shares for sessions and decks</td><td><code>/share</code><br><code>/share session</code><br><code>/share deck [deckSelector]</code><br><code>/share revoke &lt;shareId&gt;</code></td><td>-</td></tr>
 <tr><td><code>/size</code></td><td>set deck terminal size</td><td><code>/size &lt;cols&gt; &lt;rows&gt;</code><br><code>/size c&lt;cols&gt;</code><br><code>/size r&lt;rows&gt;</code></td><td>-</td></tr>
 <tr><td><code>/swap</code></td><td>swap quick ids between two sessions</td><td><code>/swap &lt;selectorA&gt; &lt;selectorB&gt;</code></td><td><code>/session.swap</code></td></tr>
 <tr><td><code>/switch</code></td><td>switch active session</td><td><code>/switch &lt;sessionSelector&gt;</code></td><td><code>/session.switch</code></td></tr>
 <tr><td><code>/transfer</code></td><td>upload or download bounded files for one session</td><td><code>/transfer upload [path]</code><br><code>/transfer download &lt;path&gt;</code></td><td>-</td></tr>
-<tr><td><code>/workspace</code></td><td>manage persisted workspace presets</td><td><code>/workspace list</code><br><code>/workspace save &lt;name&gt;</code><br><code>/workspace show &lt;preset&gt;</code><br><code>/workspace apply &lt;preset&gt;</code><br><code>/workspace duplicate &lt;preset&gt; &lt;name&gt;</code><br><code>/workspace rename &lt;preset&gt; &lt;name&gt;</code><br><code>/workspace delete &lt;preset&gt;</code><br><code>/workspace group list</code><br><code>/workspace group save &lt;name&gt;</code><br><code>/workspace group apply &lt;group&gt;</code><br><code>/workspace group rename &lt;group&gt; &lt;name&gt;</code><br><code>/workspace group delete &lt;group&gt;</code><br><code>/workspace group clear</code></td><td>-</td></tr>
+<tr><td><code>/workspace</code></td><td>manage persisted workspace presets</td><td><code>/workspace</code><br><code>/workspace save &lt;name&gt;</code><br><code>/workspace show &lt;preset&gt;</code><br><code>/workspace apply &lt;preset&gt;</code><br><code>/workspace duplicate &lt;preset&gt; &lt;name&gt;</code><br><code>/workspace rename &lt;preset&gt; &lt;name&gt;</code><br><code>/workspace delete &lt;preset&gt;</code><br><code>/workspace group list</code><br><code>/workspace group save &lt;name&gt;</code><br><code>/workspace group apply &lt;group&gt;</code><br><code>/workspace group rename &lt;group&gt; &lt;name&gt;</code><br><code>/workspace group delete &lt;group&gt;</code><br><code>/workspace group clear</code></td><td>-</td></tr>
 </tbody>
 </table>
 
@@ -73,7 +73,7 @@
 <h3 id="usage">Usage</h3>
 
 <ul>
-<li><code>/broadcast status</code></li>
+<li><code>/broadcast</code></li>
 <li><code>/broadcast off</code></li>
 <li><code>/broadcast group [group]</code></li>
 </ul>
@@ -110,7 +110,7 @@
 <h3 id="usage-3">Usage</h3>
 
 <ul>
-<li><code>/connection list</code></li>
+<li><code>/connection</code></li>
 <li><code>/connection new &lt;name&gt;</code></li>
 <li><code>/connection save &lt;name&gt;</code></li>
 <li><code>/connection show &lt;profile&gt;</code></li>
@@ -126,6 +126,13 @@
 <li><code>/connection draft reset</code></li>
 </ul>
 
+<h3 id="notes">Notes</h3>
+
+<ul>
+<li>Bare <code>/connection</code> is shorthand for <code>/connection list</code>.</li>
+<li>The session-derived subcommands <code>/connection save &lt;name&gt;</code> and <code>/connection draft active</code> use the active session by default and support direct-route targeting.</li>
+</ul>
+
 <h3 id="subcommands-2">Subcommands</h3>
 
 <table>
@@ -138,7 +145,7 @@
 <tr><td><code>/connection list</code></td><td>list saved connection profiles<br>Aliases: <code>/connection.list</code></td><td><code>/connection list</code></td></tr>
 <tr><td><code>/connection new</code></td><td>create a blank saved connection profile<br>Aliases: <code>/connection.new</code></td><td><code>/connection new &lt;name&gt;</code></td></tr>
 <tr><td><code>/connection rename</code></td><td>rename a saved connection profile<br>Aliases: <code>/connection.rename</code></td><td><code>/connection rename &lt;profile&gt; &lt;name&gt;</code></td></tr>
-<tr><td><code>/connection save</code></td><td>save a session launch preset as a connection profile<br>Aliases: <code>/connection.save</code></td><td><code>/connection save &lt;name&gt;</code></td></tr>
+<tr><td><code>/connection save</code></td><td>save a session launch preset as a connection profile<br>Aliases: <code>/connection.save</code><br>Notes: Targets the active session by default. To target another session without switching, use <code>/help @</code> and the direct-route form <code>@&lt;sessionSelector&gt; /&lt;command&gt; ...</code>.</td><td><code>/connection save &lt;name&gt;</code></td></tr>
 <tr><td><code>/connection show</code></td><td>show connection profile details<br>Aliases: <code>/connection.show</code></td><td><code>/connection show &lt;profile&gt;</code></td></tr>
 </tbody>
 </table>
@@ -150,8 +157,19 @@
 <h3 id="usage-4">Usage</h3>
 
 <ul>
+<li><code>/custom list</code></li>
+<li><code>/custom show [scope:global|scope:project|scope:session:&lt;selector&gt;] &lt;name&gt;</code></li>
+<li><code>/custom preview [scope:global|scope:project|scope:session:&lt;selector&gt;] &lt;name&gt; [key=value ...] [-- &lt;targetSelector&gt;]</code></li>
+<li><code>/custom remove [scope:global|scope:project|scope:session:&lt;selector&gt;] &lt;name&gt;</code></li>
 <li><code>/custom [plain|template] [scope:global|scope:project|scope:session:&lt;selector&gt;] &lt;name&gt; &lt;text&gt;</code></li>
 <li><code>/custom [plain|template] [scope:global|scope:project|scope:session:&lt;selector&gt;] &lt;name&gt; + block</code></li>
+</ul>
+
+<h3 id="notes-2">Notes</h3>
+
+<ul>
+<li>Use <code>/custom list</code> to inspect saved commands.</li>
+<li>When the first token is not a recognized subcommand, <code>/custom ...</code> defines or updates a custom command.</li>
 </ul>
 
 <h3 id="subcommands-3">Subcommands</h3>
@@ -159,7 +177,7 @@
 <table>
 <thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
 <tbody>
-
+<tr><td><code>/custom list</code></td><td>list saved custom commands</td><td><code>/custom list</code></td></tr>
 </tbody>
 </table>
 
@@ -170,7 +188,7 @@
 <h3 id="usage-5">Usage</h3>
 
 <ul>
-<li><code>/deck list</code></li>
+<li><code>/deck</code></li>
 <li><code>/deck new &lt;name&gt;</code></li>
 <li><code>/deck rename &lt;name&gt;</code></li>
 <li><code>/deck rename &lt;deckSelector&gt; &lt;name&gt;</code></li>
@@ -220,7 +238,7 @@
 <h3 id="usage-8">Usage</h3>
 
 <ul>
-<li><code>/layout list</code></li>
+<li><code>/layout</code></li>
 <li><code>/layout save &lt;name&gt;</code></li>
 <li><code>/layout apply &lt;profile&gt;</code></li>
 <li><code>/layout rename &lt;profile&gt; &lt;name&gt;</code></li>
@@ -302,6 +320,13 @@
 <li><code>/note [text...]</code></li>
 </ul>
 
+<h3 id="notes-3">Notes</h3>
+
+<ul>
+<li>This command does not accept a positional session selector.</li>
+<li>Update the active session note with <code>/note &lt;text...&gt;</code>, or target another session with <code>@&lt;sessionSelector&gt; /note &lt;text...&gt;</code>.</li>
+</ul>
+
 <h3 id="aliases-5">Aliases</h3>
 
 <p><code>/session.note</code></p>
@@ -330,6 +355,13 @@
 <li><code>/rename &lt;name&gt;</code></li>
 </ul>
 
+<h3 id="notes-4">Notes</h3>
+
+<ul>
+<li>This command does not accept a positional session selector.</li>
+<li>Rename the active session with <code>/rename &lt;name&gt;</code>, or target another session with <code>@&lt;sessionSelector&gt; /rename &lt;name&gt;</code>.</li>
+</ul>
+
 <h3 id="aliases-7">Aliases</h3>
 
 <p><code>/session.rename</code></p>
@@ -349,16 +381,23 @@
 <li><code>/replay paste &lt;sourceSelector&gt; &lt;targetSelector&gt; &lt;sliceSelector&gt;</code></li>
 </ul>
 
+<h3 id="notes-5">Notes</h3>
+
+<ul>
+<li>The <code>/replay view</code>, <code>/replay export</code>, and zero-selector <code>/replay copy</code> forms use the active session by default and support direct-route targeting.</li>
+<li>The excerpt-oriented <code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code>, <code>/replay preview ...</code>, and <code>/replay paste ...</code> forms use explicit positional selectors.</li>
+</ul>
+
 <h3 id="subcommands-6">Subcommands</h3>
 
 <table>
 <thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
 <tbody>
-<tr><td><code>/replay copy</code></td><td>copy the retained replay tail or a normalized replay excerpt to the clipboard<br>Aliases: <code>/replay.copy</code></td><td><code>/replay copy</code><br><code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code></td></tr>
-<tr><td><code>/replay export</code></td><td>download the retained replay tail<br>Aliases: <code>/replay.export</code></td><td><code>/replay export</code></td></tr>
+<tr><td><code>/replay copy</code></td><td>copy the retained replay tail or a normalized replay excerpt to the clipboard<br>Aliases: <code>/replay.copy</code><br>Notes: Without selector arguments, <code>/replay copy</code> uses the active session by default and supports direct-route targeting. Use <code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code> when you want an explicit replay excerpt source.</td><td><code>/replay copy</code><br><code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code></td></tr>
+<tr><td><code>/replay export</code></td><td>download the retained replay tail<br>Aliases: <code>/replay.export</code><br>Notes: Targets the active session by default. To target another session without switching, use <code>/help @</code> and the direct-route form <code>@&lt;sessionSelector&gt; /&lt;command&gt; ...</code>.</td><td><code>/replay export</code></td></tr>
 <tr><td><code>/replay paste</code></td><td>paste a normalized replay excerpt from one session into another session<br>Aliases: <code>/ccp</code>, <code>/replay.paste</code></td><td><code>/replay paste &lt;sourceSelector&gt; &lt;targetSelector&gt; &lt;sliceSelector&gt;</code></td></tr>
 <tr><td><code>/replay preview</code></td><td>preview a normalized replay excerpt from one source session<br>Aliases: <code>/replay.preview</code></td><td><code>/replay preview &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code></td></tr>
-<tr><td><code>/replay view</code></td><td>open the retained replay tail in the reading viewer<br>Aliases: <code>/replay.view</code></td><td><code>/replay view</code></td></tr>
+<tr><td><code>/replay view</code></td><td>open the retained replay tail in the reading viewer<br>Aliases: <code>/replay.view</code><br>Notes: Targets the active session by default. To target another session without switching, use <code>/help @</code> and the direct-route form <code>@&lt;sessionSelector&gt; /&lt;command&gt; ...</code>.</td><td><code>/replay view</code></td></tr>
 </tbody>
 </table>
 
@@ -370,6 +409,13 @@
 
 <ul>
 <li><code>/restart [selector[,selector...]]</code></li>
+</ul>
+
+<h3 id="notes-6">Notes</h3>
+
+<ul>
+<li>Without selector arguments, <code>/restart</code> targets the active session.</li>
+<li>Use <code>@&lt;sessionSelector&gt; /restart</code> for another single session without switching, or <code>/restart &lt;selector[,selector...]&gt;</code> for explicit targets.</li>
 </ul>
 
 <h3 id="aliases-8">Aliases</h3>
@@ -395,6 +441,7 @@
 
 <ul>
 <li><code>/settings show</code></li>
+<li><code>/settings apply &lt;json&gt;</code></li>
 <li><code>/settings startup show</code></li>
 <li><code>/settings startup cwd &lt;path&gt;</code></li>
 <li><code>/settings startup command &lt;text...&gt;</code></li>
@@ -416,11 +463,19 @@
 <li><code>/settings mouse-forwarding set &lt;off|application&gt;</code></li>
 </ul>
 
+<h3 id="notes-7">Notes</h3>
+
+<ul>
+<li>This command family targets the active session by default and does not accept a positional session selector.</li>
+<li>Use <code>@&lt;sessionSelector&gt; /settings ...</code> to inspect or update another session without switching.</li>
+</ul>
+
 <h3 id="subcommands-7">Subcommands</h3>
 
 <table>
 <thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
 <tbody>
+<tr><td><code>/settings apply</code></td><td>apply a normalized settings JSON payload<br>Notes: Targets the active session by default. To target another session without switching, use <code>/help @</code> and the direct-route form <code>@&lt;sessionSelector&gt; /&lt;command&gt; ...</code>.</td><td><code>/settings apply &lt;json&gt;</code></td></tr>
 <tr><td><code>/settings input-safety</code></td><td>inspect or edit explicit input safety options<br>Aliases: <code>/settings.input-safety</code></td><td><code>/settings input-safety show</code><br><code>/settings input-safety set &lt;field&gt; &lt;value&gt;</code></td></tr>
 <tr><td><code>/settings note</code></td><td>inspect or edit the persisted session note<br>Aliases: <code>/settings.note</code></td><td><code>/settings note show</code><br><code>/settings note set &lt;text...&gt;</code><br><code>/settings note clear</code></td></tr>
 <tr><td><code>/settings show</code></td><td>show session settings<br>Aliases: <code>/settings.show</code></td><td><code>/settings show</code></td></tr>
@@ -434,10 +489,17 @@
 <h3 id="usage-20">Usage</h3>
 
 <ul>
-<li><code>/share list</code></li>
+<li><code>/share</code></li>
 <li><code>/share session</code></li>
 <li><code>/share deck [deckSelector]</code></li>
 <li><code>/share revoke &lt;shareId&gt;</code></li>
+</ul>
+
+<h3 id="notes-8">Notes</h3>
+
+<ul>
+<li>Bare <code>/share</code> is shorthand for <code>/share list</code>.</li>
+<li>The <code>/share session</code> subcommand uses the active session by default and supports direct-route targeting.</li>
 </ul>
 
 <h3 id="subcommands-8">Subcommands</h3>
@@ -448,7 +510,7 @@
 <tr><td><code>/share deck</code></td><td>create a read-only spectator link for the active or selected deck<br>Aliases: <code>/share.deck</code></td><td><code>/share deck [deckSelector]</code></td></tr>
 <tr><td><code>/share list</code></td><td>list active and revoked share links<br>Aliases: <code>/share.list</code></td><td><code>/share list</code></td></tr>
 <tr><td><code>/share revoke</code></td><td>revoke an existing spectator link<br>Aliases: <code>/share.revoke</code></td><td><code>/share revoke &lt;shareId&gt;</code></td></tr>
-<tr><td><code>/share session</code></td><td>create a read-only spectator link for one session<br>Aliases: <code>/share.session</code></td><td><code>/share session</code></td></tr>
+<tr><td><code>/share session</code></td><td>create a read-only spectator link for one session<br>Aliases: <code>/share.session</code><br>Notes: Targets the active session by default. To target another session without switching, use <code>/help @</code> and the direct-route form <code>@&lt;sessionSelector&gt; /&lt;command&gt; ...</code>.</td><td><code>/share session</code></td></tr>
 </tbody>
 </table>
 
@@ -503,13 +565,20 @@
 <li><code>/transfer download &lt;path&gt;</code></li>
 </ul>
 
+<h3 id="notes-9">Notes</h3>
+
+<ul>
+<li>Targets the active session by default.</li>
+<li>Use <code>@&lt;sessionSelector&gt; /transfer upload [path]</code> or <code>@&lt;sessionSelector&gt; /transfer download &lt;path&gt;</code> to route file transfer to another session without switching.</li>
+</ul>
+
 <h3 id="subcommands-9">Subcommands</h3>
 
 <table>
 <thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
 <tbody>
-<tr><td><code>/transfer download</code></td><td>download a bounded file from the target session root<br>Aliases: <code>/transfer.download</code></td><td><code>/transfer download &lt;path&gt;</code></td></tr>
-<tr><td><code>/transfer upload</code></td><td>pick a local file and upload it into the target session root<br>Aliases: <code>/transfer.upload</code></td><td><code>/transfer upload [path]</code></td></tr>
+<tr><td><code>/transfer download</code></td><td>download a bounded file from the target session root<br>Aliases: <code>/transfer.download</code><br>Notes: Targets the active session by default. To target another session without switching, use <code>/help @</code> and the direct-route form <code>@&lt;sessionSelector&gt; /&lt;command&gt; ...</code>.</td><td><code>/transfer download &lt;path&gt;</code></td></tr>
+<tr><td><code>/transfer upload</code></td><td>pick a local file and upload it into the target session root<br>Aliases: <code>/transfer.upload</code><br>Notes: Targets the active session by default. To target another session without switching, use <code>/help @</code> and the direct-route form <code>@&lt;sessionSelector&gt; /&lt;command&gt; ...</code>.</td><td><code>/transfer upload [path]</code></td></tr>
 </tbody>
 </table>
 
@@ -520,7 +589,7 @@
 <h3 id="usage-25">Usage</h3>
 
 <ul>
-<li><code>/workspace list</code></li>
+<li><code>/workspace</code></li>
 <li><code>/workspace save &lt;name&gt;</code></li>
 <li><code>/workspace show &lt;preset&gt;</code></li>
 <li><code>/workspace apply &lt;preset&gt;</code></li>
@@ -567,9 +636,11 @@
 <li><a class="handbook-page-toc-link" href="#aliases">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#connection">/connection</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-3">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-2">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#custom">/custom</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-4">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-2">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-3">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#deck">/deck</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-5">Usage</a></li>
@@ -594,26 +665,32 @@
 <li><a class="handbook-page-toc-link" href="#aliases-4">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#note">/note</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-13">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-3">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-5">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#prev">/prev</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-14">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-6">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#rename">/rename</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-15">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-4">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-7">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#replay">/replay</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-16">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-5">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-6">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#restart">/restart</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-17">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-6">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-8">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#run">/run</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-18">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#settings">/settings</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-19">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-7">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-7">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#share">/share</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-20">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-8">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-8">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#size">/size</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-21">Usage</a></li>
@@ -625,6 +702,7 @@
 <li><a class="handbook-page-toc-link" href="#aliases-10">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#transfer">/transfer</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-24">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-9">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-9">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#workspace">/workspace</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-25">Usage</a></li>

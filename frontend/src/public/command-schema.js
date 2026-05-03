@@ -83,6 +83,7 @@ function freezeCommandDefinition(definition, keyPrefix = "slash") {
   const canonicalSubcommand = normalizeLower(definition.canonicalSubcommand);
   const aliasOf = normalizeText(definition.aliasOf);
   const argsPrefix = freezeStringList(definition.argsPrefix);
+  const notes = freezeStringList(definition.notes);
   return Object.freeze({
     key,
     insertText,
@@ -98,9 +99,15 @@ function freezeCommandDefinition(definition, keyPrefix = "slash") {
     canonicalSubcommand: canonicalSubcommand || undefined,
     aliasOf: aliasOf || undefined,
     argsPrefix,
+    notes,
     isAlias: Boolean(canonicalCommand)
   });
 }
+
+const ACTIVE_SESSION_DIRECT_ROUTE_NOTE = Object.freeze([
+  "Targets the active session by default.",
+  "To target another session without switching, use `/help @` and the direct-route form `@<sessionSelector> /<command> ...`."
+]);
 
 const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
   new: freezeCommandDefinition({
@@ -119,9 +126,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage decks",
     example: "/deck switch ops",
-    summary: "/deck list|new|rename|switch|delete",
+    summary: "/deck | /deck new <name> | /deck rename ... | /deck switch <deckSelector> | /deck delete [deckSelector] [force]",
     usage: [
-      "/deck list",
+      "/deck",
       "/deck new <name>",
       "/deck rename <name>",
       "/deck rename <deckSelector> <name>",
@@ -278,7 +285,11 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "rename a session",
     example: "/rename api",
-    usage: "/rename <name>"
+    usage: "/rename <name>",
+    notes: [
+      "This command does not accept a positional session selector.",
+      "Rename the active session with `/rename <name>`, or target another session with `@<sessionSelector> /rename <name>`."
+    ]
   }),
   restart: freezeCommandDefinition({
     key: "slash:restart",
@@ -288,7 +299,11 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     description: "restart sessions",
     example: "/restart 1",
     usage: "/restart [selector[,selector...]]",
-    args: [{ provider: "multi-target-selector", optional: true }]
+    args: [{ provider: "multi-target-selector", optional: true }],
+    notes: [
+      "Without selector arguments, `/restart` targets the active session.",
+      "Use `@<sessionSelector> /restart` for another single session without switching, or `/restart <selector[,selector...]>` for explicit targets."
+    ]
   }),
   note: freezeCommandDefinition({
     key: "slash:note",
@@ -297,7 +312,11 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "set or clear a persisted session note",
     example: "/note needs review",
-    usage: "/note [text...]"
+    usage: "/note [text...]",
+    notes: [
+      "This command does not accept a positional session selector.",
+      "Update the active session note with `/note <text...>`, or target another session with `@<sessionSelector> /note <text...>`."
+    ]
   }),
   connection: freezeCommandDefinition({
     key: "slash:connection",
@@ -307,9 +326,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     description: "manage saved connection profiles",
     example: "/connection apply ops-shell",
     summary:
-      "/connection list | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft ...",
+      "/connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft ...",
     usage: [
-      "/connection list",
+      "/connection",
       "/connection new <name>",
       "/connection save <name>",
       "/connection show <profile>",
@@ -323,6 +342,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       "/connection draft set <json>",
       "/connection draft save [name]",
       "/connection draft reset"
+    ],
+    notes: [
+      "Bare `/connection` is shorthand for `/connection list`.",
+      "The session-derived subcommands `/connection save <name>` and `/connection draft active` use the active session by default and support direct-route targeting."
     ],
     subcommands: {
       list: {
@@ -350,7 +373,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         description: "save a session launch preset as a connection profile",
         example: "/connection save ops-shell",
         key: "slash:connection:save",
-        usage: "/connection save <name>"
+        usage: "/connection save <name>",
+        notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
       },
       show: {
         insertText: "show",
@@ -438,7 +462,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
             description: "load the active or direct-targeted session into the connection draft",
             example: "/connection draft active",
             key: "slash:connection:draft:active",
-            usage: "/connection draft active"
+            usage: "/connection draft active",
+            notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
           },
           set: {
             insertText: "set",
@@ -487,6 +512,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       "/replay preview <sourceSelector> <sliceSelector>",
       "/replay paste <sourceSelector> <targetSelector> <sliceSelector>"
     ],
+    notes: [
+      "The `/replay view`, `/replay export`, and zero-selector `/replay copy` forms use the active session by default and support direct-route targeting.",
+      "The excerpt-oriented `/replay copy <sourceSelector> <sliceSelector>`, `/replay preview ...`, and `/replay paste ...` forms use explicit positional selectors."
+    ],
     subcommands: {
       view: {
         insertText: "view",
@@ -495,7 +524,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         description: "open the retained replay tail in the reading viewer",
         example: "/replay view",
         key: "slash:replay:view",
-        usage: "/replay view"
+        usage: "/replay view",
+        notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
       },
       export: {
         insertText: "export",
@@ -504,7 +534,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         description: "download the retained replay tail",
         example: "/replay export",
         key: "slash:replay:export",
-        usage: "/replay export"
+        usage: "/replay export",
+        notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
       },
       copy: {
         insertText: "copy",
@@ -517,7 +548,11 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
           "/replay copy",
           "/replay copy <sourceSelector> <sliceSelector>"
         ],
-        args: [{ provider: "session-selector" }, { provider: "replay-slice-selector" }]
+        args: [{ provider: "session-selector" }, { provider: "replay-slice-selector" }],
+        notes: [
+          "Without selector arguments, `/replay copy` uses the active session by default and supports direct-route targeting.",
+          "Use `/replay copy <sourceSelector> <sliceSelector>` when you want an explicit replay excerpt source."
+        ]
       },
       preview: {
         insertText: "preview",
@@ -553,6 +588,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       "/transfer upload [path]",
       "/transfer download <path>"
     ],
+    notes: [
+      "Targets the active session by default.",
+      "Use `@<sessionSelector> /transfer upload [path]` or `@<sessionSelector> /transfer download <path>` to route file transfer to another session without switching."
+    ],
     subcommands: {
       upload: {
         insertText: "upload",
@@ -561,7 +600,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         description: "pick a local file and upload it into the target session root",
         example: "/transfer upload logs/output.txt",
         key: "slash:transfer:upload",
-        usage: "/transfer upload [path]"
+        usage: "/transfer upload [path]",
+        notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
       },
       download: {
         insertText: "download",
@@ -570,7 +610,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         description: "download a bounded file from the target session root",
         example: "/transfer download logs/output.txt",
         key: "slash:transfer:download",
-        usage: "/transfer download <path>"
+        usage: "/transfer download <path>",
+        notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
       }
     }
   }),
@@ -582,9 +623,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     description: "inspect or manage session settings",
     example: "/settings show",
     summary:
-      "/settings show | /settings startup ... | /settings note ... | /settings theme ... | /settings input-safety ... | /settings mouse-forwarding ...",
+      "/settings show | /settings apply <json> | /settings startup ... | /settings note ... | /settings theme ... | /settings input-safety ... | /settings mouse-forwarding ...",
     usage: [
       "/settings show",
+      "/settings apply <json>",
       "/settings startup show",
       "/settings startup cwd <path>",
       "/settings startup command <text...>",
@@ -605,6 +647,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       "/settings mouse-forwarding show",
       "/settings mouse-forwarding set <off|application>"
     ],
+    notes: [
+      "This command family targets the active session by default and does not accept a positional session selector.",
+      "Use `@<sessionSelector> /settings ...` to inspect or update another session without switching."
+    ],
     subcommands: {
       show: {
         insertText: "show",
@@ -614,6 +660,16 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         example: "/settings show",
         key: "slash:settings:show",
         usage: "/settings show"
+      },
+      apply: {
+        insertText: "apply",
+        label: "/settings apply",
+        kind: "subcommand",
+        description: "apply a normalized settings JSON payload",
+        example: "/settings apply {\"note\":\"needs review\"}",
+        key: "slash:settings:apply",
+        usage: "/settings apply <json>",
+        notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
       },
       startup: {
         insertText: "startup",
@@ -868,9 +924,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage persisted layout profiles",
     example: "/layout apply ops",
-    summary: "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>",
+    summary: "/layout | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>",
     usage: [
-      "/layout list",
+      "/layout",
       "/layout save <name>",
       "/layout apply <profile>",
       "/layout rename <profile> <name>",
@@ -932,9 +988,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     description: "manage persisted workspace presets",
     example: "/workspace apply ops",
     summary:
-      "/workspace list | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ...",
+      "/workspace | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ...",
     usage: [
-      "/workspace list",
+      "/workspace",
       "/workspace save <name>",
       "/workspace show <preset>",
       "/workspace apply <preset>",
@@ -1093,9 +1149,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage composer broadcast mode for workspace groups",
     example: "/broadcast group",
-    summary: "/broadcast status | /broadcast off | /broadcast group [group]",
+    summary: "/broadcast | /broadcast off | /broadcast group [group]",
     usage: [
-      "/broadcast status",
+      "/broadcast",
       "/broadcast off",
       "/broadcast group [group]"
     ],
@@ -1136,12 +1192,16 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage read-only spectator shares for sessions and decks",
     example: "/share session",
-    summary: "/share list | /share session | /share deck | /share revoke <shareId>",
+    summary: "/share | /share session | /share deck [deckSelector] | /share revoke <shareId>",
     usage: [
-      "/share list",
+      "/share",
       "/share session",
       "/share deck [deckSelector]",
       "/share revoke <shareId>"
+    ],
+    notes: [
+      "Bare `/share` is shorthand for `/share list`.",
+      "The `/share session` subcommand uses the active session by default and supports direct-route targeting."
     ],
     subcommands: {
       list: {
@@ -1160,7 +1220,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         description: "create a read-only spectator link for one session",
         example: "/share session",
         key: "slash:share:session",
-        usage: "/share session"
+        usage: "/share session",
+        notes: ACTIVE_SESSION_DIRECT_ROUTE_NOTE
       },
       deck: {
         insertText: "deck",
@@ -1190,11 +1251,30 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage custom commands",
     example: "/custom show scope:project deploy",
+    summary:
+      "/custom list | /custom show ... | /custom preview ... | /custom remove ... | /custom [plain|template] [scope:...] <name> <text>",
     usage: [
+      "/custom list",
+      "/custom show [scope:global|scope:project|scope:session:<selector>] <name>",
+      "/custom preview [scope:global|scope:project|scope:session:<selector>] <name> [key=value ...] [-- <targetSelector>]",
+      "/custom remove [scope:global|scope:project|scope:session:<selector>] <name>",
       "/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text>",
       "/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> + block"
     ],
+    notes: [
+      "Use `/custom list` to inspect saved commands.",
+      "When the first token is not a recognized subcommand, `/custom ...` defines or updates a custom command."
+    ],
     subcommands: {
+      list: {
+        insertText: "list",
+        label: "/custom list",
+        kind: "subcommand",
+        description: "list saved custom commands",
+        example: "/custom list",
+        key: "slash:custom:list",
+        usage: "/custom list"
+      },
       show: {
         insertText: "show",
         label: "/custom show",
@@ -1505,6 +1585,7 @@ export function createCommandTopicHelpText(commandName, subcommandName = "", sys
       subcommand.label,
       `Usage: ${subcommand.usage.join(" | ")}`,
       subcommand.description,
+      ...(subcommand.notes || []).map((note) => `Note: ${note}`),
       aliases.length > 0 ? `Aliases: ${aliases.map((entry) => entry.label).join(" ")}` : ""
     ]
       .filter(Boolean)
@@ -1526,6 +1607,9 @@ export function createCommandTopicHelpText(commandName, subcommandName = "", sys
   }
   if (command.description) {
     sections.push(command.description);
+  }
+  if (command.notes?.length) {
+    sections.push(...command.notes.map((note) => `Note: ${note}`));
   }
   if (command.subcommands && Object.keys(command.subcommands).length > 0) {
     sections.push(

@@ -42,18 +42,18 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(sessionSwapAlias);
   assert.ok(ccpAlias);
   assert.ok(run);
-  assert.equal(deck.summary, "/deck list|new|rename|switch|delete");
+  assert.equal(deck.summary, "/deck | /deck new <name> | /deck rename ... | /deck switch <deckSelector> | /deck delete [deckSelector] [force]");
   assert.equal(
     connection.summary,
-    "/connection list | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft ..."
+    "/connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft ..."
   );
-  assert.equal(layout.summary, "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
+  assert.equal(layout.summary, "/layout | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(
     workspace.summary,
-    "/workspace list | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ..."
+    "/workspace | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ..."
   );
-  assert.equal(broadcast.summary, "/broadcast status | /broadcast off | /broadcast group [group]");
-  assert.equal(share.summary, "/share list | /share session | /share deck | /share revoke <shareId>");
+  assert.equal(broadcast.summary, "/broadcast | /broadcast off | /broadcast group [group]");
+  assert.equal(share.summary, "/share | /share session | /share deck [deckSelector] | /share revoke <shareId>");
   assert.equal(transfer.summary, "/transfer upload [path] | /transfer download <path>");
   assert.deepEqual(
     swap.args,
@@ -67,6 +67,10 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.deepEqual(connection.subcommands.new.usage, ["/connection new <name>"]);
   assert.deepEqual(connection.subcommands.duplicate.usage, ["/connection duplicate <profile> <name>"]);
   assert.deepEqual(connection.subcommands.save.usage, ["/connection save <name>"]);
+  assert.deepEqual(connection.subcommands.save.notes, [
+    "Targets the active session by default.",
+    "To target another session without switching, use `/help @` and the direct-route form `@<sessionSelector> /<command> ...`."
+  ]);
   assert.deepEqual(connection.subcommands.draft.usage, [
     "/connection draft show",
     "/connection draft new [name]",
@@ -74,6 +78,10 @@ test("command schema exposes declarative command metadata and distinct help/usag
     "/connection draft set <json>",
     "/connection draft save [name]",
     "/connection draft reset"
+  ]);
+  assert.deepEqual(connection.subcommands.draft.subcommands.active.notes, [
+    "Targets the active session by default.",
+    "To target another session without switching, use `/help @` and the direct-route form `@<sessionSelector> /<command> ...`."
   ]);
   assert.equal(deckSwitchAlias.aliasOf, "/deck switch");
   assert.deepEqual(deckSwitchAlias.argsPrefix, ["switch"]);
@@ -97,6 +105,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(ccpAlias.aliasOf, "/replay paste");
   assert.deepEqual(ccpAlias.argsPrefix, ["paste"]);
   assert.equal(settings.subcommands.show.args, undefined);
+  assert.deepEqual(settings.subcommands.apply.usage, ["/settings apply <json>"]);
   assert.deepEqual(settings.subcommands.startup.subcommands.cwd.usage, [
     "/settings startup cwd <path>",
     "/settings startup cwd clear"
@@ -104,21 +113,21 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.deepEqual(settings.subcommands["mouse-forwarding"].subcommands.set.usage, [
     "/settings mouse-forwarding set <off|application>"
   ]);
-  assert.equal(getSlashCommandUsage("deck"), "/deck list | /deck new <name> | /deck rename <name> | /deck rename <deckSelector> <name> | /deck switch <deckSelector> | /deck delete [deckSelector] [force]");
+  assert.equal(getSlashCommandUsage("deck"), "/deck | /deck new <name> | /deck rename <name> | /deck rename <deckSelector> <name> | /deck switch <deckSelector> | /deck delete [deckSelector] [force]");
   assert.equal(getSlashCommandUsage("swap"), "/swap <selectorA> <selectorB>");
   assert.equal(getSlashCommandUsage("note"), "/note [text...]");
   assert.equal(
     getSlashCommandUsage("connection"),
-    "/connection list | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft show | /connection draft new [name] | /connection draft active | /connection draft set <json> | /connection draft save [name] | /connection draft reset"
+    "/connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft show | /connection draft new [name] | /connection draft active | /connection draft set <json> | /connection draft save [name] | /connection draft reset"
   );
-  assert.equal(getSlashCommandUsage("layout"), "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
+  assert.equal(getSlashCommandUsage("layout"), "/layout | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(
     getSlashCommandUsage("workspace"),
-    "/workspace list | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear"
+    "/workspace | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear"
   );
   assert.equal(getSlashCommandUsage("workspace", "group"), "/workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear");
-  assert.equal(getSlashCommandUsage("broadcast"), "/broadcast status | /broadcast off | /broadcast group [group]");
-  assert.equal(getSlashCommandUsage("share"), "/share list | /share session | /share deck [deckSelector] | /share revoke <shareId>");
+  assert.equal(getSlashCommandUsage("broadcast"), "/broadcast | /broadcast off | /broadcast group [group]");
+  assert.equal(getSlashCommandUsage("share"), "/share | /share session | /share deck [deckSelector] | /share revoke <shareId>");
   assert.equal(
     getSlashCommandUsage("replay"),
     "/replay view | /replay export | /replay copy | /replay copy <sourceSelector> <sliceSelector> | /replay preview <sourceSelector> <sliceSelector> | /replay paste <sourceSelector> <targetSelector> <sliceSelector>"
@@ -126,7 +135,11 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(getSlashCommandUsage("transfer"), "/transfer upload [path] | /transfer download <path>");
   assert.equal(
     getSlashCommandUsage("settings"),
-    "/settings show | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...> | /settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
+    "/settings show | /settings apply <json> | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...> | /settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
+  );
+  assert.equal(
+    getSlashCommandUsage("custom"),
+    "/custom list | /custom show [scope:global|scope:project|scope:session:<selector>] <name> | /custom preview [scope:global|scope:project|scope:session:<selector>] <name> [key=value ...] [-- <targetSelector>] | /custom remove [scope:global|scope:project|scope:session:<selector>] <name> | /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text> | /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> + block"
   );
   assert.equal(getSlashCommandUsage("deck.switch"), "/deck.switch <deckSelector>");
   assert.equal(getSlashCommandUsage("ccp", "", ["replay"]), "/ccp <sourceSelector> <targetSelector> <sliceSelector>");
@@ -144,7 +157,7 @@ test("command schema formats command help text from declarative command summarie
 test("command schema formats topic help text for commands and subcommands", () => {
   const topicHelp = createCommandTopicHelpText("deck", "", ["deck", "help"]);
   assert.match(topicHelp, /^\/deck$/m);
-  assert.match(topicHelp, /Usage: \/deck list \| \/deck new <name>/);
+  assert.match(topicHelp, /Usage: \/deck \| \/deck new <name>/);
   assert.match(topicHelp, /Subcommands: list new rename switch delete/);
 
   const subcommandHelp = createCommandTopicHelpText("deck", "switch", ["deck", "help"]);
@@ -170,7 +183,22 @@ test("command schema formats topic help text for commands and subcommands", () =
 
   const shareHelp = createCommandTopicHelpText("share", "", ["share", "help"]);
   assert.match(shareHelp, /^\/share$/m);
+  assert.match(shareHelp, /Bare `\/share` is shorthand for `\/share list`\./);
   assert.match(shareHelp, /Subcommands: list session deck revoke/);
+
+  const renameHelp = createCommandTopicHelpText("rename", "", ["rename", "help"]);
+  assert.match(renameHelp, /does not accept a positional session selector/i);
+  assert.match(renameHelp, /@<sessionSelector> \/rename <name>/);
+
+  const settingsHelp = createCommandTopicHelpText("settings", "", ["settings", "help"]);
+  assert.match(settingsHelp, /Usage: \/settings show \| \/settings apply <json>/);
+  assert.match(settingsHelp, /@<sessionSelector> \/settings \.\.\./);
+
+  const shareSessionHelp = createCommandTopicHelpText("share", "session", ["share", "help"]);
+  assert.match(shareSessionHelp, /Targets the active session by default\./);
+
+  const customHelp = createCommandTopicHelpText("custom", "", ["custom", "help"]);
+  assert.match(customHelp, /Usage: \/custom list \| \/custom show/);
 
   const workspaceGroupHelp = createCommandTopicHelpText("workspace", "group", ["workspace", "help"]);
   assert.equal(
@@ -187,6 +215,7 @@ test("command schema registry resolves declarative command definitions by name",
   const registry = createSlashCommandRegistry(["deck", "connection", "layout", "workspace", "broadcast", "share", "settings", "help"]);
   assert.equal(registry.get("deck")?.insertText, "deck");
   assert.deepEqual(registry.get("connection")?.subcommands?.apply?.usage, ["/connection apply <profile>"]);
+  assert.deepEqual(registry.get("settings")?.subcommands?.apply?.usage, ["/settings apply <json>"]);
   assert.deepEqual(registry.get("connection")?.subcommands?.draft?.subcommands?.show?.usage, ["/connection draft show"]);
   assert.deepEqual(registry.get("layout")?.subcommands?.save?.usage, ["/layout save <name>"]);
   assert.deepEqual(registry.get("workspace")?.subcommands?.apply?.usage, ["/workspace apply <preset>"]);
