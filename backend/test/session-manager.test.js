@@ -1618,6 +1618,35 @@ test("SessionManager supports keyboardInteractive and privateKey ssh launch vari
   assert.equal(privateKeyLaunch.args[privateKeyLaunch.args.indexOf("-i") + 1], "/keys/id_ed25519");
 });
 
+test("SessionManager constrains SSH launches to trusted host key algorithms for the target", () => {
+  const fakePty = createFakePty();
+  let spawnOptions = null;
+  const manager = new SessionManager({
+    createPty: (options) => {
+      spawnOptions = options;
+      return fakePty;
+    },
+    sshKnownHostsPath: "/tmp/ptydeck-test-known_hosts",
+    resolveSshTrustedHostKeyTypes: (host, port) =>
+      host === "example.internal" && port === 22 ? ["ssh-rsa"] : []
+  });
+
+  manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey",
+      privateKeyPath: "/keys/id_rsa"
+    }
+  });
+
+  assert.ok(spawnOptions);
+  assert.equal(spawnOptions.args.includes("HostKeyAlgorithms=ssh-rsa"), true);
+});
+
 test("SessionManager updateSession enforces ssh auth secret transitions and signal helpers", () => {
   const fakePty = createFakePty();
   fakePty.kill = function kill(signal) {

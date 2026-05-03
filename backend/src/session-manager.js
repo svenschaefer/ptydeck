@@ -329,6 +329,7 @@ export class SessionManager {
     remoteReconnectStableMs = DEFAULT_REMOTE_RECONNECT_STABLE_MS,
     sshAskpassPath = DEFAULT_SSH_ASKPASS_PATH,
     sshKnownHostsPath = DEFAULT_SSH_KNOWN_HOSTS_PATH,
+    resolveSshTrustedHostKeyTypes,
     nowFn = Date.now,
     setTimeoutFn = setTimeout,
     clearTimeoutFn = clearTimeout,
@@ -357,6 +358,8 @@ export class SessionManager {
       typeof sshKnownHostsPath === "string" && sshKnownHostsPath.trim()
         ? sshKnownHostsPath.trim()
         : DEFAULT_SSH_KNOWN_HOSTS_PATH;
+    this.resolveSshTrustedHostKeyTypes =
+      typeof resolveSshTrustedHostKeyTypes === "function" ? resolveSshTrustedHostKeyTypes : null;
     this.sessionActivityQuietMs =
       Number.isInteger(sessionActivityQuietMs) && sessionActivityQuietMs > 0
         ? sessionActivityQuietMs
@@ -581,6 +584,10 @@ export class SessionManager {
       remoteConnection,
       remoteAuth,
       remoteSecret,
+      trustedHostKeyTypes:
+        kind === SESSION_KIND_SSH && this.resolveSshTrustedHostKeyTypes && remoteConnection
+          ? this.resolveSshTrustedHostKeyTypes(remoteConnection.host, remoteConnection.port)
+          : undefined,
       sshAskpassPath: this.sshAskpassPath,
       sshKnownHostsPath: this.sshKnownHostsPath
     });

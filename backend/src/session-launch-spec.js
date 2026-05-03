@@ -8,6 +8,8 @@ const SESSION_KIND_SSH = "ssh";
 const SSH_AUTH_METHOD_PASSWORD = "password";
 const SSH_AUTH_METHOD_PRIVATE_KEY = "privateKey";
 const SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE = "keyboardInteractive";
+const SSH_HOST_KEY_TYPE_MAX_LENGTH = 128;
+const SSH_HOST_KEY_TYPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9@._+-]{0,127}$/;
 const REMOTE_HOST_MAX_LENGTH = 255;
 const REMOTE_USERNAME_MAX_LENGTH = 64;
 const REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH = 1024;
@@ -202,6 +204,25 @@ function buildLocalStartupSubmitPayload(startCommand) {
   return `${trimmed}\r`;
 }
 
+function normalizeTrustedHostKeyTypes(value) {
+  const normalized = [];
+  const seen = new Set();
+  for (const entry of Array.isArray(value) ? value : []) {
+    const candidate = typeof entry === "string" ? entry.trim() : "";
+    if (
+      !candidate ||
+      candidate.length > SSH_HOST_KEY_TYPE_MAX_LENGTH ||
+      !SSH_HOST_KEY_TYPE_PATTERN.test(candidate) ||
+      seen.has(candidate)
+    ) {
+      continue;
+    }
+    seen.add(candidate);
+    normalized.push(candidate);
+  }
+  return normalized;
+}
+
 export function buildSessionLaunchSpec({
   kind,
   shell,
@@ -211,6 +232,7 @@ export function buildSessionLaunchSpec({
   remoteConnection,
   remoteAuth,
   remoteSecret,
+  trustedHostKeyTypes,
   sshAskpassPath,
   sshKnownHostsPath
 }) {
@@ -242,6 +264,10 @@ export function buildSessionLaunchSpec({
     "-o",
     "GlobalKnownHostsFile=/dev/null"
   ];
+  const normalizedTrustedHostKeyTypes = normalizeTrustedHostKeyTypes(trustedHostKeyTypes);
+  if (normalizedTrustedHostKeyTypes.length > 0) {
+    args.push("-o", `HostKeyAlgorithms=${normalizedTrustedHostKeyTypes.join(",")}`);
+  }
   if (remoteAuth?.method === SSH_AUTH_METHOD_PASSWORD) {
     args.push(
       "-o",

@@ -10,11 +10,12 @@ import {
 } from "../src/public/command-schema.js";
 
 test("command schema exposes declarative command metadata and distinct help/usage surfaces", () => {
-  const schema = createSlashCommandSchema(["deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "help", "run"]);
+  const schema = createSlashCommandSchema(["deck", "swap", "note", "connection", "ssh", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "help", "run"]);
   const deck = schema.find((entry) => entry.insertText === "deck");
   const swap = schema.find((entry) => entry.insertText === "swap");
   const note = schema.find((entry) => entry.insertText === "note");
   const connection = schema.find((entry) => entry.insertText === "connection");
+  const ssh = schema.find((entry) => entry.insertText === "ssh");
   const layout = schema.find((entry) => entry.insertText === "layout");
   const workspace = schema.find((entry) => entry.insertText === "workspace");
   const broadcast = schema.find((entry) => entry.insertText === "broadcast");
@@ -31,6 +32,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(swap);
   assert.ok(note);
   assert.ok(connection);
+  assert.ok(ssh);
   assert.ok(layout);
   assert.ok(workspace);
   assert.ok(broadcast);
@@ -46,6 +48,10 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(
     connection.summary,
     "/connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft ..."
+  );
+  assert.equal(
+    ssh.summary,
+    "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive"
   );
   assert.equal(layout.summary, "/layout | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(
@@ -82,6 +88,13 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.deepEqual(connection.subcommands.draft.subcommands.active.notes, [
     "Targets the active session by default.",
     "To target another session without switching, use `/help @` and the direct-route form `@<sessionSelector> /<command> ...`."
+  ]);
+  assert.deepEqual(ssh.usage, [
+    "/ssh <target>",
+    "/ssh <target> --key <path>",
+    "/ssh <target> --password",
+    "/ssh <target> --keyboard-interactive",
+    "/ssh <target> [-l|--user <username>] [-p|--port <port>]"
   ]);
   assert.equal(deckSwitchAlias.aliasOf, "/deck switch");
   assert.deepEqual(deckSwitchAlias.argsPrefix, ["switch"]);
@@ -120,6 +133,10 @@ test("command schema exposes declarative command metadata and distinct help/usag
     getSlashCommandUsage("connection"),
     "/connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft show | /connection draft new [name] | /connection draft active | /connection draft set <json> | /connection draft save [name] | /connection draft reset"
   );
+  assert.equal(
+    getSlashCommandUsage("ssh"),
+    "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>]"
+  );
   assert.equal(getSlashCommandUsage("layout"), "/layout | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(
     getSlashCommandUsage("workspace"),
@@ -146,11 +163,11 @@ test("command schema exposes declarative command metadata and distinct help/usag
 });
 
 test("command schema formats command help text from declarative command summaries", () => {
-  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "custom", "help", "run"]);
+  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "connection", "ssh", "layout", "workspace", "broadcast", "share", "replay", "transfer", "custom", "help", "run"]);
   assert.match(helpText, /^Commands: /);
   assert.equal(
     helpText,
-    "Commands: @ > / broadcast connection custom deck help layout new note replay run share swap transfer workspace"
+    "Commands: @ > / broadcast connection custom deck help layout new note replay run share ssh swap transfer workspace"
   );
 });
 
@@ -197,6 +214,11 @@ test("command schema formats topic help text for commands and subcommands", () =
   const shareSessionHelp = createCommandTopicHelpText("share", "session", ["share", "help"]);
   assert.match(shareSessionHelp, /Targets the active session by default\./);
 
+  const sshHelp = createCommandTopicHelpText("ssh", "", ["ssh", "help"]);
+  assert.match(sshHelp, /^\/ssh$/m);
+  assert.match(sshHelp, /Usage: \/ssh <target> \| \/ssh <target> --key <path>/);
+  assert.match(sshHelp, /Target syntax is `\[user@\]host\[:port\]`/);
+
   const customHelp = createCommandTopicHelpText("custom", "", ["custom", "help"]);
   assert.match(customHelp, /Usage: \/custom list \| \/custom show/);
 
@@ -212,9 +234,16 @@ test("command schema formats topic help text for commands and subcommands", () =
 });
 
 test("command schema registry resolves declarative command definitions by name", () => {
-  const registry = createSlashCommandRegistry(["deck", "connection", "layout", "workspace", "broadcast", "share", "settings", "help"]);
+  const registry = createSlashCommandRegistry(["deck", "connection", "ssh", "layout", "workspace", "broadcast", "share", "settings", "help"]);
   assert.equal(registry.get("deck")?.insertText, "deck");
   assert.deepEqual(registry.get("connection")?.subcommands?.apply?.usage, ["/connection apply <profile>"]);
+  assert.deepEqual(registry.get("ssh")?.usage, [
+    "/ssh <target>",
+    "/ssh <target> --key <path>",
+    "/ssh <target> --password",
+    "/ssh <target> --keyboard-interactive",
+    "/ssh <target> [-l|--user <username>] [-p|--port <port>]"
+  ]);
   assert.deepEqual(registry.get("settings")?.subcommands?.apply?.usage, ["/settings apply <json>"]);
   assert.deepEqual(registry.get("connection")?.subcommands?.draft?.subcommands?.show?.usage, ["/connection draft show"]);
   assert.deepEqual(registry.get("layout")?.subcommands?.save?.usage, ["/layout save <name>"]);

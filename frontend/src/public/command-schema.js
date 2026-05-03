@@ -496,6 +496,27 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       }
     }
   }),
+  ssh: freezeCommandDefinition({
+    key: "slash:ssh",
+    insertText: "ssh",
+    label: "/ssh",
+    kind: "command",
+    description: "start a one-shot SSH session without first saving a connection profile",
+    example: "/ssh ops@example.com --key ~/.ssh/id_ed25519",
+    summary: "/ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive",
+    usage: [
+      "/ssh <target>",
+      "/ssh <target> --key <path>",
+      "/ssh <target> --password",
+      "/ssh <target> --keyboard-interactive",
+      "/ssh <target> [-l|--user <username>] [-p|--port <port>]"
+    ],
+    notes: [
+      "Target syntax is `[user@]host[:port]`. You can override the parsed username or port with `-l` / `--user` and `-p` / `--port`.",
+      "Private-key auth is the default. Use `-i` / `--key <path>` to pin an explicit key path, `--password` for password auth, or `--keyboard-interactive` for keyboard-interactive auth.",
+      "If no trusted SSH host key exists for the target, ptydeck fetches the presented host keys and stops. Trust the matching key in `Manage -> Connections`, then rerun the `/ssh ...` command."
+    ]
+  }),
   replay: freezeCommandDefinition({
     key: "slash:replay",
     insertText: "replay",

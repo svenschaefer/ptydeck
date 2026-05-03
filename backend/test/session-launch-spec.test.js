@@ -256,3 +256,27 @@ test("session launch spec supports keyboard-interactive and private-key ssh vari
   assert.equal(privateKeySpec.args.includes("-p"), false);
   assert.equal(privateKeySpec.args.at(-1), "example.internal");
 });
+
+test("session launch spec constrains SSH host key algorithms to the trusted types when provided", () => {
+  const launchSpec = buildSessionLaunchSpec({
+    kind: "ssh",
+    shell: "ssh",
+    spawnCwd: "/ignored",
+    startCwd: "~",
+    startCommand: "",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey",
+      privateKeyPath: "/keys/id_rsa"
+    },
+    trustedHostKeyTypes: ["ssh-rsa", " ssh-rsa ", "ssh-ed25519", "", "bad key type"],
+    sshAskpassPath: "/tmp/askpass.sh",
+    sshKnownHostsPath: "/tmp/known_hosts"
+  });
+
+  assert.equal(launchSpec.args.includes("-o"), true);
+  assert.equal(launchSpec.args.includes("HostKeyAlgorithms=ssh-rsa,ssh-ed25519"), true);
+});

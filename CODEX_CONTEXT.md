@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; `v0.4.0-H163` remains closed with no active promoted wave)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates and seed the SSH draft on missing trust; `v0.4.0-H165` is closed with no active promoted wave)
 
 ## Current Product Truth
 
@@ -67,6 +67,17 @@ Current contract:
   - authenticated operator tokens still act on one shared ptydeck runtime authority surface
   - no tenant partitioning or per-user data separation was added
   - when external tokens do not carry a tenant-style claim, the normalized runtime principal falls back to `tenantId: "default"` only as internal metadata compatibility, not as a multi-tenant boundary
+
+## SSH Trust and Launch Baseline
+
+- Persisted SSH trust entries remain the authority for host-key admission.
+- `backend/src/runtime.js` now resolves the trusted host-key types for the selected SSH target and passes them into the session-launch seam.
+- `backend/src/session-launch-spec.js` now renders `-o HostKeyAlgorithms=...` whenever trusted host-key types are known for the target host/port.
+- This prevents OpenSSH from preferring an untrusted host-key algorithm, such as `ssh-ed25519`, over a different already-trusted key type, such as `ssh-rsa`, under strict host-key checking.
+- The command plane now exposes one-shot SSH launches through `/ssh <target>`, with optional `-l` / `--user`, `-p` / `--port`, `-i` / `--key`, `--password`, and `--keyboard-interactive` options.
+- Saved-profile SSH launches and one-shot `/ssh ...` launches both reuse the same frontend trust/secret gates in the connection-profile runtime seam instead of maintaining separate SSH launch contracts.
+- When a one-shot `/ssh ...` launch hits a target with no trusted host key yet, the frontend seeds the `Connections` draft with that attempted SSH launch, auto-probes host keys for the same host/port, and stops with trust guidance so the operator can trust the right key and rerun the same command.
+- The first-connect workflow still requires an explicit host-key trust entry before a saved-profile or one-shot SSH launch succeeds; host-key fetch/review/trust remains a `Manage -> Connections` UI action rather than a slash-command-only path.
 
 ## Messaging Files Intentionally Kept
 

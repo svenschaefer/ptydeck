@@ -13,16 +13,20 @@ Typical flow:
 1. open `Manage`
 2. choose `Connections`
 3. create a new local or SSH draft
-4. save the profile or `Save and Launch`
+4. for a new SSH target, fetch the presented host keys, verify the expected fingerprint, and trust the selected key
+5. save the profile or `Save and Launch`
 
 Useful slash companions:
 
 ```text
 /connection list
-/connection new local
+/ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
+/connection draft new ops-ssh
 /connection save
 /connection apply ops-ssh
 ```
+
+`/ssh ...` now starts a one-shot SSH session without first saving a connection profile, but the first launch for a new SSH target still depends on a trusted host-key entry. ptydeck fetches the presented host keys and stops if none is trusted yet; the host-key fetch/review/trust step still lives in the `Connections` UI instead of a slash-command-only workflow.
 
 ## Workspace Presets
 

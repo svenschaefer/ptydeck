@@ -1443,11 +1443,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
   }
 
   async function ensureTrustedHostKeyBeforeLaunch(profile) {
-    if (normalizeLower(profile?.launch?.kind) !== "ssh") {
+    const launch = profile?.launch;
+    if (normalizeLower(launch?.kind) !== "ssh") {
       return "";
     }
-    const host = normalizeText(profile?.launch?.remoteConnection?.host);
-    const port = Number.parseInt(String(profile?.launch?.remoteConnection?.port ?? 22), 10);
+    const host = normalizeText(launch?.remoteConnection?.host);
+    const port = Number.parseInt(String(launch?.remoteConnection?.port ?? 22), 10);
     if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error("Enter an SSH host and port before launching this saved profile.");
     }
@@ -1455,7 +1456,15 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (matchingTrustEntries.length > 0) {
       return "";
     }
-    if (normalizeText(selectedProfileId) !== profile.id) {
+    if (profile?.seedDraftOnMissingTrust === true) {
+      setDraftState({
+        mode: "blank",
+        profileId: "",
+        name: normalizeText(profile?.name) || "New SSH Connection",
+        deckId: normalizeText(launch?.deckId) || defaultDeckId,
+        launch
+      });
+    } else if (normalizeText(selectedProfileId) !== profile.id) {
       selectedProfileId = profile.id;
       syncSelection();
       resetDraftFromSelectedProfile();
@@ -1574,6 +1583,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     formatSessionToken,
     formatSessionDisplayName,
     buildPersistedDraftLaunch,
+    normalizeConnectionLaunch: normalizeConnectionProfileLaunch,
     getDraftState: () => draftState,
     setDraftState,
     clearSshTrustState,
@@ -1600,6 +1610,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     renameProfileById,
     duplicateProfileById,
     deleteProfileById,
+    launchConnectionLaunch,
     saveDraftById,
     saveAndLaunchDraftFlow,
     loadProfiles,
@@ -1722,6 +1733,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     removeProfile,
     getLaunchForSession,
     createProfileFromSession,
+    launchConnectionLaunch,
     saveDraftById,
     loadDraftFromActiveSession,
     setDraftState,

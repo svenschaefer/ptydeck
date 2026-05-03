@@ -72,6 +72,8 @@ export function createConnectionProfileRuntimeActions(options = {}) {
     typeof options.buildBlankConnectionProfileLaunch === "function"
       ? options.buildBlankConnectionProfileLaunch
       : () => ({});
+  const normalizeConnectionLaunch =
+    typeof options.normalizeConnectionLaunch === "function" ? options.normalizeConnectionLaunch : (launch) => launch;
   const loadDraftFromActiveSession =
     typeof options.loadDraftFromActiveSession === "function" ? options.loadDraftFromActiveSession : () => {};
   const resetDraftFromSelectedProfile =
@@ -86,6 +88,13 @@ export function createConnectionProfileRuntimeActions(options = {}) {
     typeof options.getPendingDeleteProfileId === "function" ? options.getPendingDeleteProfileId : () => "";
   const setPendingDeleteProfileId =
     typeof options.setPendingDeleteProfileId === "function" ? options.setPendingDeleteProfileId : () => {};
+
+  function formatSshTargetForLaunch(launch) {
+    const host = normalizeText(launch?.remoteConnection?.host) || "?";
+    const port = Number.isInteger(Number(launch?.remoteConnection?.port)) ? Number(launch.remoteConnection.port) : 22;
+    const username = normalizeText(launch?.remoteConnection?.username);
+    return `${username ? `${username}@` : ""}${host}:${port}`;
+  }
 
   async function createProfileFromSession(sessionOrId, name, actionOptions = {}) {
     const session = typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId;
@@ -133,6 +142,50 @@ export function createConnectionProfileRuntimeActions(options = {}) {
     setActiveSession(session.id);
     requestRender();
     return `Started session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)} from connection profile [${profile.id}] ${profile.name}.`;
+  }
+
+  async function launchConnectionLaunch(launch, launchOptions = {}) {
+    const normalizedLaunch = normalizeConnectionLaunch(launch);
+    if (!normalizedLaunch || typeof normalizedLaunch !== "object" || Array.isArray(normalizedLaunch)) {
+      throw new Error("Connection launch is incomplete.");
+    }
+    const launchName =
+      normalizeText(launchOptions.name) ||
+      (normalizeLower(normalizedLaunch.kind) === "ssh" ? `SSH ${formatSshTargetForLaunch(normalizedLaunch)}` : "Ad hoc Connection");
+    const launchContext = {
+      id: "",
+      name: launchName,
+      launch: normalizedLaunch,
+      seedDraftOnMissingTrust: launchOptions.seedDraftOnMissingTrust === true
+    };
+    await ensureTrustedHostKeyBeforeLaunch(launchContext);
+    const secretResult = await promptForLaunchSecret(launchContext);
+    if (secretResult.cancelled) {
+      if (normalizeLower(normalizedLaunch.kind) === "ssh") {
+        return `SSH launch cancelled for ${formatSshTargetForLaunch(normalizedLaunch)}.`;
+      }
+      return `Connection launch cancelled for ${launchName}.`;
+    }
+    const session = await api.createSession({
+      ...normalizedLaunch,
+      ...(secretResult.remoteSecret !== undefined ? { remoteSecret: secretResult.remoteSecret } : {})
+    });
+    if (runtimeSecretInputEl) {
+      runtimeSecretInputEl.value = "";
+    }
+    applyRuntimeEvent({ type: "session.created", session });
+    if (normalizeText(session.deckId)) {
+      setActiveDeck(session.deckId);
+    }
+    setActiveSession(session.id);
+    requestRender();
+    const feedback =
+      normalizeLower(normalizedLaunch.kind) === "ssh"
+        ? `Started session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)} for ${formatSshTargetForLaunch(normalizedLaunch)}.`
+        : `Started session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)} from ${launchName}.`;
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
   }
 
   async function renameProfileById(profileId, name) {
@@ -393,6 +446,7 @@ export function createConnectionProfileRuntimeActions(options = {}) {
     renameProfileById,
     duplicateProfileById,
     deleteProfileById,
+    launchConnectionLaunch,
     saveDraftById,
     saveAndLaunchDraftFlow,
     loadProfiles,

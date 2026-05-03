@@ -526,11 +526,33 @@
 <li><code>/size r&lt;rows&gt;</code></li>
 </ul>
 
+<h2 id="ssh">/ssh</h2>
+
+<p>start a one-shot SSH session without first saving a connection profile</p>
+
+<h3 id="usage-22">Usage</h3>
+
+<ul>
+<li><code>/ssh &lt;target&gt;</code></li>
+<li><code>/ssh &lt;target&gt; --key &lt;path&gt;</code></li>
+<li><code>/ssh &lt;target&gt; --password</code></li>
+<li><code>/ssh &lt;target&gt; --keyboard-interactive</code></li>
+<li><code>/ssh &lt;target&gt; [-l|--user &lt;username&gt;] [-p|--port &lt;port&gt;]</code></li>
+</ul>
+
+<h3 id="notes-9">Notes</h3>
+
+<ul>
+<li>Target syntax is <code>[user@]host[:port]</code>. You can override the parsed username or port with <code>-l</code> / <code>--user</code> and <code>-p</code> / <code>--port</code>.</li>
+<li>Private-key auth is the default. Use <code>-i</code> / <code>--key &lt;path&gt;</code> to pin an explicit key path, <code>--password</code> for password auth, or <code>--keyboard-interactive</code> for keyboard-interactive auth.</li>
+<li>If no trusted SSH host key exists for the target, ptydeck fetches the presented host keys and stops. Trust the matching key in <code>Manage -&gt; Connections</code>, then rerun the <code>/ssh ...</code> command.</li>
+</ul>
+
 <h2 id="swap">/swap</h2>
 
 <p>swap quick ids between two sessions</p>
 
-<h3 id="usage-22">Usage</h3>
+<h3 id="usage-23">Usage</h3>
 
 <ul>
 <li><code>/swap &lt;selectorA&gt; &lt;selectorB&gt;</code></li>
@@ -544,7 +566,7 @@
 
 <p>switch active session</p>
 
-<h3 id="usage-23">Usage</h3>
+<h3 id="usage-24">Usage</h3>
 
 <ul>
 <li><code>/switch &lt;sessionSelector&gt;</code></li>
@@ -558,14 +580,14 @@
 
 <p>upload or download bounded files for one session</p>
 
-<h3 id="usage-24">Usage</h3>
+<h3 id="usage-25">Usage</h3>
 
 <ul>
 <li><code>/transfer upload [path]</code></li>
 <li><code>/transfer download &lt;path&gt;</code></li>
 </ul>
 
-<h3 id="notes-9">Notes</h3>
+<h3 id="notes-10">Notes</h3>
 
 <ul>
 <li>Targets the active session by default.</li>
@@ -586,7 +608,7 @@
 
 <p>manage persisted workspace presets</p>
 
-<h3 id="usage-25">Usage</h3>
+<h3 id="usage-26">Usage</h3>
 
 <ul>
 <li><code>/workspace</code></li>
@@ -694,18 +716,21 @@
 <li><a class="handbook-page-toc-link" href="#subcommands-8">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#size">/size</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-21">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#swap">/swap</a></li>
+<li><a class="handbook-page-toc-link" href="#ssh">/ssh</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-22">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-9">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#swap">/swap</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-23">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-9">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#switch">/switch</a></li>
-<li><a class="handbook-page-toc-link" href="#usage-23">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-24">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-10">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#transfer">/transfer</a></li>
-<li><a class="handbook-page-toc-link" href="#usage-24">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-9">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-25">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-10">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-9">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#workspace">/workspace</a></li>
-<li><a class="handbook-page-toc-link" href="#usage-25">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-26">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-10">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#help-topics">Help Topics</a></li>
 </ul>

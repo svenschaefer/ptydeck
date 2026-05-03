@@ -5997,6 +5997,78 @@ test("ssh trust entries persist, render managed known_hosts, and reject conflict
   }
 });
 
+test("ssh session launches constrain host key algorithms to the trusted types for the target", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-ssh-hostkey-"));
+  const dataPath = join(dir, "sessions.json");
+  const spawnCalls = [];
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty: ({ command, args, cwd, env, shell }) => {
+      spawnCalls.push({ command, args, cwd, env, shell });
+      let exitHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData() {},
+        write() {},
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+  await runtime.start();
+  const { port } = runtime.getAddress();
+  const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+
+  try {
+    const trustRes = await fetch(`${baseUrl}/ssh-trust-entries`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        host: "example.internal",
+        port: 22,
+        keyType: "ssh-rsa",
+        publicKey: "AAAAB3NzaC1yc2EAAAADAQABAAABAQC7dHJ1c3RlZHJzYXRlc3RrZXlibG9i"
+      })
+    });
+    assert.equal(trustRes.status, 201);
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22,
+          username: "ops"
+        },
+        remoteAuth: {
+          method: "privateKey",
+          privateKeyPath: "/keys/id_rsa"
+        },
+        startCwd: "~"
+      })
+    });
+    assert.equal(createRes.status, 201);
+    assert.ok(spawnCalls.length > 0);
+    assert.equal(spawnCalls.at(-1).args.includes("HostKeyAlgorithms=ssh-rsa"), true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime restore normalizes invalid persisted ssh trust entries before rendering managed known_hosts", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-ssh-trust-"));
   const dataPath = join(dir, "sessions.json");

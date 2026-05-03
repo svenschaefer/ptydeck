@@ -16,6 +16,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Latest completed wave in this segment:
   - `v0.4.0-H163` Repo-Wide Quality and Coverage Follow-Up
   - `v0.4.0-H164` Server-Authoritative Session Quick-Send Favorites
+  - `v0.4.0-H165` Direct SSH Launch and Trust Consistency
 - Active wave:
   - none
 - Queued next waves:

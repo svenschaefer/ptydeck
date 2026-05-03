@@ -261,6 +261,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       resetConnectionProfileDraft: () => connectionProfileRuntimeController?.resetDraftFlow?.() || "",
       applyLayoutProfile: (profileId) => layoutProfileRuntimeController?.applyProfileById?.(profileId) || "",
       applyConnectionProfile: (profileId) => connectionProfileRuntimeController?.applyProfileById?.(profileId) || "",
+      launchConnectionLaunch: (launch, launchOptions) =>
+        connectionProfileRuntimeController?.launchConnectionLaunch?.(launch, launchOptions) || "",
       renameLayoutProfile: (profileId, name) => layoutProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
       renameConnectionProfile: (profileId, name) => connectionProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
       duplicateConnectionProfile: (profileId, name) => connectionProfileRuntimeController?.duplicateProfileById?.(profileId, name) || "",

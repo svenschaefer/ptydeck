@@ -21,7 +21,7 @@ function createExecutor(overrides = {}) {
     },
     systemSlashCommands:
       overrides.systemSlashCommands ||
-      ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "custom", "help", "run"],
+      ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "ssh", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "custom", "help", "run"],
     getActiveDeck: overrides.getActiveDeck || (() => ({ id: "default", name: "Default" })),
     getSessionCountForDeck: overrides.getSessionCountForDeck || (() => 0),
     applyRuntimeEvent: overrides.applyRuntimeEvent || (() => {}),
@@ -56,11 +56,13 @@ function createExecutor(overrides = {}) {
     normalizeCustomCommandPayloadForShell: overrides.normalizeCustomCommandPayloadForShell || ((value) => value),
     normalizeSessionTags: overrides.normalizeSessionTags || ((tags) => (Array.isArray(tags) ? tags : [])),
     normalizeThemeProfile: overrides.normalizeThemeProfile || ((profile) => profile || {}),
+    defaultTerminalTheme: overrides.defaultTerminalTheme || { background: "#111111" },
     getTerminalSettings: overrides.getTerminalSettings || (() => ({ cols: 80, rows: 20 })),
     requestRender: overrides.requestRender || (() => {}),
     listWorkspacePresets: overrides.listWorkspacePresets || (() => []),
     resolveWorkspacePreset: overrides.resolveWorkspacePreset || (() => ({ preset: null, error: "Unknown workspace preset." })),
     createWorkspacePresetFromCurrent: overrides.createWorkspacePresetFromCurrent || (async () => ""),
+    launchConnectionLaunch: overrides.launchConnectionLaunch || (async () => ""),
     applyWorkspacePreset: overrides.applyWorkspacePreset || (async () => ""),
     renameWorkspacePreset: overrides.renameWorkspacePreset || (async () => ""),
     deleteWorkspacePreset: overrides.deleteWorkspacePreset || (async () => ""),
@@ -80,7 +82,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: @ > / broadcast close connection custom deck filter help layout list move new next note prev rename replay restart run settings share size swap switch transfer workspace"
+    "Commands: @ > / broadcast close connection custom deck filter help layout list move new next note prev rename replay restart run settings share size ssh swap switch transfer workspace"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
@@ -121,6 +123,12 @@ test("command executor help and usage strings derive from declarative schema met
   assert.equal(
     connectionUsage,
     "Usage: /connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft show | /connection draft new [name] | /connection draft active | /connection draft set <json> | /connection draft save [name] | /connection draft reset"
+  );
+
+  const sshUsage = await executor.execute({ command: "ssh", args: [], raw: "/ssh" });
+  assert.equal(
+    sshUsage,
+    "Usage: /ssh <target> | /ssh <target> --key <path> | /ssh <target> --password | /ssh <target> --keyboard-interactive | /ssh <target> [-l|--user <username>] [-p|--port <port>]"
   );
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
@@ -177,6 +185,10 @@ test("command executor help and usage strings derive from declarative schema met
   const customHelp = await executor.execute({ command: "help", args: ["custom"], raw: "/help custom" });
   assert.match(customHelp, /Usage: \/custom list \| \/custom show/);
 
+  const sshHelp = await executor.execute({ command: "help", args: ["ssh"], raw: "/help ssh" });
+  assert.match(sshHelp, /Usage: \/ssh <target> \| \/ssh <target> --key <path>/);
+  assert.match(sshHelp, /Manage -> Connections/);
+
   const customPreviewUsage = await executor.execute({ command: "custom", args: ["preview"], raw: "/custom preview" });
   assert.equal(
     customPreviewUsage,
@@ -185,6 +197,56 @@ test("command executor help and usage strings derive from declarative schema met
 
   const runUsage = await executor.execute({ command: "run", args: [], raw: "/run" });
   assert.equal(runUsage, "Usage: /run + newline-separated slash commands | /cmd1 + newline + /cmd2");
+});
+
+test("command executor routes one-shot ssh launches through the shared connection launch seam", async () => {
+  const launchCalls = [];
+  const executor = createExecutor({
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    normalizeThemeProfile: (profile) => profile || {},
+    launchConnectionLaunch: async (launch, launchOptions) => {
+      launchCalls.push([launch, launchOptions]);
+      return `launched:${launch.remoteConnection.host}:${launch.remoteAuth.method}`;
+    }
+  });
+
+  assert.equal(
+    await executor.execute({
+      command: "ssh",
+      args: ["ixpqtwnk@carpo.uberspace.de", "--key", "~/.ssh/id_ed25519"],
+      raw: "/ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519"
+    }),
+    "launched:carpo.uberspace.de:privateKey"
+  );
+  assert.deepEqual(launchCalls, [
+    [
+      {
+        kind: "ssh",
+        deckId: "ops",
+        shell: "ssh",
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: [],
+        themeProfile: { background: "#111111" },
+        activeThemeProfile: { background: "#111111" },
+        inactiveThemeProfile: { background: "#111111" },
+        remoteConnection: {
+          host: "carpo.uberspace.de",
+          port: 22,
+          username: "ixpqtwnk"
+        },
+        remoteAuth: {
+          method: "privateKey",
+          privateKeyPath: "~/.ssh/id_ed25519"
+        }
+      },
+      {
+        name: "SSH ixpqtwnk@carpo.uberspace.de:22",
+        seedDraftOnMissingTrust: true
+      }
+    ]
+  ]);
 });
 
 test("command executor reports ambiguous switch targets and missing replay sources explicitly", async () => {
@@ -3340,7 +3402,7 @@ test("command executor exposes structured detailed results for success and failu
     {
       ok: true,
       feedback:
-        "Commands: @ > / broadcast close connection custom deck filter help layout list move new next note prev rename replay restart run settings share size swap switch transfer workspace"
+        "Commands: @ > / broadcast close connection custom deck filter help layout list move new next note prev rename replay restart run settings share size ssh swap switch transfer workspace"
     }
   );
 

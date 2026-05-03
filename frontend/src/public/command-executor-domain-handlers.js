@@ -1,3 +1,232 @@
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function normalizeLower(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function parsePortToken(value, label = "SSH port") {
+  const port = Number.parseInt(String(value || "").trim(), 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return { port: null, error: `${label} must be an integer between 1 and 65535.` };
+  }
+  return { port, error: "" };
+}
+
+function parseSshTargetToken(token, defaultPort = 22) {
+  const raw = normalizeText(token);
+  if (!raw) {
+    return { host: "", port: defaultPort, username: "", error: "SSH target is required." };
+  }
+
+  let username = "";
+  let hostPort = raw;
+  const atIndex = raw.lastIndexOf("@");
+  if (atIndex > 0) {
+    username = normalizeText(raw.slice(0, atIndex));
+    hostPort = normalizeText(raw.slice(atIndex + 1));
+  }
+
+  let host = hostPort;
+  let port = defaultPort;
+  if (hostPort.startsWith("[")) {
+    const closingIndex = hostPort.indexOf("]");
+    if (closingIndex < 0) {
+      return { host: "", port: defaultPort, username, error: "SSH target contains an invalid bracketed host." };
+    }
+    host = normalizeText(hostPort.slice(1, closingIndex));
+    const remainder = normalizeText(hostPort.slice(closingIndex + 1));
+    if (remainder) {
+      if (!remainder.startsWith(":")) {
+        return { host: "", port: defaultPort, username, error: "SSH target contains an invalid bracketed host port suffix." };
+      }
+      const parsedPort = parsePortToken(remainder.slice(1));
+      if (parsedPort.error) {
+        return { host: "", port: defaultPort, username, error: parsedPort.error };
+      }
+      port = parsedPort.port;
+    }
+  } else {
+    const colonIndex = hostPort.lastIndexOf(":");
+    if (colonIndex > 0 && colonIndex === hostPort.indexOf(":")) {
+      const maybePort = normalizeText(hostPort.slice(colonIndex + 1));
+      if (/^\d+$/.test(maybePort)) {
+        const parsedPort = parsePortToken(maybePort);
+        if (parsedPort.error) {
+          return { host: "", port: defaultPort, username, error: parsedPort.error };
+        }
+        host = normalizeText(hostPort.slice(0, colonIndex));
+        port = parsedPort.port;
+      }
+    }
+  }
+
+  if (!host || /\s/.test(host)) {
+    return { host: "", port: defaultPort, username, error: "SSH target host must be a non-empty hostname or address without whitespace." };
+  }
+  if (username && /\s/.test(username)) {
+    return { host: "", port: defaultPort, username, error: "SSH target username must not contain whitespace." };
+  }
+
+  return { host, port, username, error: "" };
+}
+
+export function formatSshTargetSpec(target) {
+  const host = normalizeText(target?.host) || "?";
+  const port = Number.isInteger(Number(target?.port)) ? Number(target.port) : 22;
+  const username = normalizeText(target?.username);
+  return `${username ? `${username}@` : ""}${host}:${port}`;
+}
+
+export function parseSshCommandArgs(args = [], options = {}) {
+  const defaultPort = Number.isInteger(options.defaultPort) ? options.defaultPort : 22;
+  const tokens = Array.isArray(args) ? args : [];
+  if (tokens.length === 0) {
+    return { ok: false, usage: true, error: "" };
+  }
+
+  let targetToken = "";
+  let username = "";
+  let port = null;
+  let authMethod = "privateKey";
+  let privateKeyPath = "";
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = normalizeText(tokens[index]);
+    if (!token) {
+      continue;
+    }
+    if (!token.startsWith("-")) {
+      if (targetToken) {
+        return { ok: false, usage: false, error: "SSH target can only be specified once." };
+      }
+      targetToken = token;
+      continue;
+    }
+    const readValue = (label) => {
+      const value = normalizeText(tokens[index + 1]);
+      if (!value || value.startsWith("-")) {
+        return { value: "", error: `${label} value is required.` };
+      }
+      index += 1;
+      return { value, error: "" };
+    };
+    if (token === "-p" || token === "--port") {
+      const next = readValue("SSH port");
+      if (next.error) {
+        return { ok: false, usage: false, error: next.error };
+      }
+      const parsedPort = parsePortToken(next.value);
+      if (parsedPort.error) {
+        return { ok: false, usage: false, error: parsedPort.error };
+      }
+      port = parsedPort.port;
+      continue;
+    }
+    if (token === "-l" || token === "--user") {
+      const next = readValue("SSH username");
+      if (next.error) {
+        return { ok: false, usage: false, error: next.error };
+      }
+      if (/\s/.test(next.value)) {
+        return { ok: false, usage: false, error: "SSH username must not contain whitespace." };
+      }
+      username = next.value;
+      continue;
+    }
+    if (token === "-i" || token === "--key") {
+      const next = readValue("SSH private key path");
+      if (next.error) {
+        return { ok: false, usage: false, error: next.error };
+      }
+      if (authMethod !== "privateKey") {
+        return {
+          ok: false,
+          usage: false,
+          error: "SSH auth method flags are mutually exclusive. Use either private-key, password, or keyboard-interactive auth."
+        };
+      }
+      privateKeyPath = next.value;
+      continue;
+    }
+    if (token === "--password") {
+      if (authMethod !== "privateKey" || privateKeyPath) {
+        return {
+          ok: false,
+          usage: false,
+          error: "SSH auth method flags are mutually exclusive. Use either private-key, password, or keyboard-interactive auth."
+        };
+      }
+      authMethod = "password";
+      continue;
+    }
+    if (token === "--keyboard-interactive") {
+      if (authMethod !== "privateKey" || privateKeyPath) {
+        return {
+          ok: false,
+          usage: false,
+          error: "SSH auth method flags are mutually exclusive. Use either private-key, password, or keyboard-interactive auth."
+        };
+      }
+      authMethod = "keyboardInteractive";
+      continue;
+    }
+    return { ok: false, usage: false, error: `Unknown SSH option: ${token}` };
+  }
+
+  if (!targetToken) {
+    return { ok: false, usage: true, error: "" };
+  }
+
+  const parsedTarget = parseSshTargetToken(targetToken, defaultPort);
+  if (parsedTarget.error) {
+    return { ok: false, usage: false, error: parsedTarget.error };
+  }
+
+  return {
+    ok: true,
+    value: {
+      host: parsedTarget.host,
+      port: port ?? parsedTarget.port,
+      username: username || parsedTarget.username,
+      authMethod,
+      privateKeyPath
+    }
+  };
+}
+
+export function buildSshConnectionLaunch(spec, options = {}) {
+  const defaultDeckId = normalizeText(options.defaultDeckId) || "default";
+  const deckId = normalizeText(options.deckId) || defaultDeckId;
+  const normalizeThemeProfile =
+    typeof options.normalizeThemeProfile === "function" ? options.normalizeThemeProfile : (value) => value || {};
+  const themeProfile = normalizeThemeProfile(options.defaultThemeProfile || {});
+  return {
+    kind: "ssh",
+    deckId,
+    shell: "ssh",
+    startCwd: "~",
+    startCommand: "",
+    env: {},
+    tags: [],
+    themeProfile,
+    activeThemeProfile: themeProfile,
+    inactiveThemeProfile: themeProfile,
+    remoteConnection: {
+      host: spec.host,
+      port: spec.port,
+      ...(normalizeText(spec.username) ? { username: normalizeText(spec.username) } : {})
+    },
+    remoteAuth: {
+      method: spec.authMethod,
+      ...(spec.authMethod === "privateKey" && normalizeText(spec.privateKeyPath)
+        ? { privateKeyPath: normalizeText(spec.privateKeyPath) }
+        : {})
+    }
+  };
+}
+
 export function createCommandExecutorDomainHandlers(options = {}) {
   const defaultDeckId = options.defaultDeckId || "default";
   const normalizeKeyword =
@@ -59,12 +288,17 @@ export function createCommandExecutorDomainHandlers(options = {}) {
     typeof options.resetConnectionProfileDraft === "function" ? options.resetConnectionProfileDraft : async () => "";
   const applyConnectionProfile =
     typeof options.applyConnectionProfile === "function" ? options.applyConnectionProfile : async () => "";
+  const launchConnectionLaunch =
+    typeof options.launchConnectionLaunch === "function" ? options.launchConnectionLaunch : async () => "";
   const duplicateConnectionProfile =
     typeof options.duplicateConnectionProfile === "function" ? options.duplicateConnectionProfile : async () => "";
   const renameConnectionProfile =
     typeof options.renameConnectionProfile === "function" ? options.renameConnectionProfile : async () => "";
   const deleteConnectionProfile =
     typeof options.deleteConnectionProfile === "function" ? options.deleteConnectionProfile : async () => "";
+  const normalizeThemeProfile =
+    typeof options.normalizeThemeProfile === "function" ? options.normalizeThemeProfile : (profile) => profile || {};
+  const defaultThemeProfile = options.defaultThemeProfile && typeof options.defaultThemeProfile === "object" ? options.defaultThemeProfile : {};
 
   const listWorkspacePresets = typeof options.listWorkspacePresets === "function" ? options.listWorkspacePresets : () => [];
   const resolveWorkspacePreset =
@@ -327,6 +561,30 @@ export function createCommandExecutorDomainHandlers(options = {}) {
     return formatUsage("connection");
   }
 
+  async function executeSshCommand(context = {}) {
+    const args = Array.isArray(context.args) ? context.args : [];
+    const parsed = parseSshCommandArgs(args);
+    if (!parsed.ok) {
+      return parsed.usage ? formatUsage("ssh") : parsed.error;
+    }
+    const activeDeckId = normalizeText(getActiveDeck()?.id) || defaultDeckId;
+    const launch = normalizeConnectionProfileLaunch(
+      buildSshConnectionLaunch(parsed.value, {
+        deckId: activeDeckId,
+        defaultDeckId,
+        defaultThemeProfile,
+        normalizeThemeProfile
+      })
+    );
+    if (!launch) {
+      return "SSH launch could not be prepared because the default terminal theme is incomplete.";
+    }
+    return launchConnectionLaunch(launch, {
+      name: `SSH ${formatSshTargetSpec(parsed.value)}`,
+      seedDraftOnMissingTrust: true
+    });
+  }
+
   async function executeWorkspaceCommand(context = {}) {
     const args = Array.isArray(context.args) ? context.args : [];
     const subcommand = normalizeKeyword(args[0]);
@@ -538,6 +796,8 @@ export function createCommandExecutorDomainHandlers(options = {}) {
         return executeLayoutCommand(context);
       case "connection":
         return executeConnectionCommand(context);
+      case "ssh":
+        return executeSshCommand(context);
       case "workspace":
         return executeWorkspaceCommand(context);
       case "broadcast":
@@ -553,6 +813,7 @@ export function createCommandExecutorDomainHandlers(options = {}) {
     executeStructuredCommand,
     executeLayoutCommand,
     executeConnectionCommand,
+    executeSshCommand,
     executeWorkspaceCommand,
     executeBroadcastCommand,
     executeShareCommand

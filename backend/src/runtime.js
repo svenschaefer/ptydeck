@@ -2255,6 +2255,7 @@ export function createRuntime(config) {
     remoteReconnectDelayMs: config.remoteReconnectDelayMs,
     remoteReconnectStableMs: config.remoteReconnectStableMs,
     sshKnownHostsPath,
+    resolveSshTrustedHostKeyTypes: (host, port) => listTrustedSshHostKeyTypes(host, port),
     createTraceId: () => createTraceId("mgr"),
     inspectTerminalForegroundProcess:
       typeof config.inspectTerminalForegroundProcess === "function" ? config.inspectTerminalForegroundProcess : undefined,
@@ -3676,6 +3677,24 @@ export function createRuntime(config) {
 
   function listSshTrustEntries() {
     return Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry);
+  }
+
+  function listTrustedSshHostKeyTypes(host, port) {
+    const normalizedHost = typeof host === "string" ? host.trim() : "";
+    const normalizedPort = Number.isInteger(port) ? port : normalizeSshTrustEntryPort(port, "port", { strict: false });
+    if (!normalizedHost) {
+      return [];
+    }
+    const types = [];
+    const seen = new Set();
+    for (const entry of Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries)) {
+      if (entry.host !== normalizedHost || entry.port !== normalizedPort || seen.has(entry.keyType)) {
+        continue;
+      }
+      seen.add(entry.keyType);
+      types.push(entry.keyType);
+    }
+    return types;
   }
 
   async function probeSshHostKeysOrThrow(input) {

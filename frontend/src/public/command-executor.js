@@ -135,6 +135,7 @@ export function createCommandExecutor(options = {}) {
     typeof options.resetConnectionProfileDraft === "function" ? options.resetConnectionProfileDraft : async () => "";
   const applyLayoutProfile = typeof options.applyLayoutProfile === "function" ? options.applyLayoutProfile : async () => "";
   const applyConnectionProfile = typeof options.applyConnectionProfile === "function" ? options.applyConnectionProfile : async () => "";
+  const launchConnectionLaunch = typeof options.launchConnectionLaunch === "function" ? options.launchConnectionLaunch : async () => "";
   const renameLayoutProfile = typeof options.renameLayoutProfile === "function" ? options.renameLayoutProfile : async () => "";
   const renameConnectionProfile = typeof options.renameConnectionProfile === "function" ? options.renameConnectionProfile : async () => "";
   const duplicateConnectionProfile =
@@ -716,6 +717,7 @@ export function createCommandExecutor(options = {}) {
     saveConnectionProfileDraft,
     resetConnectionProfileDraft,
     applyConnectionProfile,
+    launchConnectionLaunch,
     duplicateConnectionProfile,
     renameConnectionProfile,
     deleteConnectionProfile,
@@ -738,6 +740,8 @@ export function createCommandExecutor(options = {}) {
     getBroadcastStatus,
     enableGroupBroadcast,
     disableBroadcast,
+    normalizeThemeProfile,
+    defaultThemeProfile: defaultTerminalTheme,
     listShares,
     createShareLink,
     revokeShareLink,

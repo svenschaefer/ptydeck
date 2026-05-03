@@ -1043,6 +1043,65 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   assert.ok(calls.some((entry) => entry[0] === "delete-trust"));
 });
 
+test("connection profile runtime controller seeds the SSH draft when a one-shot launch stops on missing trust", async () => {
+  const calls = [];
+  const ui = createConnectionProfileUiRefs();
+  const controller = createConnectionProfileRuntimeController({
+    windowRef: {},
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async listSshTrustEntries() {
+        calls.push(["list-trust"]);
+        return [];
+      },
+      async probeSshHostKeys(payload) {
+        calls.push(["probe-trust", payload]);
+        return [
+          {
+            host: payload.host,
+            port: payload.port,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAcreated",
+            fingerprintSha256: "SHA256:created"
+          }
+        ];
+      }
+    },
+    getDecks: () => [{ id: "default", name: "Default" }, { id: "ops", name: "Ops" }],
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await assert.rejects(
+    () =>
+      controller.launchConnectionLaunch(
+        {
+          kind: "ssh",
+          deckId: "ops",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "",
+          env: {},
+          tags: [],
+          activeThemeProfile: createThemeProfile("#111111"),
+          inactiveThemeProfile: createThemeProfile("#121212"),
+          remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
+          remoteAuth: { method: "privateKey", privateKeyPath: "~/.ssh/id_ed25519" }
+        },
+        { name: "SSH ixpqtwnk@carpo.uberspace.de:22", seedDraftOnMissingTrust: true }
+      ),
+    /No trusted host key is stored for carpo\.uberspace\.de:22/
+  );
+
+  assert.deepEqual(calls.filter((entry) => entry[0] === "probe-trust"), [
+    ["probe-trust", { host: "carpo.uberspace.de", port: 22 }]
+  ]);
+  assert.equal(ui.draftKindSelectEl.value, "ssh");
+  assert.equal(ui.draftNameInputEl.value, "SSH ixpqtwnk@carpo.uberspace.de:22");
+  assert.equal(controller.getDraftState()?.launch?.remoteConnection?.host, "carpo.uberspace.de");
+  assert.equal(ui.sshTrustFingerprintInputEl.value, "SHA256:created");
+});
+
 test("connection profile runtime controller rejects malformed SSH trust create payloads deterministically", async () => {
   const ui = createConnectionProfileUiRefs();
   const controller = createConnectionProfileRuntimeController({

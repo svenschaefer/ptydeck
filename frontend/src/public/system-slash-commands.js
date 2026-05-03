@@ -14,6 +14,7 @@ export const SYSTEM_SLASH_COMMANDS = Object.freeze([
   "restart",
   "note",
   "connection",
+  "ssh",
   "layout",
   "workspace",
   "broadcast",

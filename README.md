@@ -10,7 +10,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Browser UI with `xterm.js`, session cards, deck switching, and split layouts
 - Persistent session metadata, notes, layout profiles, and workspace presets
 - Local and SSH-backed sessions through one shared session model
-- Slash-command control plane with direct session routing via `@<sessionSelector> /...`
+- Slash-command control plane with direct session routing via `@<sessionSelector> /...`, plus one-shot SSH launches through `/ssh ...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
 - Session-card hover quick actions with per-session top custom-command favorites plus direct `Clipboard` send
 - Session replay/export, replay-excerpt clipboard relay via `/replay ...` and `/ccp`, file transfer, read-only sharing, and saved connection profiles
@@ -147,6 +147,14 @@ Work with connection-profile drafts from the command plane:
 /connection draft set {"startCwd":"/srv/app","tags":["ops"]}
 /connection draft save ops-shell
 ```
+
+Start a one-shot SSH session without first saving a profile:
+
+```text
+/ssh ixpqtwnk@carpo.uberspace.de --key ~/.ssh/id_ed25519
+```
+
+The first launch for a new SSH target still requires a trusted host key through `Manage -> Connections`.
 
 Edit session settings through typed slash commands:
 

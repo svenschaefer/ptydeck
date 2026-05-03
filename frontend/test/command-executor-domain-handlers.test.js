@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createCommandExecutorDomainHandlers } from "../src/public/command-executor-domain-handlers.js";
+import {
+  buildSshConnectionLaunch,
+  createCommandExecutorDomainHandlers,
+  parseSshCommandArgs
+} from "../src/public/command-executor-domain-handlers.js";
 
 test("command executor domain handlers route connection draft commands through extracted hooks", async () => {
   const draftCalls = [];
@@ -57,6 +61,115 @@ test("command executor domain handlers route connection draft commands through e
     }),
     "Loaded the active session into a new connection profile draft."
   );
+});
+
+test("command executor domain handlers parse and route one-shot ssh launches deterministically", async () => {
+  assert.deepEqual(parseSshCommandArgs([]), { ok: false, usage: true, error: "" });
+  assert.deepEqual(parseSshCommandArgs(["ixpqtwnk@carpo.uberspace.de:2222", "--password"]), {
+    ok: true,
+    value: {
+      host: "carpo.uberspace.de",
+      port: 2222,
+      username: "ixpqtwnk",
+      authMethod: "password",
+      privateKeyPath: ""
+    }
+  });
+  assert.equal(
+    parseSshCommandArgs(["carpo.uberspace.de", "--keyboard-interactive", "--key", "~/.ssh/id_ed25519"]).error,
+    "SSH auth method flags are mutually exclusive. Use either private-key, password, or keyboard-interactive auth."
+  );
+  assert.equal(parseSshCommandArgs(["carpo.uberspace.de", "--port", "70000"]).error, "SSH port must be an integer between 1 and 65535.");
+  assert.equal(parseSshCommandArgs(["carpo.uberspace.de", "--wat"]).error, "Unknown SSH option: --wat");
+
+  assert.deepEqual(
+    buildSshConnectionLaunch(
+      {
+        host: "carpo.uberspace.de",
+        port: 22,
+        username: "ixpqtwnk",
+        authMethod: "privateKey",
+        privateKeyPath: "~/.ssh/id_ed25519"
+      },
+      {
+        deckId: "ops",
+        defaultDeckId: "default",
+        defaultThemeProfile: { background: "#111111" },
+        normalizeThemeProfile: (profile) => profile
+      }
+    ),
+    {
+      kind: "ssh",
+      deckId: "ops",
+      shell: "ssh",
+      startCwd: "~",
+      startCommand: "",
+      env: {},
+      tags: [],
+      themeProfile: { background: "#111111" },
+      activeThemeProfile: { background: "#111111" },
+      inactiveThemeProfile: { background: "#111111" },
+      remoteConnection: {
+        host: "carpo.uberspace.de",
+        port: 22,
+        username: "ixpqtwnk"
+      },
+      remoteAuth: {
+        method: "privateKey",
+        privateKeyPath: "~/.ssh/id_ed25519"
+      }
+    }
+  );
+
+  const launchCalls = [];
+  const handlers = createCommandExecutorDomainHandlers({
+    defaultDeckId: "default",
+    formatUsage: (command, subcommand = "") => `usage:${command}:${subcommand}`,
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    normalizeThemeProfile: (profile) => profile || {},
+    defaultThemeProfile: { background: "#111111" },
+    normalizeConnectionProfileLaunch: (launch) => launch,
+    launchConnectionLaunch: async (launch, launchOptions) => {
+      launchCalls.push([launch, launchOptions]);
+      return "ssh-launched";
+    }
+  });
+
+  assert.equal(await handlers.executeSshCommand({ args: [] }), "usage:ssh:");
+  assert.equal(await handlers.executeSshCommand({ args: ["carpo.uberspace.de", "--wat"] }), "Unknown SSH option: --wat");
+  assert.equal(
+    await handlers.executeSshCommand({ args: ["ixpqtwnk@carpo.uberspace.de", "--key", "~/.ssh/id_ed25519"] }),
+    "ssh-launched"
+  );
+  assert.deepEqual(launchCalls, [
+    [
+      {
+        kind: "ssh",
+        deckId: "ops",
+        shell: "ssh",
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: [],
+        themeProfile: { background: "#111111" },
+        activeThemeProfile: { background: "#111111" },
+        inactiveThemeProfile: { background: "#111111" },
+        remoteConnection: {
+          host: "carpo.uberspace.de",
+          port: 22,
+          username: "ixpqtwnk"
+        },
+        remoteAuth: {
+          method: "privateKey",
+          privateKeyPath: "~/.ssh/id_ed25519"
+        }
+      },
+      {
+        name: "SSH ixpqtwnk@carpo.uberspace.de:22",
+        seedDraftOnMissingTrust: true
+      }
+    ]
+  ]);
 });
 
 test("command executor domain handlers manage workspace and broadcast paths through extracted seams", async () => {

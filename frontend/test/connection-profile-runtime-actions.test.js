@@ -32,6 +32,111 @@ test("connection profile runtime actions keep cancelled apply flows non-destruct
   assert.equal(runtimeSecretInputEl.value, "secret");
 });
 
+test("connection profile runtime actions launch ad hoc SSH sessions through the shared trust and secret gates", async () => {
+  const calls = [];
+  const runtimeEvents = [];
+  const runtimeSecretInputEl = { value: "inline-secret" };
+  const actions = createConnectionProfileRuntimeActions({
+    api: {
+      async createSession(payload) {
+        calls.push(["create-session", payload]);
+        return { id: "s-ssh", name: "carpo", deckId: "ops" };
+      }
+    },
+    normalizeConnectionLaunch: (launch) => launch,
+    ensureTrustedHostKeyBeforeLaunch: async (launchContext) => {
+      calls.push(["ensure-trust", launchContext]);
+      return "";
+    },
+    promptForLaunchSecret: async (launchContext) => {
+      calls.push(["prompt-secret", launchContext.name]);
+      return { ok: true, remoteSecret: "pw", cancelled: false };
+    },
+    runtimeSecretInputEl,
+    applyRuntimeEvent: (event) => runtimeEvents.push(event),
+    setActiveDeck: (deckId) => calls.push(["set-active-deck", deckId]),
+    setActiveSession: (sessionId) => calls.push(["set-active-session", sessionId]),
+    requestRender: () => calls.push(["render"]),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setStatus: (message) => calls.push(["status", message]),
+    formatSessionToken: (sessionId) => (sessionId === "s-ssh" ? "8" : sessionId),
+    formatSessionDisplayName: (session) => String(session?.name || "")
+  });
+
+  assert.equal(
+    await actions.launchConnectionLaunch(
+      {
+        kind: "ssh",
+        deckId: "ops",
+        shell: "ssh",
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: [],
+        activeThemeProfile: {},
+        inactiveThemeProfile: {},
+        remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
+        remoteAuth: { method: "password" }
+      },
+      { name: "SSH ixpqtwnk@carpo.uberspace.de:22", seedDraftOnMissingTrust: true }
+    ),
+    "Started session [8] carpo for ixpqtwnk@carpo.uberspace.de:22."
+  );
+  assert.equal(runtimeSecretInputEl.value, "");
+  assert.deepEqual(runtimeEvents, [
+    {
+      type: "session.created",
+      session: { id: "s-ssh", name: "carpo", deckId: "ops" }
+    }
+  ]);
+  assert.deepEqual(calls, [
+    [
+      "ensure-trust",
+      {
+        id: "",
+        name: "SSH ixpqtwnk@carpo.uberspace.de:22",
+        launch: {
+          kind: "ssh",
+          deckId: "ops",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "",
+          env: {},
+          tags: [],
+          activeThemeProfile: {},
+          inactiveThemeProfile: {},
+          remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
+          remoteAuth: { method: "password" }
+        },
+        seedDraftOnMissingTrust: true
+      }
+    ],
+    ["prompt-secret", "SSH ixpqtwnk@carpo.uberspace.de:22"],
+    [
+      "create-session",
+      {
+        kind: "ssh",
+        deckId: "ops",
+        shell: "ssh",
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: [],
+        activeThemeProfile: {},
+        inactiveThemeProfile: {},
+        remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
+        remoteAuth: { method: "password" },
+        remoteSecret: "pw"
+      }
+    ],
+    ["set-active-deck", "ops"],
+    ["set-active-session", "s-ssh"],
+    ["render"],
+    ["feedback", "Started session [8] carpo for ixpqtwnk@carpo.uberspace.de:22."],
+    ["status", "Started session [8] carpo for ixpqtwnk@carpo.uberspace.de:22."]
+  ]);
+});
+
 test("connection profile runtime actions clear stale state on load failure", async () => {
   const errors = [];
   const replaceCalls = [];
