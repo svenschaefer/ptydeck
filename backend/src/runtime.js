@@ -5,29 +5,24 @@ import { homedir } from "node:os";
 import { basename, dirname, join, posix, relative, resolve } from "node:path";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
-import { createAuditLogger, createHttpAuditEvent } from "./audit-log.js";
+import { createAuditLogger } from "./audit-log.js";
 import { createAccessTokenVerifier, createDevToken } from "./auth.js";
-import { ApiError, toErrorResponse } from "./errors.js";
+import { ApiError } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
 import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messaging-runtime.js";
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
-import { createRuntimeHttpHelpers, requiredScopeForRoute } from "./runtime-http-helpers.js";
+import { createRuntimeHttpHelpers } from "./runtime-http-helpers.js";
+import { createRuntimeHttpRequestHandler } from "./runtime-http-request-handler.js";
 import { createRuntimeResourceDispatch } from "./runtime-resource-dispatch.js";
 import { createRuntimeSessionDispatch } from "./runtime-session-dispatch.js";
 import { createRuntimeSessionAuthority } from "./runtime-session-authority.js";
 import { createRuntimeSessionControlDispatch } from "./runtime-session-control-dispatch.js";
-import { matchRuntimeRoute, normalizeRuntimeMetricsPath } from "./runtime-route-table.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
 import { createRuntimeWsConnectionHandler } from "./runtime-ws-connection.js";
 import { createRuntimeWsUpgradeHandler } from "./runtime-ws-upgrade.js";
 import { createRuntimeWsTicketRegistry, normalizeWsDisconnectReason } from "./runtime-ws-tickets.js";
-import {
-  buildRuntimeHealthPayload,
-  buildRuntimeReadyPayload,
-  countActiveRuntimeSessions,
-  renderRuntimeMetrics
-} from "./runtime-status-reporting.js";
+import { countActiveRuntimeSessions } from "./runtime-status-reporting.js";
 import {
   createSessionControlAttachmentRegistry,
   normalizeSessionControlClientLabel
@@ -5376,246 +5371,40 @@ function tryCreateRestoredSession({
     });
   }
 
-  const server = http.createServer(async (req, res) => {
-    const startedAt = Date.now();
-    const methodForLog = req.method || "GET";
-    let pathnameForLog = req.url || "/";
-    let normalizedMetricsPathForLog = pathnameForLog;
-    let requestTraceContext = null;
-    let requestContextForAudit = null;
-    let routeKindForAudit = "";
-    let routeParamsForAudit = {};
-    let authForAudit = null;
-    let targetForAudit = {};
-    let metadataForAudit = {};
-    let errorCodeForAudit = "";
-    let writeJsonResponse = (statusCode, body) => writeJson(req, res, statusCode, body, requestTraceContext);
-    res.on("finish", () => {
-      const durationMs = Date.now() - startedAt;
-      const statusCode = String(res.statusCode);
-      const routeKey = `${methodForLog} ${normalizedMetricsPathForLog}`;
-      metrics.httpRequestsTotal += 1;
-      metrics.httpDurationMsCount += 1;
-      metrics.httpDurationMsSum += durationMs;
-      recordHttpDuration(durationMs);
-      if (res.statusCode >= 400) {
-        metrics.httpErrorsTotal += 1;
-      }
-      bumpMetricCounter(metrics.httpRequestsByStatus, statusCode);
-      bumpMetricCounter(metrics.httpRequestsByRoute, routeKey);
-      logDebug("http.request.done", {
-        method: methodForLog,
-        pathname: pathnameForLog,
-        statusCode: res.statusCode,
-        durationMs
-      }, requestTraceContext);
-      void auditLogger.write(createHttpAuditEvent({
-        auth: authForAudit,
-        authEnabled: config.authEnabled,
-        errorCode: errorCodeForAudit,
-        metadata: metadataForAudit,
-        method: methodForLog,
-        params: routeParamsForAudit,
-        pathname: pathnameForLog,
-        requestContext: requestContextForAudit,
-        routeKind: routeKindForAudit,
-        statusCode: res.statusCode,
-        target: targetForAudit,
-        traceContext: requestTraceContext
-      }));
-    });
-
-    try {
-      const requestContext = resolveRequestContext(req, config.trustedProxy);
-      requestContextForAudit = requestContext;
-      const parsedUrl = new URL(req.url || "/", `${requestContext.protocol}://${requestContext.host}`);
-      pathnameForLog = parsedUrl.pathname;
-      normalizedMetricsPathForLog = normalizeRuntimeMetricsPath(parsedUrl.pathname);
-      requestTraceContext = buildRequestTraceContext(req, requestContext, parsedUrl.pathname);
-      logDebug("http.request.start", {
-        method: methodForLog,
-        pathname: pathnameForLog,
-        clientIp: requestContext.clientIp,
-        protocol: requestContext.protocol,
-        trustedProxy: requestContext.trustedProxy
-      }, requestTraceContext);
-
-      if (req.method === "OPTIONS") {
-        ensureTlsIngress(requestContext);
-        writeJsonResponse(204);
-        return;
-      }
-
-      const match = matchRuntimeRoute(parsedUrl.pathname, req.method || "GET");
-      const body = await parseJsonBody(req, maxBodyBytes);
-      const params = match.params || {};
-      routeKindForAudit = match.kind;
-      routeParamsForAudit = params;
-
-      validateRequest({
-        method: req.method || "GET",
-        pathname: parsedUrl.pathname,
-        params,
-        query: Object.fromEntries(parsedUrl.searchParams.entries()),
-        body
-      });
-      ensureTlsIngress(requestContext);
-
-      if (match.kind === "health") {
-        writeJsonResponse(200, buildRuntimeHealthPayload({
-          messagingStatusSummary: messagingRuntime.buildStatusSummary(),
-          streamAnalysisStatusSummary: sessionStreamAnalysisCapture.buildStatusSummary()
-        }));
-        return;
-      }
-
-      if (match.kind === "ready") {
-        const startupWarmupState = startupWarmup.getState();
-        writeJsonResponse(200, buildRuntimeReadyPayload({
-          isReady,
-          startupWarmupGateReleased: startupWarmupState.gateReleased,
-          startupWarmupEnabled: startupWarmupState.enabled,
-          startupWarmupQuietMs: startupWarmupState.quietMs,
-          startupWarmupQuietDeadlineAt: startupWarmupState.quietDeadlineAt,
-          sessions: manager.list(),
-          messagingStatusSummary: messagingRuntime.buildStatusSummary(),
-          streamAnalysisStatusSummary: sessionStreamAnalysisCapture.buildStatusSummary()
-        }));
-        return;
-      }
-
-      if (match.kind === "metrics") {
-        const payload = renderRuntimeMetrics({
-          sessions: manager.list(),
-          unrestoredSessionCount: unrestoredSessions.size,
-          wsConnectionCount: sockets.size,
-          metrics,
-          httpDurationBucketsMs: HTTP_DURATION_BUCKETS_MS,
-          escapePrometheusLabel,
-          messagingMetricLines: messagingRuntime.renderMetricLines()
-        });
-        res.writeHead(200, {
-          ...buildSecurityHeaders(),
-          ...buildTraceHeaders(requestTraceContext),
-          "content-type": "text/plain; version=0.0.4; charset=utf-8",
-          "cache-control": "no-store"
-        });
-        res.end(payload);
-        return;
-      }
-
-      if (match.kind === "devToken") {
-        if (!config.authEnabled || !config.authDevMode) {
-          throw new ApiError(404, "NotFound", `No route for ${req.method} ${parsedUrl.pathname}`);
-        }
-        const scopeDefaults = ["sessions:read", "sessions:create", "sessions:write", "sessions:delete", "ws:connect"];
-        const requestedScopes =
-          Array.isArray(body?.scopes) && body.scopes.every((entry) => typeof entry === "string")
-            ? body.scopes
-            : scopeDefaults;
-        const payload = {
-          accessToken: createDevToken({
-            secret: config.authDevSecret,
-            issuer: config.authIssuer,
-            audience: config.authAudience,
-            subject: typeof body?.subject === "string" && body.subject.trim() ? body.subject.trim() : "dev-user",
-            tenantId: typeof body?.tenantId === "string" && body.tenantId.trim() ? body.tenantId.trim() : "dev",
-            scopes: requestedScopes,
-            ttlSeconds: config.authDevTokenTtlSeconds
-          }),
-          tokenType: "Bearer",
-          expiresIn: config.authDevTokenTtlSeconds,
-          scope: requestedScopes.join(" ")
-        };
-        validateResponse({ statusCode: 200, body: payload, expect: "authToken" });
-        writeJsonResponse(200, payload);
-        return;
-      }
-
-      if (match.kind === "wsTicket") {
-        const auth = await authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
-          onAuthenticated: (authenticated) => {
-            authForAudit = authenticated;
-          }
-        });
-        const payload = wsTicketRegistry.issue(auth, body);
-        validateResponse({ statusCode: 200, body: payload, expect: "wsTicket" });
-        writeJsonResponse(200, payload);
-        return;
-      }
-
-      let auth = null;
-      if (match.kind !== "notFound") {
-        auth = await authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
-          onAuthenticated: (authenticated) => {
-            authForAudit = authenticated;
-          }
-        });
-      }
-
-      if (await resourceDispatch.dispatchResourceRequest({
-        match,
-        parsedUrl,
-        body,
-        auth,
-        req,
-        requestContext,
-        requestTraceContext,
-        writeJsonResponse
-      })) {
-        return;
-      }
-
-      if (await sessionDispatch.dispatchSessionRequest({
-        match,
-        parsedUrl,
-        body,
-        auth,
-        req,
-        requestContext,
-        requestTraceContext,
-        setAuditContext: ({ target, metadata } = {}) => {
-          if (target) {
-            targetForAudit = target;
-          }
-          if (metadata) {
-            metadataForAudit = {
-              ...metadataForAudit,
-              ...metadata
-            };
-          }
-        },
-        writeJsonResponse
-      })) {
-        return;
-      }
-
-      if (await sessionControlDispatch.dispatchSessionControlRequest({
-        match,
-        body,
-        auth,
-        req,
-        requestTraceContext,
-        writeJsonResponse
-      })) {
-        return;
-      }
-
-      throw new ApiError(404, "NotFound", `No route for ${req.method} ${parsedUrl.pathname}`);
-    } catch (err) {
-      const mapped = toErrorResponse(err);
-      errorCodeForAudit = typeof mapped.body?.error === "string" ? mapped.body.error : "";
-      validateResponse({ statusCode: mapped.statusCode, body: mapped.body, expect: "error" });
-      writeJsonResponse( mapped.statusCode, mapped.body);
-      logDebug("http.request.error", {
-        method: methodForLog,
-        pathname: pathnameForLog,
-        statusCode: mapped.statusCode,
-        error: mapped.body.error,
-        message: mapped.body.message
-      }, requestTraceContext);
-    }
+  const handleHttpRequest = createRuntimeHttpRequestHandler({
+    config,
+    maxBodyBytes,
+    metrics,
+    recordHttpDuration,
+    bumpMetricCounter,
+    logDebug,
+    resolveRequestContext,
+    buildRequestTraceContext,
+    parseJsonBody,
+    validateRequest,
+    validateResponse,
+    ensureTlsIngress,
+    authenticateRequest,
+    writeJson,
+    buildSecurityHeaders,
+    buildTraceHeaders,
+    auditLogger,
+    getIsReady: () => isReady,
+    startupWarmup,
+    manager,
+    unrestoredSessions,
+    sockets,
+    httpDurationBucketsMs: HTTP_DURATION_BUCKETS_MS,
+    escapePrometheusLabel,
+    wsTicketRegistry,
+    messagingRuntime,
+    sessionStreamAnalysisCapture,
+    dispatchResourceRequest: (input) => resourceDispatch.dispatchResourceRequest(input),
+    dispatchSessionRequest: (input) => sessionDispatch.dispatchSessionRequest(input),
+    dispatchSessionControlRequest: (input) => sessionControlDispatch.dispatchSessionControlRequest(input)
   });
+
+  const server = http.createServer(handleHttpRequest);
 
   server.on("upgrade", (request, socket, head) => {
     void handleWsUpgrade(request, socket, head);

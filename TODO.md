@@ -14,7 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-272` Owner `BE`: extract the next HTTP/startup/runtime-authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
 - `QLT-273` Owner `BE`: isolate one more restart/reconnect/persistence lifecycle helper seam from `backend/src/session-manager.js` and harden the remaining manager branch gaps.
 - `QLT-274` Owner `FE`: extract the next bootstrap/handoff/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
 - `QLT-275` Owner `FE`: extract the next operator command/discovery seam from `frontend/src/public/command-executor.js` and add direct deterministic regressions for the extracted path.
@@ -25,6 +24,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
 - `FE` ownership role is active for `QLT-274` through `QLT-277`.
-- `BE` ownership role is active for `QLT-272` and `QLT-273`.
+- `BE` ownership role is active for `QLT-273`.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.

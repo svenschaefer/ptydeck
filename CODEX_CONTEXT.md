@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`, delegate session REST routing out of `backend/src/runtime.js` into `backend/src/runtime-session-dispatch.js`, isolate restart payload shaping from `backend/src/session-manager.js` into `backend/src/session-manager-lifecycle.js`, extract trusted-local handoff/layout composition out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-trusted-local-composition.js`, extract SSH trust/launch lifecycle authority out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-ssh-lifecycle.js`, extract `/settings` command dispatch out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-settings-handlers.js`, and tighten direct runtime-state/session-terminal coverage across `frontend/src/public/store.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`; fresh review evidence now promotes `v0.4.0-H168` for the remaining backend runtime/session-manager and frontend composition/command/profile/store/terminal monolith hotspots)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`, delegate session REST routing out of `backend/src/runtime.js` into `backend/src/runtime-session-dispatch.js`, delegate the remaining HTTP request entry seam out of `backend/src/runtime.js` into `backend/src/runtime-http-request-handler.js`, isolate restart payload shaping from `backend/src/session-manager.js` into `backend/src/session-manager-lifecycle.js`, extract trusted-local handoff/layout composition out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-trusted-local-composition.js`, extract SSH trust/launch lifecycle authority out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-ssh-lifecycle.js`, extract `/settings` command dispatch out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-settings-handlers.js`, and tighten direct runtime-state/session-terminal coverage across `frontend/src/public/store.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`; `QLT-272` is now closed and `v0.4.0-H168` remains active for the remaining backend session-manager and frontend composition/command/profile/store/terminal monolith hotspots)
 
 ## Current Product Truth
 
@@ -403,12 +403,15 @@ Relevant hotspots promoted into `TODO.md` / `ROADMAP.md`:
 
 Promoted `H168` tasks:
 
-- `QLT-272` Owner `BE`: extract the next HTTP/startup/runtime-authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
 - `QLT-273` Owner `BE`: isolate one more restart/reconnect/persistence lifecycle helper seam from `backend/src/session-manager.js` and harden the remaining manager branch gaps.
 - `QLT-274` Owner `FE`: extract the next bootstrap/handoff/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
 - `QLT-275` Owner `FE`: extract the next operator command/discovery seam from `frontend/src/public/command-executor.js` and add direct deterministic regressions for the extracted path.
 - `QLT-276` Owner `FE`: isolate the next SSH/profile/workspace operator seam from `frontend/src/public/connection-profile-runtime-controller.js` and close the remaining branch gaps with direct regressions.
 - `QLT-277` Owner `FE`: harden shared runtime-state and terminal-interaction coverage across `frontend/src/public/store.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js`.
+
+`QLT-272` is now complete. `backend/src/runtime.js` delegates the remaining HTTP request entry seam into `backend/src/runtime-http-request-handler.js`, reducing the runtime monolith from `6136` to `5925` lines without widening the shipped REST contract. Direct deterministic seam coverage now lives in `backend/test/runtime-http-request-handler.test.js`, and the extracted module validates at `95.59%` line / `90.16%` branch coverage.
+
+The validated backend hotspot snapshot after `QLT-272` now reports the reduced `backend/src/runtime.js` at `78.77%` line / `69.38%` branch coverage, `backend/src/runtime-http-request-handler.js` at `95.59%` line / `90.16%` branch coverage, and backend top-line coverage at `95.41%` line / `89.31%` branch on the active tree.
 
 Not promoted from the fresh review:
 
@@ -456,7 +459,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-272` through `QLT-277`.
+- `TODO.md`: active promoted tasks are `QLT-273` through `QLT-277`.
 - `ROADMAP.md`: active wave is `v0.4.0-H168`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.
