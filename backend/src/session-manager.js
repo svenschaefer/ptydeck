@@ -40,6 +40,7 @@ import {
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
 import { consumeTerminalSignals, createEmptyTerminalSignalState } from "./terminal-output-signals.js";
 import { createShellAdapter } from "./shell-adapter.js";
+import { buildRestartSessionCreatePayload } from "./session-manager-lifecycle.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
 const DEFAULT_SSH_CLIENT = "ssh";
@@ -1955,34 +1956,15 @@ export class SessionManager {
 
   restart(sessionId, options = {}) {
     const session = this.get(sessionId);
-    const snapshot = { ...session.meta };
     const trace = normalizeTraceSeed(options.trace);
-    this.delete(sessionId, { trace });
-    return this.create({
-      id: snapshot.id,
-      kind: snapshot.kind,
-      remoteConnection: snapshot.remoteConnection,
-      remoteAuth: snapshot.remoteAuth,
+    const restartPayload = buildRestartSessionCreatePayload({
+      sessionMeta: session.meta,
       remoteSecret: session.remoteSecret,
-      quickIdToken: snapshot.quickIdToken,
-      cwd: snapshot.startCwd || snapshot.cwd,
-      shell: snapshot.shell,
-      name: snapshot.name,
-      startCwd: snapshot.startCwd || snapshot.cwd,
-      startCommand: snapshot.startCommand || "",
-      env: snapshot.env || {},
-      note: snapshot.note,
-      mouseForwardingMode: snapshot.mouseForwardingMode,
-      inputSafetyProfile: snapshot.inputSafetyProfile,
-      tags: snapshot.tags || [],
-      quickSendUsage: snapshot.quickSendUsage || [],
-      themeProfile: snapshot.themeProfile || {},
-      activeThemeProfile: snapshot.activeThemeProfile,
-      inactiveThemeProfile: snapshot.inactiveThemeProfile,
-      createdAt: snapshot.createdAt,
       updatedAt: this.nowFn(),
       trace
     });
+    this.delete(sessionId, { trace });
+    return this.create(restartPayload);
   }
 
   closeWithReason(sessionId, reason, options = {}) {

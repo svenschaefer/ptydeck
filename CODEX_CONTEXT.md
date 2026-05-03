@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, and extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`; a fresh repo-wide review now promotes `v0.4.0-H167` around the remaining backend/runtime and frontend authority monoliths)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`, delegate session REST routing out of `backend/src/runtime.js` into `backend/src/runtime-session-dispatch.js`, and isolate restart payload shaping from `backend/src/session-manager.js` into `backend/src/session-manager-lifecycle.js`; `v0.4.0-H167` remains active for the remaining frontend authority monoliths)
 
 ## Current Product Truth
 
@@ -365,6 +365,12 @@ Promoted `H167` tasks:
 - `QLT-270` Owner `FE`: isolate SSH launch/trust operator lifecycle branches from `frontend/src/public/connection-profile-runtime-controller.js` and close the remaining branch gaps with direct regressions.
 - `QLT-271` Owner `FE`: harden shared runtime-state and terminal-interaction coverage across `frontend/src/public/store.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`.
 
+Delivered `H167` slices on 2026-05-03:
+
+- `QLT-266` is complete. `backend/src/runtime.js` now delegates the remaining session REST seam into `backend/src/runtime-session-dispatch.js`, reducing the runtime monolith from `6462` to `6136` lines without widening the REST contract. Direct deterministic seam coverage now lives in `backend/test/runtime-session-dispatch.test.js`, and the extracted module validates at `100.00%` line / `99.07%` branch coverage.
+- `QLT-267` is complete. `backend/src/session-manager.js` now delegates restart payload shaping into `backend/src/session-manager-lifecycle.js`, reducing the manager from `2055` to `2037` lines. Direct lifecycle coverage now lives in `backend/test/session-manager-lifecycle.test.js`, and the extracted helper validates at `100.00%` line / `95.00%` branch coverage. `backend/test/session-manager.test.js` now also locks down the disabled-reconnect fail-closed branch plus degraded-versus-offline reconnect-unavailable errors.
+- The validated backend hotspot snapshot after those two slices is `backend/src/runtime-session-dispatch.js` at `100.00%` line / `99.07%` branch, `backend/src/session-manager-lifecycle.js` at `100.00%` line / `95.00%` branch, `backend/src/session-manager.js` at `96.12%` line / `79.08%` branch, and the reduced `backend/src/runtime.js` at `79.50%` line / `70.06%` branch. Backend top-line coverage on the active tree is now `95.39%` line / `89.32%` branch.
+
 Not promoted from the fresh review:
 
 - `scripts/analyze-pty-write-eintr.mjs` (`77.17%` line / `43.48%` branch) and `scripts/analyze-startup-timeline.mjs` (`80.77%` line / `49.09%` branch) remain intentionally unpromoted because they are retained diagnostics, not live product/runtime authority paths.
@@ -411,8 +417,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-266` through `QLT-271`.
-- `ROADMAP.md`: active wave is `v0.4.0-H167`; no queued next wave is currently promoted.
+- `TODO.md`: active promoted tasks are `QLT-268` through `QLT-271`.
+- `ROADMAP.md`: active wave is `v0.4.0-H167`; the remaining active order is `QLT-268`, `QLT-269`, `QLT-270`, `QLT-271`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.

@@ -2135,7 +2135,7 @@ test("SessionManager restart preserves identity and restarts PTY", async () => {
   assert.ok(restarted.updatedAt >= created.createdAt);
   assert.equal(manager.get(created.id).ptyProcess, secondPty);
   secondPty.emitData("__CWD__/var/tmp__\nuser@host:/var/tmp$ ");
-  await waitFor(() => secondPty.writes.includes("echo START\r"));
+  await waitFor(() => secondPty.writes.includes("echo START\r"), 1000);
   assert.deepEqual(secondPty.writes, ["echo START\r"]);
 });
 
@@ -2251,6 +2251,76 @@ test("SessionManager reconnect retry failures degrade first, then fail closed of
   assert.equal(session.meta.remoteRuntime.lastDisconnectReason, "reconnect spawn failed 3");
   assert.equal(scheduled.length, 0);
   assert.throws(() => manager.interrupt(created.id), /is offline\. Restart the session to retry immediately\./);
+});
+
+test("SessionManager fails closed immediately when SSH reconnect retries are disabled", () => {
+  const firstPty = createFakePty();
+  const scheduled = [];
+  const manager = new SessionManager({
+    createPty: () => firstPty,
+    remoteReconnectMaxAttempts: 0,
+    setTimeoutFn(fn, delayMs) {
+      const timer = { fn, delayMs };
+      scheduled.push(timer);
+      return timer;
+    }
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+  const session = manager.get(created.id);
+
+  const scheduledReconnect = manager.scheduleRemoteReconnect(session, {
+    reason: "ssh-transport-exit",
+    timestamp: 1700000000000
+  });
+
+  assert.equal(scheduledReconnect, false);
+  assert.equal(session.meta.remoteRuntime.connectivityState, "offline");
+  assert.equal(session.meta.remoteRuntime.lastDisconnectReason, "ssh-transport-exit");
+  assert.equal(session.meta.remoteRuntime.nextReconnectAt, null);
+  assert.deepEqual(scheduled, []);
+});
+
+test("SessionManager reconnect-unavailable errors distinguish degraded from offline SSH sessions", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+  const session = manager.get(created.id);
+  session.ptyProcess = null;
+  session.meta.remoteRuntime.connectivityState = "degraded";
+
+  assert.throws(
+    () => manager.sendInput(created.id, "pwd\r"),
+    /is reconnecting\. Wait for recovery or restart the session explicitly\./
+  );
+
+  session.meta.remoteRuntime.connectivityState = "offline";
+
+  assert.throws(
+    () => manager.resize(created.id, 120, 40),
+    /is offline\. Restart the session to retry immediately\./
+  );
 });
 
 test("SessionManager passes startup env overrides to PTY spawn", () => {

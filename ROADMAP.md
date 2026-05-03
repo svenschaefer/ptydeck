@@ -20,8 +20,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Active Wave Order
 
-- `QLT-266` Owner `BE`
-- `QLT-267` Owner `BE`
 - `QLT-268` Owner `FE`
 - `QLT-269` Owner `FE`
 - `QLT-270` Owner `FE`
@@ -33,8 +31,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Exit Criteria
 
-- the next backend authority seam is extracted from `backend/src/runtime.js` and covered with direct deterministic regressions
-- `backend/src/session-manager.js` restart/reconnect/persistence/error-path coverage is tightened and one remaining lifecycle helper seam is isolated
 - the next frontend runtime-composition and command-dispatch seams are extracted from `frontend/src/public/app-runtime-composition-controller.js` and `frontend/src/public/command-executor.js`
 - the remaining SSH operator lifecycle branch gaps in `frontend/src/public/connection-profile-runtime-controller.js` are closed with direct regressions
 - shared runtime-state and session-terminal interaction coverage is tightened across `frontend/src/public/store.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`
