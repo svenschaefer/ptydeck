@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { URL } from "node:url";
 import { WebSocket } from "ws";
@@ -5997,9 +5997,10 @@ test("ssh trust entries persist, render managed known_hosts, and reject conflict
   }
 });
 
-test("ssh session launches constrain host key algorithms to the trusted types for the target", async () => {
+test("ssh session launches constrain host key algorithms to the trusted types and use an absolute managed known_hosts path", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-ssh-hostkey-"));
-  const dataPath = join(dir, "sessions.json");
+  const dataPathAbsolute = join(dir, "sessions.json");
+  const dataPath = relative(process.cwd(), dataPathAbsolute);
   const spawnCalls = [];
   const runtime = createRuntime({
     port: 0,
@@ -6064,6 +6065,7 @@ test("ssh session launches constrain host key algorithms to the trusted types fo
     assert.equal(createRes.status, 201);
     assert.ok(spawnCalls.length > 0);
     assert.equal(spawnCalls.at(-1).args.includes("HostKeyAlgorithms=ssh-rsa"), true);
+    assert.equal(spawnCalls.at(-1).args.includes(`UserKnownHostsFile=${join(dir, "ssh_known_hosts")}`), true);
   } finally {
     await runtime.stop();
   }

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates and seed the SSH draft on missing trust; `v0.4.0-H165` is closed with no active promoted wave)
+Last updated: 2026-05-03 (trusted-local handoff now resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches now pin `HostKeyAlgorithms` to the trusted host-key types for the selected target and pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes; one-shot `/ssh ...` launches now reuse the saved-profile trust/secret gates and seed the SSH draft on missing trust; `v0.4.0-H165` is closed with no active promoted wave)
 
 ## Current Product Truth
 
@@ -72,8 +72,11 @@ Current contract:
 
 - Persisted SSH trust entries remain the authority for host-key admission.
 - `backend/src/runtime.js` now resolves the trusted host-key types for the selected SSH target and passes them into the session-launch seam.
+- `backend/src/runtime.js` now also resolves the managed `ssh_known_hosts` path to an absolute filesystem path before handing it to the session-launch seam.
 - `backend/src/session-launch-spec.js` now renders `-o HostKeyAlgorithms=...` whenever trusted host-key types are known for the target host/port.
+- `backend/src/session-launch-spec.js` now always receives an absolute `-o UserKnownHostsFile=...` path, so the spawned `ssh` client no longer resolves the managed trust file relative to the session spawn cwd.
 - This prevents OpenSSH from preferring an untrusted host-key algorithm, such as `ssh-ed25519`, over a different already-trusted key type, such as `ssh-rsa`, under strict host-key checking.
+- This also closes the live dev/runtime bug where the backend trust store and rendered `backend/data/ssh_known_hosts` file were correct, but OpenSSH still failed strict host-key checking because a relative `data/ssh_known_hosts` path was being resolved in the wrong working directory.
 - The command plane now exposes one-shot SSH launches through `/ssh <target>`, with optional `-l` / `--user`, `-p` / `--port`, `-i` / `--key`, `--password`, and `--keyboard-interactive` options.
 - Saved-profile SSH launches and one-shot `/ssh ...` launches both reuse the same frontend trust/secret gates in the connection-profile runtime seam instead of maintaining separate SSH launch contracts.
 - When a one-shot `/ssh ...` launch hits a target with no trusted host key yet, the frontend seeds the `Connections` draft with that attempted SSH launch, auto-probes host keys for the same host/port, and stops with trust guidance so the operator can trust the right key and rerun the same command.

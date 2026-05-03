@@ -2225,7 +2225,7 @@ export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
   const debugLogs = config.debugLogs === true;
-  const sshKnownHostsPath = join(dirname(config.dataPath), "ssh_known_hosts");
+  const sshKnownHostsPath = resolve(dirname(config.dataPath), "ssh_known_hosts");
   const sshHostKeyProbeTimeoutMs =
     Number.isInteger(config.sshHostKeyProbeTimeoutMs) && config.sshHostKeyProbeTimeoutMs > 0
       ? config.sshHostKeyProbeTimeoutMs
