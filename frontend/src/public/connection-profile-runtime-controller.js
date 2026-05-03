@@ -1,4 +1,13 @@
 import { createConnectionProfileRuntimeActions } from "./connection-profile-runtime-actions.js";
+import {
+  buildSshTrustGuidance,
+  buildSshTrustStatus,
+  createConnectionProfileSshLifecycle,
+  formatSshTarget,
+  getSshTrustTargetKey,
+  isSameSshTrustTarget,
+  normalizeSshTrustTargetInput
+} from "./connection-profile-ssh-lifecycle.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -403,120 +412,6 @@ function setSelectOptions(selectEl, options, selectedValue) {
   selectEl.value = String(selectedValue || "");
 }
 
-function normalizeSshTrustEntry(entry) {
-  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-    return null;
-  }
-  const id = normalizeText(entry.id);
-  const host = normalizeText(entry.host);
-  const port = Number.parseInt(String(entry.port ?? ""), 10);
-  const keyType = normalizeText(entry.keyType);
-  const publicKey = normalizeText(entry.publicKey);
-  const fingerprintSha256 = normalizeText(entry.fingerprintSha256);
-  if (!id || !host || !Number.isInteger(port) || port < 1 || port > 65535 || !keyType || !publicKey || !fingerprintSha256) {
-    return null;
-  }
-  return {
-    id,
-    host,
-    port,
-    keyType,
-    publicKey,
-    fingerprintSha256,
-    createdAt: Number.isInteger(entry.createdAt) ? entry.createdAt : 0,
-    updatedAt: Number.isInteger(entry.updatedAt) ? entry.updatedAt : 0
-  };
-}
-
-function normalizeSshTrustEntryCollection(entries) {
-  const next = [];
-  const seen = new Set();
-  for (const entry of Array.isArray(entries) ? entries : []) {
-    const normalized = normalizeSshTrustEntry(entry);
-    if (!normalized || seen.has(normalized.id)) {
-      continue;
-    }
-    seen.add(normalized.id);
-    next.push(normalized);
-  }
-  next.sort((left, right) => {
-    const hostCompare = left.host.localeCompare(right.host, "en-US", { sensitivity: "base" });
-    if (hostCompare !== 0) {
-      return hostCompare;
-    }
-    if (left.port !== right.port) {
-      return left.port - right.port;
-    }
-    const keyTypeCompare = left.keyType.localeCompare(right.keyType, "en-US", { sensitivity: "base" });
-    if (keyTypeCompare !== 0) {
-      return keyTypeCompare;
-    }
-    return left.id.localeCompare(right.id, "en-US", { sensitivity: "base" });
-  });
-  return next;
-}
-
-function normalizeSshHostKeyProbeCandidate(entry) {
-  const normalizedTrustEntry = normalizeSshTrustEntry({
-    ...entry,
-    id:
-      normalizeText(entry?.id) ||
-      `${normalizeText(entry?.host)}:${Number.parseInt(String(entry?.port ?? ""), 10)}:${normalizeText(entry?.keyType)}:${normalizeText(entry?.fingerprintSha256)}`
-  });
-  if (!normalizedTrustEntry) {
-    return null;
-  }
-  return {
-    id: normalizedTrustEntry.id,
-    host: normalizedTrustEntry.host,
-    port: normalizedTrustEntry.port,
-    keyType: normalizedTrustEntry.keyType,
-    publicKey: normalizedTrustEntry.publicKey,
-    fingerprintSha256: normalizedTrustEntry.fingerprintSha256
-  };
-}
-
-function normalizeSshHostKeyProbeCandidateCollection(entries) {
-  const next = [];
-  const seen = new Set();
-  for (const entry of Array.isArray(entries) ? entries : []) {
-    const normalized = normalizeSshHostKeyProbeCandidate(entry);
-    if (!normalized || seen.has(normalized.id)) {
-      continue;
-    }
-    seen.add(normalized.id);
-    next.push(normalized);
-  }
-  next.sort((left, right) => {
-    const keyTypeCompare = left.keyType.localeCompare(right.keyType, "en-US", { sensitivity: "base" });
-    if (keyTypeCompare !== 0) {
-      return keyTypeCompare;
-    }
-    return left.fingerprintSha256.localeCompare(right.fingerprintSha256, "en-US", { sensitivity: "base" });
-  });
-  return next;
-}
-
-function formatSshTarget(host, port, username) {
-  const normalizedHost = normalizeText(host) || "?";
-  const normalizedPort = Number.isInteger(Number(port)) ? Number(port) : 22;
-  const normalizedUsername = normalizeText(username);
-  return `${normalizedUsername ? `${normalizedUsername}@` : ""}${normalizedHost}:${normalizedPort}`;
-}
-
-function formatSshTrustRecordLabel(record) {
-  if (!record) {
-    return "";
-  }
-  return `${record.keyType} · ${record.fingerprintSha256}`;
-}
-
-function isSshTrustConflictError(error) {
-  const status = Number.parseInt(String(error?.status ?? ""), 10);
-  const code = normalizeText(error?.error);
-  return status === 409 && code === "SshHostKeyTrustConflict";
-}
-
 export function createConnectionProfileRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const documentRef = options.documentRef || null;
@@ -626,6 +521,42 @@ export function createConnectionProfileRuntimeController(options = {}) {
   let isRenderingDraft = false;
   let loadingSshTrustEntries = false;
   let uiEventsBound = false;
+
+  function getSshLifecycleState() {
+    return {
+      sshTrustEntries,
+      selectedSshTrustEntryId,
+      sshHostKeyProbeCandidates,
+      selectedSshProbeCandidateId,
+      probingSshHostKeys,
+      sshProbeTargetKey,
+      loadingSshTrustEntries
+    };
+  }
+
+  function updateSshLifecycleState(patch = {}) {
+    if (Object.prototype.hasOwnProperty.call(patch, "sshTrustEntries")) {
+      sshTrustEntries = Array.isArray(patch.sshTrustEntries) ? patch.sshTrustEntries : [];
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "selectedSshTrustEntryId")) {
+      selectedSshTrustEntryId = normalizeText(patch.selectedSshTrustEntryId);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "sshHostKeyProbeCandidates")) {
+      sshHostKeyProbeCandidates = Array.isArray(patch.sshHostKeyProbeCandidates) ? patch.sshHostKeyProbeCandidates : [];
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "selectedSshProbeCandidateId")) {
+      selectedSshProbeCandidateId = normalizeText(patch.selectedSshProbeCandidateId);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "probingSshHostKeys")) {
+      probingSshHostKeys = patch.probingSshHostKeys === true;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "sshProbeTargetKey")) {
+      sshProbeTargetKey = normalizeText(patch.sshProbeTargetKey);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "loadingSshTrustEntries")) {
+      loadingSshTrustEntries = patch.loadingSshTrustEntries === true;
+    }
+  }
 
   function setStatus(message) {
     if (statusEl) {
@@ -1006,42 +937,23 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return { host, port };
   }
 
-  function getSshTrustTargetKey(target) {
-    const host = normalizeText(target?.host);
-    const port = Number.parseInt(String(target?.port ?? 22), 10);
-    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
-      return "";
-    }
-    return `${host}:${port}`;
-  }
-
-  function normalizeSshTrustTargetInput(target, label = "SSH target") {
-    const host = normalizeText(target?.host);
-    const port = Number.parseInt(String(target?.port ?? 22), 10);
-    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error(`${label} must include a valid host and port.`);
-    }
-    return { host, port };
-  }
-
-  function isSameSshTrustTarget(left, right) {
-    const leftKey = getSshTrustTargetKey(left);
-    return leftKey && leftKey === getSshTrustTargetKey(right);
-  }
-
   function shouldRenderSshTrustTarget(target) {
     return isSameSshTrustTarget(getCurrentSshTrustTarget(), target);
   }
 
   function clearSshProbeCandidates() {
-    sshHostKeyProbeCandidates = [];
-    selectedSshProbeCandidateId = "";
-    sshProbeTargetKey = "";
+    updateSshLifecycleState({
+      sshHostKeyProbeCandidates: [],
+      selectedSshProbeCandidateId: "",
+      sshProbeTargetKey: ""
+    });
   }
 
   function clearSshTrustState() {
-    sshTrustEntries = [];
-    selectedSshTrustEntryId = "";
+    updateSshLifecycleState({
+      sshTrustEntries: [],
+      selectedSshTrustEntryId: ""
+    });
     clearSshProbeCandidates();
   }
 
@@ -1079,168 +991,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return getSshTrustEntriesForTarget(normalizedTarget).find(
       (entry) => entry.keyType === probeCandidate.keyType && entry.publicKey !== probeCandidate.publicKey
     ) || null;
-  }
-
-  function buildSshTrustGuidance({
-    isSsh,
-    target,
-    matchingTrustEntries,
-    probeCandidates,
-    conflictEntry
-  }) {
-    if (!isSsh) {
-      return "SSH trust entries are only used for SSH profiles.";
-    }
-    if (!target) {
-      return "Enter an SSH host and port to manage host-key trust.";
-    }
-    const targetLabel = formatSshTarget(target.host, target.port);
-    if (conflictEntry) {
-      return `Rotation review for ${targetLabel}: verify the trusted and fetched fingerprints below, then replace the stored trust entry only if the new fingerprint is expected.`;
-    }
-    if (matchingTrustEntries.length === 0 && probeCandidates.length === 0) {
-      return `First connect for ${targetLabel}: fetch host keys, verify the expected fingerprint out of band, then trust the matching key before launching.`;
-    }
-    if (matchingTrustEntries.length === 0) {
-      return `First connect for ${targetLabel}: ${probeCandidates.length} fetched host key candidate(s) are ready for review. Trust only the fingerprint that matches your server.`;
-    }
-    if (probeCandidates.length > 0) {
-      return `${targetLabel} already has ${matchingTrustEntries.length} trusted key(s). Compare the fetched candidate before trusting an additional key or rotating an existing one.`;
-    }
-    return `Trusted host keys for ${targetLabel} are stored separately from the saved connection profile. Refresh, delete obsolete entries, or fetch current host keys when you suspect rotation.`;
-  }
-
-  function buildSshTrustStatus({
-    isSsh,
-    target,
-    matchingTrustEntries,
-    probeCandidates,
-    conflictEntry,
-    probing
-  }) {
-    if (!isSsh) {
-      return "SSH trust entries are only used for SSH profiles.";
-    }
-    if (!target) {
-      return "Enter an SSH host to manage trusted host keys.";
-    }
-    const targetLabel = formatSshTarget(target.host, target.port);
-    if (probing) {
-      return `Fetching host keys for ${targetLabel}...`;
-    }
-    if (conflictEntry) {
-      return `Rotation candidate ready for ${targetLabel}`;
-    }
-    if (matchingTrustEntries.length === 0 && probeCandidates.length > 0) {
-      return `First connect pending for ${targetLabel}`;
-    }
-    if (matchingTrustEntries.length === 0) {
-      return `No trusted host key stored for ${targetLabel}`;
-    }
-    if (probeCandidates.length > 0) {
-      return `${matchingTrustEntries.length} trusted · ${probeCandidates.length} fetched for ${targetLabel}`;
-    }
-    return `${matchingTrustEntries.length} trusted key(s) for ${targetLabel}`;
-  }
-
-  function buildSshTrustConflictFeedback(target, conflictEntry, probeCandidate) {
-    return `SSH host-key rotation review required for ${formatSshTarget(
-      target.host,
-      target.port
-    )}. Trusted ${conflictEntry.keyType} fingerprint ${conflictEntry.fingerprintSha256} conflicts with fetched ${probeCandidate.fingerprintSha256}. Verify both fingerprints, then use Replace Trusted Key if the change is expected.`;
-  }
-
-  function resolveSshTrustRecord(records, selectorText, {
-    emptyError,
-    ambiguousLabel
-  } = {}) {
-    const candidates = Array.isArray(records) ? records.filter(Boolean) : [];
-    if (candidates.length === 0) {
-      return {
-        record: null,
-        error: emptyError || "No SSH host keys are available for this target."
-      };
-    }
-    const selector = normalizeText(selectorText);
-    if (!selector) {
-      if (candidates.length === 1) {
-        return { record: candidates[0], error: "" };
-      }
-      return {
-        record: null,
-        error:
-          ambiguousLabel ||
-          `Multiple SSH host keys match this target. Specify one by key type or fingerprint: ${candidates
-            .map((entry) => formatSshTrustRecordLabel(entry))
-            .join(", ")}.`
-      };
-    }
-    const normalizedSelector = selector.toLowerCase();
-    const matchBy = (predicate) => {
-      const next = [];
-      const seen = new Set();
-      for (const candidate of candidates) {
-        const keys = [
-          candidate.id,
-          candidate.keyType,
-          candidate.fingerprintSha256,
-          `${candidate.keyType}:${candidate.fingerprintSha256}`
-        ]
-          .map((value) => normalizeText(value).toLowerCase())
-          .filter(Boolean);
-        if (keys.some((key) => predicate(key))) {
-          if (!seen.has(candidate.id)) {
-            seen.add(candidate.id);
-            next.push(candidate);
-          }
-        }
-      }
-      return next;
-    };
-    const exactMatches = matchBy((key) => key === normalizedSelector);
-    if (exactMatches.length === 1) {
-      return { record: exactMatches[0], error: "" };
-    }
-    if (exactMatches.length > 1) {
-      return {
-        record: null,
-        error: `SSH host-key selector '${selector}' is ambiguous. Use a full key type or fingerprint.`
-      };
-    }
-    const prefixMatches = matchBy((key) => key.startsWith(normalizedSelector));
-    if (prefixMatches.length === 1) {
-      return { record: prefixMatches[0], error: "" };
-    }
-    if (prefixMatches.length > 1) {
-      return {
-        record: null,
-        error:
-          ambiguousLabel ||
-          `SSH host-key selector '${selector}' is ambiguous. Matches: ${prefixMatches.map((entry) => formatSshTrustRecordLabel(entry)).join(", ")}.`
-      };
-    }
-    return {
-      record: null,
-      error: `No SSH host key matches '${selector}' for this target.`
-    };
-  }
-
-  function buildMissingSshTrustRecoveryMessage(target, launchContext, candidates) {
-    const commandTarget = formatSshTarget(target.host, target.port);
-    const candidateLines = Array.isArray(candidates) && candidates.length > 0
-      ? candidates.map((candidate) => `- ${formatSshTrustRecordLabel(candidate)}`).join("\n")
-      : "- No SSH host keys were fetched for this target.";
-    const relaunchInstruction = launchContext?.seedDraftOnMissingTrust === true
-      ? "Then rerun the same `/ssh ...` command."
-      : "Then launch this SSH connection again.";
-    return [
-      `No trusted host key is stored for ${commandTarget}.`,
-      `Fetched ${Array.isArray(candidates) ? candidates.length : 0} SSH host key candidate(s):`,
-      candidateLines,
-      `Verify the expected fingerprint, then trust one with \`/ssh hostkey trust ${commandTarget} <keyType|fingerprint>\`.`,
-      `List stored trust entries with \`/ssh hostkey list ${commandTarget}\` or probe again with \`/ssh hostkey probe ${commandTarget}\`.`,
-      relaunchInstruction
-    ].join("\n");
   }
 
   function syncDraftStateFromInputs() {
@@ -1557,33 +1307,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
     });
   }
 
-  async function refreshSshTrustEntries(options = {}) {
-    if (typeof api.listSshTrustEntries !== "function") {
-      sshTrustEntries = [];
-      renderDraftComputedState();
-      return [];
-    }
-    if (loadingSshTrustEntries) {
-      return sshTrustEntries.slice();
-    }
-    loadingSshTrustEntries = true;
-    renderDraftComputedState();
-    try {
-      const payload = await api.listSshTrustEntries();
-      sshTrustEntries = normalizeSshTrustEntryCollection(payload);
-      renderDraftComputedState();
-      return sshTrustEntries.slice();
-    } catch (error) {
-      if (options.silent !== true) {
-        throw error;
-      }
-      return sshTrustEntries.slice();
-    } finally {
-      loadingSshTrustEntries = false;
-      renderDraftComputedState();
-    }
-  }
-
   function syncSelection() {
     if (!selectedProfileId || !profiles.some((entry) => entry.id === selectedProfileId)) {
       selectedProfileId = profiles[0]?.id || "";
@@ -1699,351 +1422,62 @@ export function createConnectionProfileRuntimeController(options = {}) {
     });
   }
 
-  async function promptForLaunchSecret(profile) {
-    if (!authMethodRequiresSecret(profile?.launch?.remoteAuth)) {
-      return { ok: true, remoteSecret: undefined, cancelled: false };
-    }
-    if (!requestSecret) {
-      throw new Error("SSH runtime-secret prompt is unavailable.");
-    }
-    const context = describeSshLaunchContext(profile);
-    const secret = await requestSecret({
-      title: "SSH Runtime Secret",
-      message: `Enter the SSH runtime secret for ${context.label} (${context.target}).`,
-      inputLabel: "Runtime Secret",
-      placeholder: "Required only for password or keyboard-interactive SSH launches",
-      confirmLabel: "Launch SSH",
-      cancelLabel: "Cancel"
+  function seedDraftOnMissingTrust(profile, launch) {
+    setDraftState({
+      mode: "blank",
+      profileId: "",
+      name: normalizeText(profile?.name) || "New SSH Connection",
+      deckId: normalizeText(launch?.deckId) || defaultDeckId,
+      launch
     });
-    if (secret === null || secret === undefined) {
-      return { ok: false, remoteSecret: undefined, cancelled: true };
-    }
-    if (!String(secret).trim()) {
-      throw new Error("SSH secret is required for password and keyboard-interactive SSH launches.");
-    }
-    return { ok: true, remoteSecret: String(secret), cancelled: false };
   }
 
-  async function ensureTrustedHostKeyBeforeLaunch(profile) {
-    const launch = profile?.launch;
-    if (normalizeLower(launch?.kind) !== "ssh") {
-      return "";
+  function selectProfileForMissingTrust(profile) {
+    if (normalizeText(selectedProfileId) === profile?.id) {
+      return;
     }
-    const host = normalizeText(launch?.remoteConnection?.host);
-    const port = Number.parseInt(String(launch?.remoteConnection?.port ?? 22), 10);
-    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error("Enter an SSH host and port before launching this SSH connection.");
-    }
-    const matchingTrustEntries = sshTrustEntries.filter((entry) => entry.host === host && entry.port === port);
-    if (matchingTrustEntries.length > 0) {
-      return "";
-    }
-    if (profile?.seedDraftOnMissingTrust === true) {
-      setDraftState({
-        mode: "blank",
-        profileId: "",
-        name: normalizeText(profile?.name) || "New SSH Connection",
-        deckId: normalizeText(launch?.deckId) || defaultDeckId,
-        launch
-      });
-    } else if (normalizeText(selectedProfileId) !== profile.id) {
-      selectedProfileId = profile.id;
-      syncSelection();
-      resetDraftFromSelectedProfile();
-    }
-    const { candidates } = await probeSshHostKeysForTarget({ host, port }, { auto: true, silent: true });
-    throw new Error(buildMissingSshTrustRecoveryMessage({ host, port }, profile, candidates));
+    selectedProfileId = normalizeText(profile?.id);
+    syncSelection();
+    resetDraftFromSelectedProfile();
   }
 
-  async function probeSshHostKeysForTarget(targetInput, options = {}) {
-    const target = normalizeSshTrustTargetInput(targetInput, "SSH host-key target");
-    if (typeof api.probeSshHostKeys !== "function") {
-      throw new Error("SSH host-key probing is not available.");
-    }
-    probingSshHostKeys = true;
-    if (shouldRenderSshTrustTarget(target)) {
-      renderDraftComputedState();
-    }
-    try {
-      const payload = await api.probeSshHostKeys({
-        host: target.host,
-        port: target.port
-      });
-      sshHostKeyProbeCandidates = normalizeSshHostKeyProbeCandidateCollection(payload);
-      selectedSshProbeCandidateId = sshHostKeyProbeCandidates[0]?.id || "";
-      sshProbeTargetKey = getSshTrustTargetKey(target);
-      if (shouldRenderSshTrustTarget(target)) {
-        renderDraftComputedState();
-      }
-      const feedback = options.auto === true
-        ? `Fetched SSH host keys for ${formatSshTarget(target.host, target.port)}. Review the fingerprint and trust the selected key before launching.`
-        : `Fetched ${sshHostKeyProbeCandidates.length} SSH host key(s) for ${formatSshTarget(target.host, target.port)}.`;
-      if (options.silent !== true) {
-        setCommandFeedback(feedback);
-        setStatus(feedback);
-      }
-      return {
-        target,
-        candidates: getSshProbeCandidatesForTarget(target),
-        feedback
-      };
-    } finally {
-      probingSshHostKeys = false;
-      if (shouldRenderSshTrustTarget(target)) {
-        renderDraftComputedState();
-      }
-    }
-  }
+  const sshLifecycle = createConnectionProfileSshLifecycle({
+    api,
+    defaultDeckId,
+    normalizeText,
+    normalizeLower,
+    authMethodRequiresSecret,
+    requestSecret,
+    describeSshLaunchContext,
+    getErrorMessage,
+    getState: getSshLifecycleState,
+    updateState: updateSshLifecycleState,
+    getCurrentSshTrustTarget,
+    shouldRenderSshTrustTarget,
+    renderDraftComputedState,
+    setCommandFeedback,
+    setStatus,
+    getSshProbeCandidatesForTarget,
+    getSshTrustEntriesForTarget,
+    findSshTrustConflictEntry,
+    seedDraftOnMissingTrust,
+    selectProfileForMissingTrust
+  });
 
-  async function probeSshHostKeysFlow(options = {}) {
-    const target = getCurrentSshTrustTarget();
-    if (!target) {
-      throw new Error("Enter an SSH host and port before fetching host keys.");
-    }
-    const result = await probeSshHostKeysForTarget(target, options);
-    return result.feedback;
-  }
-
-  async function saveTrustEntryForTarget(targetInput, selectorText = "", options = {}) {
-    const target = normalizeSshTrustTargetInput(targetInput, "SSH host-key target");
-    if (typeof api.createSshTrustEntry !== "function") {
-      throw new Error("SSH trust entry management is not available.");
-    }
-    const probeCandidates = getSshProbeCandidatesForTarget(target);
-    const selectedProbeCandidate = resolveSshTrustRecord(probeCandidates, selectorText, {
-      emptyError: `No fetched SSH host keys are cached for ${formatSshTarget(target.host, target.port)}. Run \`/ssh hostkey probe ${formatSshTarget(
-        target.host,
-        target.port
-      )}\` first.`,
-      ambiguousLabel: `Multiple fetched SSH host keys are available for ${formatSshTarget(
-        target.host,
-        target.port
-      )}. Specify one by key type or fingerprint.`
-    });
-    if (selectedProbeCandidate.error || !selectedProbeCandidate.record) {
-      throw new Error(selectedProbeCandidate.error || "Fetch SSH host keys and select the key you want to trust first.");
-    }
-    const created = await api.createSshTrustEntry({
-      host: target.host,
-      port: target.port,
-      keyType: selectedProbeCandidate.record.keyType,
-      publicKey: selectedProbeCandidate.record.publicKey
-    });
-    const normalizedCreated = normalizeSshTrustEntry(created);
-    if (!normalizedCreated) {
-      throw new Error("SSH trust entry API returned an invalid trust entry.");
-    }
-    await refreshSshTrustEntries({ silent: true });
-    selectedSshTrustEntryId = normalizedCreated.id;
-    selectedSshProbeCandidateId = `${normalizedCreated.host}:${normalizedCreated.port}:${normalizedCreated.keyType}:${normalizedCreated.fingerprintSha256}`;
-    if (shouldRenderSshTrustTarget(target)) {
-      renderDraftComputedState();
-    }
-    const feedback = `Trusted SSH host key for ${formatSshTarget(target.host, target.port)} (${normalizedCreated.keyType} · ${normalizedCreated.fingerprintSha256}).`;
-    if (options.silent !== true) {
-      setCommandFeedback(feedback);
-      setStatus(feedback);
-    }
-    return {
-      target,
-      entry: normalizedCreated,
-      feedback
-    };
-  }
-
-  async function saveTrustEntryFlow() {
-    const target = getCurrentSshTrustTarget();
-    if (!target) {
-      throw new Error("Enter an SSH host and port before trusting a host key.");
-    }
-    try {
-      const result = await saveTrustEntryForTarget(target, selectedSshProbeCandidateId);
-      return result.feedback;
-    } catch (error) {
-      if (!isSshTrustConflictError(error)) {
-        throw error;
-      }
-      const selectedProbeCandidate = getSshProbeCandidatesForTarget(target).find((entry) => entry.id === selectedSshProbeCandidateId) || null;
-      const conflictEntry = selectedProbeCandidate ? findSshTrustConflictEntry(target, selectedProbeCandidate) : null;
-      if (!selectedProbeCandidate || !conflictEntry) {
-        throw error;
-      }
-      const feedback = buildSshTrustConflictFeedback(target, conflictEntry, selectedProbeCandidate);
-      setCommandFeedback(feedback);
-      setStatus(feedback);
-      renderDraftComputedState();
-      return feedback;
-    }
-  }
-
-  async function replaceTrustEntryForTarget(targetInput, selectorText = "", options = {}) {
-    const target = normalizeSshTrustTargetInput(targetInput, "SSH host-key target");
-    if (typeof api.createSshTrustEntry !== "function" || typeof api.deleteSshTrustEntry !== "function") {
-      throw new Error("SSH trust entry replacement is not available.");
-    }
-    if (options.refresh !== false) {
-      await refreshSshTrustEntries({ silent: true });
-    }
-    const probeCandidates = getSshProbeCandidatesForTarget(target);
-    const selectedProbeCandidate = resolveSshTrustRecord(probeCandidates, selectorText, {
-      emptyError: `No fetched SSH host keys are cached for ${formatSshTarget(target.host, target.port)}. Run \`/ssh hostkey probe ${formatSshTarget(
-        target.host,
-        target.port
-      )}\` first.`,
-      ambiguousLabel: `Multiple fetched SSH host keys are available for ${formatSshTarget(
-        target.host,
-        target.port
-      )}. Specify one by key type or fingerprint.`
-    });
-    if (selectedProbeCandidate.error || !selectedProbeCandidate.record) {
-      throw new Error(selectedProbeCandidate.error || "Fetch SSH host keys and select the key you want to trust first.");
-    }
-    const conflictEntry = findSshTrustConflictEntry(target, selectedProbeCandidate.record);
-    if (!conflictEntry) {
-      throw new Error(`No conflicting trusted SSH host key is selected for ${formatSshTarget(target.host, target.port)}.`);
-    }
-    await api.deleteSshTrustEntry(conflictEntry.id);
-    let normalizedCreated = null;
-    try {
-      const created = await api.createSshTrustEntry({
-        host: target.host,
-        port: target.port,
-        keyType: selectedProbeCandidate.record.keyType,
-        publicKey: selectedProbeCandidate.record.publicKey
-      });
-      normalizedCreated = normalizeSshTrustEntry(created);
-      if (!normalizedCreated) {
-        throw new Error("SSH trust entry API returned an invalid trust entry.");
-      }
-    } catch (error) {
-      let restored = false;
-      try {
-        await api.createSshTrustEntry({
-          host: conflictEntry.host,
-          port: conflictEntry.port,
-          keyType: conflictEntry.keyType,
-          publicKey: conflictEntry.publicKey
-        });
-        restored = true;
-      } catch {
-        restored = false;
-      }
-      await refreshSshTrustEntries({ silent: true });
-      renderDraftComputedState();
-      if (restored) {
-        throw new Error(
-          `Failed to replace trusted SSH host key for ${formatSshTarget(
-            target.host,
-            target.port
-          )}. Restored the previous trusted fingerprint ${conflictEntry.fingerprintSha256}. ${getErrorMessage(
-            error,
-            "Failed to trust the replacement host key."
-          )}`
-        );
-      }
-      throw new Error(
-        `Failed to replace trusted SSH host key for ${formatSshTarget(
-          target.host,
-          target.port
-        )}. The previous trusted fingerprint ${conflictEntry.fingerprintSha256} could not be restored automatically. ${getErrorMessage(
-          error,
-          "Failed to trust the replacement host key."
-        )}`
-      );
-    }
-    await refreshSshTrustEntries({ silent: true });
-    selectedSshTrustEntryId = normalizedCreated.id;
-    selectedSshProbeCandidateId = `${normalizedCreated.host}:${normalizedCreated.port}:${normalizedCreated.keyType}:${normalizedCreated.fingerprintSha256}`;
-    if (shouldRenderSshTrustTarget(target)) {
-      renderDraftComputedState();
-    }
-    const feedback = `Replaced trusted SSH host key for ${formatSshTarget(
-      target.host,
-      target.port
-    )} (${conflictEntry.keyType}, ${conflictEntry.fingerprintSha256} -> ${normalizedCreated.fingerprintSha256}).`;
-    if (options.silent !== true) {
-      setCommandFeedback(feedback);
-      setStatus(feedback);
-    }
-    return {
-      target,
-      previousEntry: conflictEntry,
-      entry: normalizedCreated,
-      feedback
-    };
-  }
-
-  async function replaceTrustEntryFlow() {
-    const target = getCurrentSshTrustTarget();
-    if (!target) {
-      throw new Error("Enter an SSH host and port before replacing a trusted host key.");
-    }
-    const result = await replaceTrustEntryForTarget(target, selectedSshProbeCandidateId, { refresh: false });
-    return result.feedback;
-  }
-
-  async function listSshTrustEntriesForTarget(targetInput = null, options = {}) {
-    if (options.refresh !== false) {
-      await refreshSshTrustEntries({ silent: true });
-    }
-    if (!targetInput) {
-      return sshTrustEntries.slice();
-    }
-    const target = normalizeSshTrustTargetInput(targetInput, "SSH host-key target");
-    return getSshTrustEntriesForTarget(target);
-  }
-
-  async function deleteTrustEntryForTarget(targetInput, selectorText = "", options = {}) {
-    const target = normalizeSshTrustTargetInput(targetInput, "SSH host-key target");
-    if (typeof api.deleteSshTrustEntry !== "function") {
-      throw new Error("SSH trust entry management is not available.");
-    }
-    if (options.refresh !== false) {
-      await refreshSshTrustEntries({ silent: true });
-    }
-    const selectedEntry = resolveSshTrustRecord(getSshTrustEntriesForTarget(target), selectorText, {
-      emptyError: `No trusted SSH host keys are stored for ${formatSshTarget(target.host, target.port)}.`,
-      ambiguousLabel: `Multiple trusted SSH host keys are stored for ${formatSshTarget(
-        target.host,
-        target.port
-      )}. Specify one by key type or fingerprint.`
-    });
-    if (selectedEntry.error || !selectedEntry.record) {
-      throw new Error(selectedEntry.error || "Select a trusted SSH host key to delete.");
-    }
-    await api.deleteSshTrustEntry(selectedEntry.record.id);
-    await refreshSshTrustEntries({ silent: true });
-    if (selectedSshTrustEntryId === selectedEntry.record.id) {
-      selectedSshTrustEntryId = "";
-    }
-    if (shouldRenderSshTrustTarget(target)) {
-      renderDraftComputedState();
-    }
-    const feedback = selectedEntry.record
-      ? `Deleted trusted SSH host key for ${formatSshTarget(selectedEntry.record.host, selectedEntry.record.port)} (${selectedEntry.record.keyType}).`
-      : "Deleted trusted SSH host key.";
-    if (options.silent !== true) {
-      setCommandFeedback(feedback);
-      setStatus(feedback);
-    }
-    return {
-      target,
-      entry: selectedEntry.record,
-      feedback
-    };
-  }
-
-  async function deleteTrustEntryFlow() {
-    if (!selectedSshTrustEntryId) {
-      throw new Error("Select a trusted SSH host key to delete.");
-    }
-    const target = getCurrentSshTrustTarget();
-    if (!target) {
-      throw new Error("Enter an SSH host and port before deleting a trusted host key.");
-    }
-    const result = await deleteTrustEntryForTarget(target, selectedSshTrustEntryId, { refresh: false });
-    return result.feedback;
-  }
+  const {
+    refreshSshTrustEntries,
+    promptForLaunchSecret,
+    ensureTrustedHostKeyBeforeLaunch,
+    probeSshHostKeysForTarget,
+    probeSshHostKeysFlow,
+    saveTrustEntryForTarget,
+    saveTrustEntryFlow,
+    replaceTrustEntryForTarget,
+    replaceTrustEntryFlow,
+    listSshTrustEntriesForTarget,
+    deleteTrustEntryForTarget,
+    deleteTrustEntryFlow
+  } = sshLifecycle;
 
   const runtimeActions = createConnectionProfileRuntimeActions({
     api,

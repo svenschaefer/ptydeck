@@ -21,12 +21,10 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Active Wave Order
 
 - `QLT-269` Owner `FE`
-- `QLT-270` Owner `FE`
 
 ## Wave Exit Criteria
 
 - the next frontend command-dispatch seam is extracted from `frontend/src/public/command-executor.js`
-- the remaining SSH operator lifecycle branch gaps in `frontend/src/public/connection-profile-runtime-controller.js` are closed with direct regressions
 
 ## Sequencing Rules
 
