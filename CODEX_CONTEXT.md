@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (`QLT-260`, `QLT-262`, and `QLT-264` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
+Last updated: 2026-05-03 (`QLT-260`, `QLT-262`, `QLT-263`, and `QLT-264` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
 
 ## Current Product Truth
 
@@ -229,9 +229,9 @@ On 2026-05-02, a fresh repo-wide review was rerun after the session quick-send o
 
 Validated top-line coverage on the current `H163` active tree:
 
-- root tooling: `92.77%` line / `76.81%` branch
-- backend: `95.15%` line / `88.54%` branch
-- frontend: `96.86%` line / `89.32%` branch
+- root tooling: `92.82%` line / `77.09%` branch
+- backend: `95.22%` line / `88.64%` branch
+- frontend: `96.87%` line / `89.56%` branch
 
 Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 
@@ -240,7 +240,8 @@ Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 - `backend/src/telegram-adapter.js`: `1423` lines, `91.22%` line / `79.45%` branch
 - `backend/src/messaging-runtime.js`: `1030` lines, `91.75%` line / `80.00%` branch
 - `backend/src/discord-adapter.js`: `404` lines, `92.08%` line / `54.90%` branch
-- `frontend/src/public/app-runtime-composition-controller.js`: `1918` lines, `88.32%` line / `61.96%` branch
+- `frontend/src/public/app-runtime-composition-controller.js`: `1854` lines, `88.35%` line / `70.00%` branch
+- `frontend/src/public/app-runtime-foundation.js`: `135` lines, `100.00%` line / `93.24%` branch
 - `frontend/src/public/command-executor.js`: `1816` lines, `86.45%` line / `75.45%` branch
 - `frontend/src/public/command-composer-runtime-controller.js`: `773` lines, `86.55%` line / `73.02%` branch
 - `frontend/src/public/terminal-stream.js`: `242` lines, `88.84%` line / `79.57%` branch
@@ -266,10 +267,16 @@ Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
   - `backend/src/terminal-foreground-process.js`: `97.42%` line / `89.80%` branch
 - The remaining uncovered lines in `backend/src/terminal-foreground-process.js` are internal null-guard clauses that are not externally reachable through the current exported helper contract.
 
+`QLT-263` is now complete. The frontend runtime monolith now delegates shared bootstrap/foundation ownership into the new `frontend/src/public/app-runtime-foundation.js` seam instead of keeping those support-service constructors inline:
+
+- `frontend/src/public/app-runtime-foundation.js` now owns runtime-config resolution, debug/no-debug trace controller creation, API client construction including unauthorized auth-refresh delegation, clipboard/controller bootstrap, command-discovery usage-store setup, startup-backup setup, trusted-local client bootstrap, replay-export/file-transfer controller construction, store creation, and stream-interpretation engine creation.
+- `frontend/src/public/app-runtime-composition-controller.js` now keeps the operator-facing runtime composition and the raw session-stream authority path, while delegating the shared foundation block through `createAppRuntimeFoundation(...)`.
+- `frontend/test/app-runtime-foundation.test.js` now locks the seam down directly, and `frontend/test/layered-architecture-boundaries.test.js` now treats the extracted foundation as the explicit home of `createStore()` while preserving the stream-authority boundary assertions on the composition controller.
+- `frontend/package.json` now includes `src/public/app-runtime-foundation.js` in the explicit frontend `build` / `lint` `node --check` file lists so the extracted seam stays inside the deterministic syntax gate.
+
 Remaining promoted `H163` tasks:
 
 - `QLT-261` hardens the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
-- `QLT-263` extracts the next bootstrap/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and closes it with direct deterministic regressions.
 - `QLT-265` hardens terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
 
 Not promoted from the fresh review:
@@ -319,7 +326,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-261`, `QLT-263`, and `QLT-265`.
+- `TODO.md`: active promoted tasks are `QLT-261` and `QLT-265`.
 - `ROADMAP.md`: latest completed wave is `v0.4.0-H164`; active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.

@@ -1,35 +1,26 @@
-import { createApiClient } from "./api-client.js";
 import { createAppBootstrapCompositionController } from "./app-bootstrap-composition-controller.js";
 import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
+import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
 import { createAppRuntimeInitializationController } from "./app-runtime-initialization-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
-import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
 import { createConnectionProfileRuntimeController } from "./connection-profile-runtime-controller.js";
-import { createCommandDiscoveryUsageStore } from "./command-discovery-ranking.js";
 import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
 import { createControlPaneRuntimeController } from "./control-pane-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
 import { createSessionControlRuntimeController } from "./session-control-runtime-controller.js";
-import { createStore } from "./store.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
-import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionQuickSendRuntimeController } from "./session-quick-send-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
-import { createStartupBackupRuntimeController as defaultCreateStartupBackupRuntimeController } from "./startup-backup-runtime-controller.js";
-import { createStreamInterpretationPluginEngine } from "./stream-interpretation-plugin-engine.js";
-import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
-import { createTraceDebugController } from "./trace-debug-controller.js";
 import { createPasteObservationRuntimeController } from "./paste-observation-runtime-controller.js";
-import { createTrustedLocalClientRuntimeController as defaultCreateTrustedLocalClientRuntimeController } from "./trusted-local-client-runtime-controller.js";
 import { createTrustedLocalHandoffRuntimeController } from "./trusted-local-handoff-runtime-controller.js";
 import { createTrustedLocalLayoutRuntimeController } from "./trusted-local-layout-runtime-controller.js";
 import { createWorkspaceManagerRuntimeController } from "./workspace-manager-runtime-controller.js";
@@ -51,9 +42,7 @@ import { SYSTEM_SLASH_COMMANDS } from "./system-slash-commands.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createActionDialogController } from "./ui/action-dialog-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
-import { createFileTransferRuntimeController } from "./file-transfer-runtime-controller.js";
 import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
-import { createReplayExportRuntimeController } from "./replay-export-runtime-controller.js";
 import { createReplayViewerRuntimeController } from "./replay-viewer-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSendHistoryRuntimeController } from "./send-history-runtime-controller.js";
@@ -84,82 +73,6 @@ const {
 } = options;
 const window = windowRef;
 const document = documentRef;
-const createStartupBackupRuntimeController =
-  typeof createStartupBackupRuntimeControllerOption === "function"
-    ? createStartupBackupRuntimeControllerOption
-    : defaultCreateStartupBackupRuntimeController;
-const createTrustedLocalClientRuntimeController =
-  typeof createTrustedLocalClientRuntimeControllerOption === "function"
-    ? createTrustedLocalClientRuntimeControllerOption
-    : defaultCreateTrustedLocalClientRuntimeController;
-
-const config = resolveRuntimeConfig(window);
-const debugLogs = config.debugLogs === true;
-const debugLog = (event, details = {}) => {
-  if (!debugLogs) {
-    return;
-  }
-  const timestamp = new Date().toISOString();
-  console.debug(`[ptydeck][${timestamp}] ${event}`, details);
-};
-const api = createApiClient(config.apiBaseUrl, {
-  debug: debugLogs,
-  log: debugLog,
-  onTrace: (meta) => traceDebugController.record("api.response", meta),
-  async onUnauthorized() {
-    const refreshed = await appRuntimeStateController?.bootstrapDevAuthToken();
-    if (!refreshed) {
-      debugLog("auth.recovery.failed", {});
-    }
-    return refreshed;
-  }
-});
-const clipboardRuntimeController = createClipboardRuntimeController({
-  navigatorRef: window?.navigator || globalThis.navigator || null
-});
-const commandDiscoveryUsageStore = createCommandDiscoveryUsageStore({
-  storageRef: window?.localStorage || null
-});
-const startupBackupRuntimeController = createStartupBackupRuntimeController({
-  localStorageRef: window?.localStorage || null
-});
-const trustedLocalClientRuntimeController = createTrustedLocalClientRuntimeController({
-  localStorageRef: window?.localStorage || null,
-  navigatorRef: window?.navigator || globalThis.navigator || null,
-  cryptoRef: window?.crypto || globalThis.crypto || null
-});
-const replayExportRuntimeController = createReplayExportRuntimeController({
-  api,
-  documentRef: document,
-  URLRef: window?.URL || globalThis.URL || null,
-  BlobCtor: window?.Blob || globalThis.Blob,
-  writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
-});
-const fileTransferRuntimeController = createFileTransferRuntimeController({
-  api,
-  documentRef: document,
-  windowRef: window,
-  URLRef: window?.URL || globalThis.URL || null,
-  BlobCtor: window?.Blob || globalThis.Blob,
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
-});
-const streamDebugTraceController = debugLogs
-  ? createStreamDebugTraceController({
-      windowRef: window
-    })
-  : { record() {}, dispose() {} };
-const traceDebugController = debugLogs
-  ? createTraceDebugController({
-      windowRef: window
-    })
-  : { record() {}, dispose() {} };
-const store = createStore();
-const streamInterpretationPluginEngine = createStreamInterpretationPluginEngine({
-  plugins: Array.isArray(options.streamInterpretationPlugins) ? options.streamInterpretationPlugins : []
-});
 
 const {
   appShellEl,
@@ -533,6 +446,30 @@ let splitLayoutRuntimeController = null;
 let slashWorkflowRuntimeController = null;
 let appBootstrapCompositionController = null;
 let appRuntimeInitializationController = null;
+const {
+  api,
+  clipboardRuntimeController,
+  commandDiscoveryUsageStore,
+  config,
+  debugLog,
+  debugLogs,
+  fileTransferRuntimeController,
+  replayExportRuntimeController,
+  startupBackupRuntimeController,
+  store,
+  streamDebugTraceController,
+  streamInterpretationPluginEngine,
+  traceDebugController,
+  trustedLocalClientRuntimeController
+} = createAppRuntimeFoundation({
+  windowRef: window,
+  documentRef: document,
+  createStartupBackupRuntimeController: createStartupBackupRuntimeControllerOption,
+  createTrustedLocalClientRuntimeController: createTrustedLocalClientRuntimeControllerOption,
+  streamInterpretationPlugins: options.streamInterpretationPlugins,
+  getAppRuntimeStateController: () => appRuntimeStateController,
+  getAppSessionRuntimeFacadeController: () => appSessionRuntimeFacadeController
+});
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,

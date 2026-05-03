@@ -73,20 +73,31 @@ test("ui controllers stay free of store and interpretation internals", async () 
 });
 
 test("runtime composition keeps raw stream data on the terminal path and activity clearing on the idle path", async () => {
-  const source = await readFile(sourcePath("app-runtime-composition-controller.js"), "utf8");
+  const [compositionSource, foundationSource] = await readSources([
+    "app-runtime-composition-controller.js",
+    "app-runtime-foundation.js"
+  ]);
 
-  const requiredMarkers = [
-    'import { createStore } from "./store.js";',
+  const compositionMarkers = [
+    'import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";',
     'import { createSessionStreamAuthorityController } from "./session-stream-authority-controller.js";',
-    "const store = createStore();",
     "const streamAdapter = createSessionStreamAuthorityController({",
     "recordTrace: (sessionId, eventType, payload) => streamDebugTraceController.record(sessionId, eventType, payload),",
     "appendTerminalChunk: (sessionId, chunk) => appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk),",
     "clearSessionActivity: (sessionId) => store.clearSessionActivity(sessionId)"
   ];
 
-  for (const marker of requiredMarkers) {
-    assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  for (const marker of compositionMarkers) {
+    assert.ok(compositionSource.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+
+  const foundationMarkers = [
+    'import { createStore as defaultCreateStore } from "./store.js";',
+    "const store = createStore();"
+  ];
+
+  for (const marker of foundationMarkers) {
+    assert.ok(foundationSource.includes(marker), `expected runtime foundation marker ${marker}`);
   }
 
   const forbiddenMarkers = [
@@ -100,7 +111,7 @@ test("runtime composition keeps raw stream data on the terminal path and activit
   ];
 
   for (const marker of forbiddenMarkers) {
-    assert.equal(source.includes(marker), false, `did not expect runtime stream-interpretation marker ${marker}`);
+    assert.equal(compositionSource.includes(marker), false, `did not expect runtime stream-interpretation marker ${marker}`);
   }
 });
 
