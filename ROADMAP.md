@@ -22,8 +22,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Active Wave Order
 
-1. `QLT-265` Owner `FE`: harden terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
-2. `QLT-261` Owner `BE`: harden the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
+1. `QLT-261` Owner `BE`: harden the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
 
 ## Wave Dependencies
 
@@ -31,8 +30,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Exit Criteria
 
-- all `QLT-261` and `QLT-265` are implemented and validated
-- the slash-command/help/reference contract remains aligned while additional operator-interaction coverage lands on the same command surface
+- all `QLT-261` is implemented and validated
 - validated root, backend, and frontend coverage lanes still pass `npm run test:coverage:check`
 - `TODO.md` and `ROADMAP.md` continue to reflect the explicit split between open tasks and sequencing state
 

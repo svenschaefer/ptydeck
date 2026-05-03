@@ -472,3 +472,101 @@ test("session quick-send controller reports clipboard read and paste failures ex
     ["read-error", "clipboard read failed"]
   ]);
 });
+
+test("session quick-send controller clears stale render children, distinguishes duplicate session-scope labels, and hides empty or missing targets", () => {
+  const sessions = [
+    {
+      id: "s1",
+      name: "Alpha",
+      deckId: "default",
+      quickSendUsage: [
+        { lookupKey: "session:s1:deploy", count: 3, lastUsedAt: 50 },
+        { lookupKey: "global::deploy", count: 1, lastUsedAt: 10 }
+      ]
+    }
+  ];
+  const controller = createSessionQuickSendRuntimeController({
+    documentRef: createDocumentRef(),
+    listCustomCommands: () => [
+      { name: "deploy", scope: "session", sessionId: "s1", content: "echo session" },
+      { name: "deploy", scope: "global", content: "echo global" }
+    ],
+    getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
+    canReadClipboardText: () => false,
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name
+  });
+
+  const hiddenPanelEl = new FakeElement("div");
+  const hiddenActionsEl = new FakeElement("div");
+  hiddenActionsEl.appendChild(new FakeElement("button"));
+  controller.renderSessionQuickSend(
+    {
+      quickSendPanelEl: hiddenPanelEl,
+      quickSendActionsEl: hiddenActionsEl
+    },
+    "missing"
+  );
+
+  assert.equal(hiddenPanelEl.hidden, true);
+  assert.equal(hiddenActionsEl.children.length, 0);
+
+  const panelEl = new FakeElement("div");
+  const titleEl = new FakeElement("p");
+  const targetEl = new FakeElement("p");
+  const actionsEl = new FakeElement("div");
+  actionsEl.appendChild(new FakeElement("button"));
+  controller.renderSessionQuickSend(
+    {
+      quickSendPanelEl: panelEl,
+      quickSendTitleEl: titleEl,
+      quickSendTargetEl: targetEl,
+      quickSendActionsEl: actionsEl
+    },
+    sessions[0]
+  );
+
+  assert.equal(panelEl.hidden, false);
+  assert.equal(titleEl.textContent, "Send to Session");
+  assert.equal(targetEl.textContent, "[1] Alpha · 2 favorites");
+  assert.deepEqual(
+    actionsEl.children.map((child) => child.textContent),
+    ["/deploy · session", "/deploy · global"]
+  );
+});
+
+test("session quick-send controller reports blocked write targets and missing clipboard targets explicitly", async () => {
+  const sessions = [{ id: "s1", name: "Alpha", deckId: "default", quickSendUsage: [{ lookupKey: "project::deploy", count: 1, lastUsedAt: 1 }] }];
+  const errors = [];
+  const blockedController = createSessionQuickSendRuntimeController({
+    documentRef: createDocumentRef(),
+    listCustomCommands: () => [{ name: "deploy", scope: "project", content: "echo deploy" }],
+    getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
+    canWriteToSession: () => false,
+    getSessionWriteBlockedMessage: () => "Write access is blocked for this session.",
+    setError: (message) => errors.push(["blocked", message])
+  });
+
+  assert.deepEqual(await blockedController.sendCustomCommand("s1", "project::deploy"), {
+    ok: false,
+    status: "blocked",
+    feedback: "Write access is blocked for this session."
+  });
+
+  const missingClipboardTargetController = createSessionQuickSendRuntimeController({
+    documentRef: createDocumentRef(),
+    getSessionById: () => null,
+    setError: (message) => errors.push(["clipboard-missing-session", message])
+  });
+
+  assert.deepEqual(await missingClipboardTargetController.sendClipboard("s1"), {
+    ok: false,
+    status: "missing-session",
+    feedback: "Clipboard send target is unavailable."
+  });
+
+  assert.deepEqual(errors, [
+    ["blocked", "Write access is blocked for this session."],
+    ["clipboard-missing-session", "Clipboard send target is unavailable."]
+  ]);
+});

@@ -105,6 +105,11 @@ test("normalizeCustomCommandPayloadForShell escapes only unmatched single quotes
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'ok'"), "echo 'ok'");
 });
 
+test("normalizeCustomCommandPayloadForShell preserves escaped quotes and trailing backslashes deterministically", () => {
+  assert.equal(normalizeCustomCommandPayloadForShell(String.raw`echo \'quoted\'`), String.raw`echo \'quoted\'`);
+  assert.equal(normalizeCustomCommandPayloadForShell(String.raw`printf "path\\"`), String.raw`printf "path\\"`);
+});
+
 test("hasMeaningfulStreamActivity ignores ANSI-only and control-only redraw chunks", () => {
   assert.equal(hasMeaningfulStreamActivity(""), false);
   assert.equal(hasMeaningfulStreamActivity("\u001b[2J\u001b[H"), false);
@@ -268,4 +273,26 @@ test("createSessionStreamAdapter resets and disposes per-session pending state",
 
   assert.deepEqual(idleSessions, []);
   assert.equal(adapter.getPendingLine("s2"), "");
+});
+
+test("createSessionStreamAdapter leaves idle scheduling disabled when idleMs is omitted and strips ANSI from pending lines on demand", () => {
+  const idleSessions = [];
+  const adapter = createSessionStreamAdapter({
+    stripAnsiForLines: true,
+    onLine() {},
+    onIdle(sessionId) {
+      idleSessions.push(sessionId);
+    }
+  });
+
+  adapter.push("s1", "\u001b[31mred");
+  assert.equal(adapter.getPendingLine("s1"), "red");
+
+  adapter.resetSession("missing");
+  adapter.disposeSession("missing");
+  adapter.disposeSession(null);
+  adapter.resetSession("");
+  adapter.dispose();
+
+  assert.deepEqual(idleSessions, []);
 });

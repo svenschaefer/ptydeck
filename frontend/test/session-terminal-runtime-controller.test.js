@@ -1247,6 +1247,87 @@ test("session-terminal-runtime controller intercepts explicit paste shortcuts th
   assert.equal(entry.terminal.focusCalls, 1);
 });
 
+test("session-terminal-runtime controller ignores duplicate clipboard events and suppresses the immediate middle-click follow-up paste when mouse forwarding is enabled", async () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    getSessionById: () => ({ id: "s1", mouseForwardingMode: "application" }),
+    readClipboardText: async () => "ignored\n"
+  });
+  const refs = createTerminalCardRefs("duplicate-paste-events");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1", mouseForwardingMode: "application" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const duplicatePasteEvent = createClipboardPasteEvent("echo once\n");
+  refs.mount.helperTextarea.dispatchEvent(duplicatePasteEvent);
+  refs.mount.dispatchEvent(duplicatePasteEvent);
+
+  assert.equal(duplicatePasteEvent.defaultPrevented, true);
+  assert.equal(duplicatePasteEvent.propagationStopped, true);
+  assert.deepEqual(pasted, [["s1", "echo once\n"]]);
+
+  const middleDown = createMouseEvent("mousedown", 1);
+  refs.mount.dispatchEvent(middleDown);
+  const suppressedPasteEvent = createClipboardPasteEvent("echo suppressed\n");
+  refs.mount.helperTextarea.dispatchEvent(suppressedPasteEvent);
+  const nextPasteEvent = createClipboardPasteEvent("echo allowed\n");
+  refs.mount.helperTextarea.dispatchEvent(nextPasteEvent);
+
+  assert.equal(middleDown.defaultPrevented, false);
+  assert.equal(suppressedPasteEvent.defaultPrevented, false);
+  assert.equal(nextPasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, [
+    ["s1", "echo once\n"],
+    ["s1", "echo allowed\n"]
+  ]);
+  assert.equal(entry.terminal.focusCalls, 3);
+});
+
+test("session-terminal-runtime controller removes focus-intent listeners during clipboard-binding disposal", () => {
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const refs = createTerminalCardRefs("focus-intent-disposal");
+  refs.focusBtn = new FakeEventTarget("focus-intent-button");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  refs.focusBtn.dispatchEvent({ type: "mousedown" });
+  assert.equal(entry.terminal.focusCalls, 1);
+
+  entry.disposeClipboardBindings();
+  refs.focusBtn.dispatchEvent({ type: "mousedown" });
+
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
 test("session-terminal-runtime controller treats Shift-Insert and beforeinput paste as one terminal paste", async () => {
   const pasted = [];
   const controller = createSessionTerminalRuntimeController({

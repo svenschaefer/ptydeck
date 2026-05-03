@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-03 (`QLT-260`, `QLT-262`, `QLT-263`, and `QLT-264` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
+Last updated: 2026-05-03 (`QLT-260`, `QLT-262`, `QLT-263`, `QLT-264`, and `QLT-265` completed inside active `v0.4.0-H163`; `v0.4.0-H164` remains the latest completed wave)
 
 ## Current Product Truth
 
@@ -230,8 +230,8 @@ On 2026-05-02, a fresh repo-wide review was rerun after the session quick-send o
 Validated top-line coverage on the current `H163` active tree:
 
 - root tooling: `92.82%` line / `77.09%` branch
-- backend: `95.22%` line / `88.64%` branch
-- frontend: `96.87%` line / `89.56%` branch
+- backend: `95.25%` line / `88.66%` branch
+- frontend: `96.93%` line / `89.65%` branch
 
 Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 
@@ -240,13 +240,6 @@ Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 - `backend/src/telegram-adapter.js`: `1423` lines, `91.22%` line / `79.45%` branch
 - `backend/src/messaging-runtime.js`: `1030` lines, `91.75%` line / `80.00%` branch
 - `backend/src/discord-adapter.js`: `404` lines, `92.08%` line / `54.90%` branch
-- `frontend/src/public/app-runtime-composition-controller.js`: `1854` lines, `88.35%` line / `70.00%` branch
-- `frontend/src/public/app-runtime-foundation.js`: `135` lines, `100.00%` line / `93.24%` branch
-- `frontend/src/public/command-executor.js`: `1816` lines, `86.45%` line / `75.45%` branch
-- `frontend/src/public/command-composer-runtime-controller.js`: `773` lines, `86.55%` line / `73.02%` branch
-- `frontend/src/public/terminal-stream.js`: `242` lines, `88.84%` line / `79.57%` branch
-- `frontend/src/public/ui/session-terminal-runtime-controller.js`: `89.32%` line / `81.91%` branch
-- `frontend/src/public/session-quick-send-runtime-controller.js`: `91.24%` line / `80.30%` branch
 
 `QLT-260` is now complete. `backend/src/runtime.js` delegates spectator/session visibility, filtered snapshot/event shaping, and read-only quick-send sanitization into the new `backend/src/runtime-session-authority.js` seam, which validates at `93.62%` line / `87.23%` branch coverage under direct tests in `backend/test/runtime-session-authority.test.js`.
 
@@ -274,10 +267,21 @@ Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
 - `frontend/test/app-runtime-foundation.test.js` now locks the seam down directly, and `frontend/test/layered-architecture-boundaries.test.js` now treats the extracted foundation as the explicit home of `createStore()` while preserving the stream-authority boundary assertions on the composition controller.
 - `frontend/package.json` now includes `src/public/app-runtime-foundation.js` in the explicit frontend `build` / `lint` `node --check` file lists so the extracted seam stays inside the deterministic syntax gate.
 
+`QLT-265` is now complete. Retained terminal, quick-send, and workflow operator-interaction coverage is materially tighter without widening the shipped frontend runtime contract:
+
+- `frontend/test/terminal-stream.test.js` now locks down escaped-quote preservation with trailing backslashes plus the no-idle ANSI-stripping pending-line path.
+- `frontend/test/session-terminal-runtime-controller.test.js` now locks down duplicate clipboard-event suppression, the immediate middle-click follow-up guard when mouse forwarding is enabled, and focus-intent listener disposal during clipboard-binding cleanup.
+- `frontend/test/slash-workflow-runtime-controller.test.js` now locks down `/run` header stripping in block mode, idle dispose behavior without redundant render requests, action-only workflows without a bound session, and fail-closed session-control actions.
+- `frontend/test/session-quick-send-runtime-controller.test.js` now locks down stale hover-child pruning, duplicate session-scope label disambiguation, hidden empty/missing targets, blocked write targets, and explicit missing-clipboard reporting.
+- The focused hotspot snapshot after the task is:
+  - `frontend/src/public/terminal-stream.js`: `94.72%` line / `89.62%` branch
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `90.66%` line / `83.57%` branch
+  - `frontend/src/public/slash-workflow-runtime-controller.js`: `91.26%` line / `80.00%` branch
+  - `frontend/src/public/session-quick-send-runtime-controller.js`: `93.84%` line / `84.09%` branch
+
 Remaining promoted `H163` tasks:
 
 - `QLT-261` hardens the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
-- `QLT-265` hardens terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
 
 Not promoted from the fresh review:
 
@@ -326,7 +330,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-261` and `QLT-265`.
+- `TODO.md`: the active promoted task is `QLT-261`.
 - `ROADMAP.md`: latest completed wave is `v0.4.0-H164`; active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.

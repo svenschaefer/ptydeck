@@ -389,3 +389,60 @@ test("slash-workflow runtime controller clears bound engine state after listener
   assert.equal(retried.ok, true);
   assert.equal(retried.status, "succeeded");
 });
+
+test("slash-workflow runtime controller strips the /run header for run-block mode and dispose clears UI state without requesting render", async () => {
+  const clearCalls = [];
+  const { calls, controller } = createControllerContext({
+    clearWorkflowRunState: (options) => {
+      clearCalls.push(options ?? null);
+    }
+  });
+
+  const result = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "run-block",
+    raw: "/run\n/list\n/next"
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "succeeded");
+  assert.deepEqual(
+    calls.filter((entry) => entry[0] === "execute"),
+    [
+      ["execute", "/list"],
+      ["execute", "/next"]
+    ]
+  );
+
+  controller.dispose();
+  assert.deepEqual(clearCalls, [{ render: false }]);
+});
+
+test("slash-workflow runtime controller runs action-only workflows without a bound session and keeps session control actions fail-closed", async () => {
+  const store = createStore();
+  const executed = [];
+  const controller = createSlashWorkflowRuntimeController({
+    store,
+    executeControlCommandDetailed: async (interpreted) => {
+      executed.push(interpreted.raw);
+      return { ok: true, feedback: "ok" };
+    },
+    setWorkflowRunState() {},
+    clearWorkflowRunState() {},
+    requestRender() {},
+    formatSessionToken: () => "?",
+    formatSessionDisplayName: () => ""
+  });
+
+  const result = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/list"
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "succeeded");
+  assert.deepEqual(executed, ["/list"]);
+  assert.equal(await controller.interruptWorkflowSession(), "No workflow session available to interrupt.");
+  assert.equal(await controller.killWorkflowSession(), "No workflow session available to kill.");
+});
