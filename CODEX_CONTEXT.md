@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-04 (the backend session manager now delegates SSH remote-runtime reconnect/availability state shaping into `backend/src/session-manager-remote-runtime.js`, covering reconnect baseline normalization, degraded/offline scheduling, reconnect-attempt mutation, and degraded-versus-offline operator error details directly; trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches still pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`, delegate session REST routing out of `backend/src/runtime.js` into `backend/src/runtime-session-dispatch.js`, delegate the remaining HTTP request entry seam out of `backend/src/runtime.js` into `backend/src/runtime-http-request-handler.js`, isolate restart payload shaping from `backend/src/session-manager.js` into `backend/src/session-manager-lifecycle.js`, extract trusted-local handoff/layout composition out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-trusted-local-composition.js`, extract runtime bootstrap-controller wiring out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-bootstrap-assembly.js`, extract SSH trust/launch lifecycle authority out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-ssh-lifecycle.js`, extract `/settings` command dispatch out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-settings-handlers.js`, extract operator/discovery slash-command handling out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-operator-handlers.js`, extract connection-profile draft/profile/workspace state shaping out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-draft-state.js`, and tighten direct runtime-state/session-terminal coverage across `frontend/src/public/store.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js`; `v0.4.0-H168` is now fully closed)
+Last updated: 2026-05-04 (the backend session manager now delegates SSH remote-runtime reconnect/availability state shaping into `backend/src/session-manager-remote-runtime.js`, covering reconnect baseline normalization, degraded/offline scheduling, reconnect-attempt mutation, and degraded-versus-offline operator error details directly; trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches still pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`, delegate session REST routing out of `backend/src/runtime.js` into `backend/src/runtime-session-dispatch.js`, delegate the remaining HTTP request entry seam out of `backend/src/runtime.js` into `backend/src/runtime-http-request-handler.js`, isolate restart payload shaping from `backend/src/session-manager.js` into `backend/src/session-manager-lifecycle.js`, extract trusted-local handoff/layout composition out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-trusted-local-composition.js`, extract runtime bootstrap-controller wiring out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-bootstrap-assembly.js`, extract SSH trust/launch lifecycle authority out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-ssh-lifecycle.js`, extract `/settings` command dispatch out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-settings-handlers.js`, extract operator/discovery slash-command handling out of `frontend/src/public/command-executor.js` into `frontend/src/public/command-executor-operator-handlers.js`, extract connection-profile draft/profile/workspace state shaping out of `frontend/src/public/connection-profile-runtime-controller.js` into `frontend/src/public/connection-profile-draft-state.js`, tighten direct runtime-state/session-terminal coverage across `frontend/src/public/store.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js`, and promote `v0.4.0-H169` against the remaining backend runtime/session-manager plus frontend composition/command/profile/terminal hotspots now visible on the validated `H168` closeout tree)
 
 ## Current Product Truth
 
@@ -501,6 +501,45 @@ Any future automatic outbound rebuild must start from these constraints:
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term automatic-outbound messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
+
+## Repo-Wide Quality Review Follow-Up (`v0.4.0-H169` active)
+
+On 2026-05-04, the next quality-follow-up wave was promoted directly from the validated `H168` closeout tree rather than from stale pre-closeout hotspot snapshots.
+
+Validated top-line coverage on the promotion tree:
+
+- root tooling: `92.82%` line / `77.09%` branch
+- backend: `95.41%` line / `89.34%` branch
+- frontend: `97.14%` line / `89.64%` branch
+
+Relevant hotspots promoted into `TODO.md` / `ROADMAP.md`:
+
+- `backend/src/runtime.js`: `5925` lines, `78.77%` line / `69.34%` branch
+- `backend/src/session-manager.js`: `2018` lines, `95.39%` line / `78.98%` branch
+- `frontend/src/public/app-runtime-composition-controller.js`: `1833` lines, `89.20%` line / `70.00%` branch
+- `frontend/src/public/command-executor.js`: `1007` lines, `89.77%` line / `76.53%` branch
+- `frontend/src/public/connection-profile-runtime-controller.js`: `1113` lines, `96.05%` line / `78.67%` branch
+- `frontend/src/public/store.js`: `1186` lines, `94.44%` line / `82.51%` branch
+- `frontend/src/public/ui/session-terminal-runtime-controller.js`: `824` lines, `91.87%` line / `83.62%` branch
+
+Promoted `H169` tasks:
+
+- `QLT-278` Owner `BE`: extract the next startup/metrics/session-authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
+- `QLT-279` Owner `BE`: isolate one more reconnect/persistence/cleanup lifecycle helper seam from `backend/src/session-manager.js` and harden the remaining manager branch gaps.
+- `QLT-280` Owner `FE`: extract the next initialization/recovery/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
+- `QLT-281` Owner `FE`: extract the next retained operator command/router seam from `frontend/src/public/command-executor.js` and add direct deterministic regressions for the extracted path.
+- `QLT-282` Owner `FE`: isolate the next SSH/profile/workspace operator seam from `frontend/src/public/connection-profile-runtime-controller.js` and close the remaining branch gaps with direct regressions.
+- `QLT-283` Owner `FE`: harden retained runtime-state and terminal-interaction coverage across `frontend/src/public/store.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js`.
+
+Not promoted from the same tree:
+
+- retained root diagnostics such as `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs`, because they remain non-authoritative diagnostics rather than shipped runtime paths
+- the transport-only messaging baseline, because the remaining quality pressure is now concentrated in the larger backend/runtime and frontend/runtime monoliths above while the third-attempt messaging chain stays deferred in `TODO-OUTLOOK.md`
+
+Current planning state:
+
+- `TODO.md`: active promoted tasks are `QLT-278` through `QLT-283`.
+- `ROADMAP.md`: active wave is `v0.4.0-H169`; no queued next wave is currently promoted.
 
 ## Repository Quality Review (2026-04-29)
 
