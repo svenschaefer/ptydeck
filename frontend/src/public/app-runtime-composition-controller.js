@@ -1,4 +1,4 @@
-import { createAppBootstrapCompositionController } from "./app-bootstrap-composition-controller.js";
+import { createAppRuntimeBootstrapAssembly } from "./app-runtime-bootstrap-assembly.js";
 import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
@@ -1677,7 +1677,17 @@ sessionGridController = createSessionGridController({
   themeProfileKeys: THEME_PROFILE_KEYS,
   debugLog
 });
-appBootstrapCompositionController = createAppBootstrapCompositionController({
+({
+  appBootstrapCompositionController,
+  commandEngine,
+  commandTargetRuntimeController,
+  commandExecutor,
+  authBootstrapRuntimeController,
+  wsRuntimeController,
+  commandComposerAutocompleteController,
+  commandComposerRuntimeController,
+  appLifecycleController
+} = createAppRuntimeBootstrapAssembly({
   store,
   api,
   config,
@@ -1695,38 +1705,10 @@ appBootstrapCompositionController = createAppBootstrapCompositionController({
   terminalThemePresets: TERMINAL_THEME_PRESETS,
   themeProfileKeys: THEME_PROFILE_KEYS,
   defaultTerminalTheme: DEFAULT_TERMINAL_THEME,
-  commandGuardSendOnceBtn,
-  commandGuardCancelBtn,
-  windowRef: window,
-  documentRef: document,
-  wsStateRef,
-  interpretRuntimeEvent: (event) =>
-    streamInterpretationPluginEngine.interpretRuntimeEvent(event, {
-      getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId)
-    }),
-  applySessionInterpretationActions: (sessionId, actions) => store.applySessionInterpretationActions(sessionId, actions),
-  observeSessionData: (sessionId, data) => {
-    streamDebugTraceController.record(sessionId, "ws.session.data", {
-      chunk: data,
-      hasTerminal: terminals.has(sessionId)
-    });
-    pasteObservationRuntimeController?.observeSessionOutput?.(sessionId, data);
-  },
-  createBtn,
-  deckCreateBtn,
-  startupWarmupSkipBtn,
-  sendBtn,
-  commandFeedbackActionBtn,
-  layoutRuntimeController,
-  terminalSearchController,
-  layoutProfileRuntimeController,
-  connectionProfileRuntimeController,
-  workspacePresetRuntimeController,
-  workspaceManagerRuntimeController,
-  sendHistoryRuntimeController,
+  streamInterpretationPluginEngine,
+  streamDebugTraceController,
+  traceDebugController,
   pasteObservationRuntimeController,
-  broadcastInputRuntimeController,
-  sessionTerminalResizeController,
   appCommandUiFacadeController,
   appLayoutDeckFacadeController,
   appRuntimeStateController,
@@ -1736,56 +1718,44 @@ appBootstrapCompositionController = createAppBootstrapCompositionController({
   sessionViewModel,
   runtimeEventController,
   deckRuntimeController,
-  buildCustomCommandUsageApiOptions: (command) =>
-    sessionQuickSendRuntimeController?.buildCustomCommandUsageApiOptions?.(command),
-  getDiscoveryUsageScore: (key) => commandDiscoveryUsageStore.getUsageScore(key),
-  recordDiscoveryUsage: (key) => commandDiscoveryUsageStore.record(key),
-  readClipboardText: () => clipboardRuntimeController.readText(),
-  writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
+  commandDiscoveryUsageStore,
+  clipboardRuntimeController,
+  trustedLocalClientRuntimeController,
+  replayViewerRuntimeController,
+  replayExportRuntimeController,
+  fileTransferRuntimeController,
+  layoutRuntimeController,
+  terminalSearchController,
+  layoutProfileRuntimeController,
+  connectionProfileRuntimeController,
+  workspacePresetRuntimeController,
+  workspaceManagerRuntimeController,
+  sendHistoryRuntimeController,
+  broadcastInputRuntimeController,
+  sessionTerminalResizeController,
+  sessionQuickSendRuntimeController,
+  slashWorkflowRuntimeController,
+  createBtn,
+  deckCreateBtn,
+  startupWarmupSkipBtn,
+  sendBtn,
+  commandFeedbackActionBtn,
+  commandGuardSendOnceBtn,
+  commandGuardCancelBtn,
+  windowRef: window,
+  documentRef: document,
+  wsStateRef,
   isReadOnlyMode,
   getReadOnlyModeMessage,
   canWriteToSession,
   getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
   showBlockedWriteReclaimUi,
-  getWsTicketPayload: () => trustedLocalClientRuntimeController.getWsTicketPayload(),
   setAccessState,
   handleCommandFeedbackAction,
-  openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
-  exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
-  exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),
-  loadSessionReplayExcerpt: (session, selector) => replayExportRuntimeController.loadSessionReplayExcerpt(session, selector),
-  copySessionReplayExcerpt: (session, selector, runtimeOptions) =>
-    replayExportRuntimeController.copySessionReplayExcerpt(session, selector, runtimeOptions),
-  previewSessionReplayExcerpt: (session, payload) =>
-    replayExportRuntimeController.previewSessionReplayExcerpt(session, payload),
-  listShares: () => api.listShares(),
-  createShareLink: (payload) => api.createShareLink(payload),
-  revokeShareLink: (shareId) => api.revokeShareLink(shareId),
-  uploadSessionFile: (session, options) => fileTransferRuntimeController.uploadSessionFile(session, options),
-  downloadSessionFile: (session, options) => fileTransferRuntimeController.downloadSessionFile(session, options),
-  runWorkflowDetailed: (interpreted) => slashWorkflowRuntimeController?.runWorkflowDetailed?.(interpreted),
-  stopWorkflow: () => slashWorkflowRuntimeController?.stopActiveWorkflow?.() === true,
-  interruptWorkflowSession: () => slashWorkflowRuntimeController?.interruptWorkflowSession?.() || Promise.resolve(""),
-  killWorkflowSession: () => slashWorkflowRuntimeController?.killWorkflowSession?.() || Promise.resolve(""),
-  disposeWorkflowRuntime: () => slashWorkflowRuntimeController?.dispose?.(),
-  disposeStreamDebugTrace: () => {
-    streamDebugTraceController.dispose();
-    traceDebugController.dispose();
-  },
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
   devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS
-});
-({
-  commandEngine,
-  commandTargetRuntimeController,
-  commandExecutor,
-  authBootstrapRuntimeController,
-  wsRuntimeController,
-  commandComposerAutocompleteController,
-  commandComposerRuntimeController,
-  appLifecycleController
-} = appBootstrapCompositionController.composeControllers());
+}));
 
 slashWorkflowRuntimeController = createSlashWorkflowRuntimeController({
   store,

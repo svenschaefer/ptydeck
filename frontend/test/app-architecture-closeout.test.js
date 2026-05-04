@@ -7,6 +7,9 @@ const appEntryPath = fileURLToPath(new URL("../src/public/app.js", import.meta.u
 const appRuntimeCompositionPath = fileURLToPath(
   new URL("../src/public/app-runtime-composition-controller.js", import.meta.url)
 );
+const appRuntimeBootstrapAssemblyPath = fileURLToPath(
+  new URL("../src/public/app-runtime-bootstrap-assembly.js", import.meta.url)
+);
 const sessionGridControllerPath = fileURLToPath(new URL("../src/public/ui/session-grid-controller.js", import.meta.url));
 const sessionTerminalRuntimeControllerPath = fileURLToPath(
   new URL("../src/public/ui/session-terminal-runtime-controller.js", import.meta.url)
@@ -53,7 +56,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
   const source = await readFile(appRuntimeCompositionPath, "utf8");
 
   const requiredDelegationMarkers = [
-    "createAppBootstrapCompositionController",
+    "createAppRuntimeBootstrapAssembly",
     "createAppCommandUiFacadeController",
     "createAppLayoutDeckFacadeController",
     "createAppRuntimeInitializationController",
@@ -80,6 +83,23 @@ test("runtime composition controller owns the delegated runtime assembly contrac
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+});
+
+test("runtime bootstrap assembly owns the delegated bootstrap controller contract", async () => {
+  const source = await readFile(appRuntimeBootstrapAssemblyPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createAppBootstrapCompositionController",
+    "const appBootstrapCompositionController = createAppBootstrapCompositionController({",
+    "interpretRuntimeEvent: (event) =>",
+    "streamInterpretationPluginEngine.interpretRuntimeEvent(event, {",
+    'streamDebugTraceController.record(sessionId, "ws.session.data", {',
+    "const composedControllers = appBootstrapCompositionController.composeControllers?.() || {};"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime bootstrap assembly marker ${marker}`);
   }
 });
 
