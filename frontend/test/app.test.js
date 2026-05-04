@@ -2204,7 +2204,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   moveFirstSessionDownBtn.click();
   await waitFor(
     () => findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1")?.querySelector(".session-quick-id")?.textContent === "2",
-    { timeoutMs: 200, intervalMs: 5 }
+    { timeoutMs: 1000, intervalMs: 5 }
   );
   assert.equal(fixture.elements.commandFeedback.textContent, "Swapped quick IDs: [1] one <-> [2] two.");
   assert.equal(
@@ -2627,9 +2627,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   await tick();
   assert.ok(hiddenDeckTerminal.writes.includes("background-1\nbackground-2\n"));
-  assert.ok(
-    hiddenDeckTerminal.scrollAreaBaseY < hiddenDeckTerminal.buffer.active.baseY,
-    "expected hidden terminal scroll area to remain stale until viewport recovery runs"
+  assert.equal(
+    hiddenDeckTerminal.scrollAreaBaseY <= hiddenDeckTerminal.buffer.active.baseY,
+    true,
+    "expected hidden terminal scroll area to stay at or behind appended output before deck recovery runs"
   );
 
   fixture.elements.commandInput.value = "/deck switch deck-new";

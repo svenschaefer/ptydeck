@@ -602,3 +602,57 @@ test("store reducer clears unread on same-session activation and removes command
     removedByScopeFallback
   );
 });
+
+test("store reducer deduplicates replacement commands and treats equivalent filter text as a no-op", () => {
+  const initial = createInitialRuntimeState();
+
+  const withCommands = reduceRuntimeState(initial, {
+    type: "commands.replace",
+    commands: [
+      null,
+      { name: "deploy", scope: "global", content: "echo global" },
+      { name: "deploy", scope: "global", content: "echo duplicate ignored" },
+      { name: "deploy", scope: "session", sessionId: "s1", content: "echo session" }
+    ]
+  });
+  assert.deepEqual(
+    withCommands.customCommands.map((command) => [command.scope, command.sessionId || "", command.name, command.content]),
+    [
+      ["session", "s1", "deploy", "echo session"],
+      ["global", "", "deploy", "echo global"]
+    ]
+  );
+
+  const withFilter = reduceRuntimeState(withCommands, {
+    type: "filter.set",
+    value: "  tag:ops  "
+  });
+  assert.equal(withFilter.sessionFilterText, "tag:ops");
+  assert.equal(
+    reduceRuntimeState(withFilter, {
+      type: "filter.set",
+      value: "tag:ops"
+    }),
+    withFilter
+  );
+});
+
+test("store wrapper returns null for invalid normalized submissions and normalizes filter text updates", () => {
+  const store = createStore();
+  let publishCount = 0;
+  store.subscribe(() => {
+    publishCount += 1;
+  });
+  store.setSessions([{ id: "s1", deckId: "default" }]);
+
+  assert.equal(store.recordSessionCommandSubmission("s1", {}), null);
+  assert.equal(store.getState().sessions[0].commandCorrelations.length, 0);
+
+  store.setSessionFilterText("  tag:ssh  ");
+  assert.equal(store.getState().sessionFilterText, "tag:ssh");
+  const publishesAfterFirstFilter = publishCount;
+
+  store.setSessionFilterText("tag:ssh");
+  assert.equal(store.getState().sessionFilterText, "tag:ssh");
+  assert.equal(publishCount, publishesAfterFirstFilter);
+});

@@ -2152,6 +2152,128 @@ test("session-terminal-runtime controller falls back cleanly when no global scro
   assert.equal(entry.terminal.focusCalls, 1);
 });
 
+test("session-terminal-runtime controller suppresses auxclick paste locally and arms terminal forwarding from context menu when mouse forwarding is enabled", () => {
+  const localController = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const localRefs = createTerminalCardRefs("auxclick-local");
+  const localEntry = localController.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs: localRefs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  const auxClickEvent = createMouseEvent("auxclick", 1);
+  localRefs.mount.dispatchEvent(auxClickEvent);
+  assert.equal(auxClickEvent.defaultPrevented, true);
+  assert.equal(auxClickEvent.propagationStopped, true);
+  assert.equal(localEntry.terminal.focusCalls, 0);
+
+  const terminalWrites = [];
+  const forwardingController = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    getSessionById: () => ({ id: "s2", mouseForwardingMode: "application" })
+  });
+  const forwardingRefs = createTerminalCardRefs("contextmenu-forwarding");
+  const forwardingEntry = forwardingController.mountSessionTerminalCard({
+    session: { id: "s2", mouseForwardingMode: "application" },
+    refs: forwardingRefs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  forwardingEntry.terminal.emitData("\u001b[I");
+  forwardingRefs.mount.dispatchEvent({ type: "contextmenu" });
+  forwardingEntry.terminal.emitData("\u001b[M");
+
+  assert.equal(forwardingEntry.terminal.focusCalls, 1);
+  assert.deepEqual(terminalWrites, [["s2", "\u001b[M"]]);
+});
+
+test("session-terminal-runtime controller releases active scrollbar drag during clipboard-binding disposal", () => {
+  const windowRef = new FakeWindowEventTarget();
+  const controller = createSessionTerminalRuntimeController({
+    windowRef
+  });
+  const refs = createTerminalCardRefs("dispose-drag");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  const downEvent = createMouseEvent("mousedown", 0);
+  downEvent.clientX = 645;
+  downEvent.clientY = 112;
+  refs.mount.dispatchEvent(downEvent);
+
+  assert.equal(windowRef.listeners.get("mousemove")?.length || 0, 1);
+  assert.equal(windowRef.listeners.get("mouseup")?.length || 0, 1);
+
+  entry.disposeClipboardBindings();
+
+  assert.equal(windowRef.listeners.get("mousemove")?.length || 0, 0);
+  assert.equal(windowRef.listeners.get("mouseup")?.length || 0, 0);
+});
+
+test("session-terminal-runtime controller tolerates ResizeObserver instances without an observe method", () => {
+  class IncompleteResizeObserver {
+    constructor(callback) {
+      this.callback = callback;
+    }
+  }
+
+  const terminals = new Map();
+  const terminalObservers = new Map();
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: IncompleteResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs: createTerminalCardRefs("incomplete-resize-observer"),
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals,
+    terminalObservers,
+    applyResizeForSession() {}
+  });
+
+  assert.equal(terminals.get("s1"), entry);
+  assert.equal(terminalObservers.size, 1);
+  assert.ok(terminalObservers.get("s1") instanceof IncompleteResizeObserver);
+});
+
 test("session-terminal-runtime controller uses the default browser clipboard helpers when custom overrides are absent", async () => {
   const clipboardWrites = [];
   const pasted = [];

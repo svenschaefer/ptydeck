@@ -1,4 +1,4 @@
-import { createCommandHelpText, createCommandTopicHelpText, createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
+import { createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
 import {
   formatConnectionProfileSummary,
   normalizeConnectionProfileLaunch
@@ -18,6 +18,7 @@ import {
 } from "./custom-command-model.js";
 import { createCommandExecutorCustomHandlers } from "./command-executor-custom-handlers.js";
 import { createCommandExecutorDomainHandlers } from "./command-executor-domain-handlers.js";
+import { createCommandExecutorOperatorHandlers } from "./command-executor-operator-handlers.js";
 import { createCommandExecutorSettingsHandlers } from "./command-executor-settings-handlers.js";
 import {
   createCommandExecutorSessionHandlers,
@@ -592,6 +593,29 @@ export function createCommandExecutor(options = {}) {
     api
   });
 
+  const operatorHandlers = createCommandExecutorOperatorHandlers({
+    store,
+    api,
+    defaultDeckId,
+    systemSlashCommands,
+    formatUsage,
+    resolveTargetSelectors,
+    resolveDeckToken,
+    parseSizeCommandArgs,
+    applyTerminalSizeSettings,
+    setSessionFilterText,
+    resolveFilterSelectors: options.resolveFilterSelectors,
+    getActiveDeck,
+    getSessionCountForDeck,
+    applyRuntimeEvent,
+    setActiveDeck,
+    resolveSessionDeckId,
+    formatSessionToken,
+    formatSessionDisplayName,
+    getSessionRuntimeState,
+    getTerminalSettings
+  });
+
   function renderCustomCommandForTargets(commandName, exactCustom, targetSessions, parameterAssignments, decks, commands, sessions) {
     const renderedEntries = [];
     for (const session of targetSessions) {
@@ -651,270 +675,17 @@ export function createCommandExecutor(options = {}) {
     const decks = Array.isArray(state.decks) ? state.decks : [];
     const activeSessionId = state.activeSessionId;
 
-    if (command === "" || command === "help") {
-      if (args.length === 0) {
-        return createCommandHelpText(systemSlashCommands);
-      }
-      const topicHelp = createCommandTopicHelpText(args[0], args[1] || "", systemSlashCommands);
-      if (topicHelp) {
-        return topicHelp;
-      }
-      return createCommandHelpText(systemSlashCommands);
-    }
-
-    if (command === "run") {
-      return formatUsage("run");
-    }
-
-    if (command === "deck") {
-      const subcommand = String(args[0] || "").toLowerCase();
-      const rest = args.slice(1);
-      const decks = state.decks.slice();
-      const activeDeck = getActiveDeck();
-
-      if (!subcommand || subcommand === "list") {
-        if (decks.length === 0) {
-          return "No decks available.";
-        }
-        const lines = decks.map((deck) => {
-          const marker = activeDeck && deck.id === activeDeck.id ? "*" : " ";
-          const count = getSessionCountForDeck(deck.id, sessions);
-          return `${marker} [${deck.id}] ${deck.name} (${count} sessions)`;
-        });
-        return lines.join("\n");
-      }
-
-      if (subcommand === "new") {
-        const terminalSettings = getTerminalSettings();
-        const name = rest.join(" ").trim();
-        if (!name) {
-          return formatUsage("deck", "new");
-        }
-        const created = await api.createDeck({
-          name,
-          settings: {
-            terminal: {
-              cols: terminalSettings.cols,
-              rows: terminalSettings.rows
-            }
-          }
-        });
-        applyRuntimeEvent(
-          {
-            type: "deck.created",
-            deck: created
-          },
-          { preferredActiveDeckId: created.id }
-        );
-        return `Created deck [${created.id}] ${created.name}.`;
-      }
-
-      if (subcommand === "rename") {
-        if (!activeDeck) {
-          return "No active deck to rename.";
-        }
-        if (rest.length === 0) {
-          return formatUsage("deck", "rename");
-        }
-
-        let targetDeck = activeDeck;
-        let name = "";
-        if (rest.length === 1) {
-          name = rest[0].trim();
-        } else {
-          const resolvedDeck = resolveDeckToken(rest[0], decks);
-          if (!resolvedDeck.deck) {
-            return resolvedDeck.error;
-          }
-          targetDeck = resolvedDeck.deck;
-          name = rest.slice(1).join(" ").trim();
-        }
-
-        if (!name) {
-          return formatUsage("deck", "rename");
-        }
-        const updated = await api.updateDeck(targetDeck.id, { name });
-        applyRuntimeEvent(
-          {
-            type: "deck.updated",
-            deck: updated
-          },
-          { preferredActiveDeckId: updated.id }
-        );
-        return `Renamed deck [${updated.id}] to ${updated.name}.`;
-      }
-
-      if (subcommand === "switch") {
-        if (rest.length !== 1) {
-          return formatUsage("deck", "switch");
-        }
-        const resolved = resolveDeckToken(rest[0], decks);
-        if (!resolved.deck) {
-          return resolved.error;
-        }
-        const changed = setActiveDeck(resolved.deck.id);
-        if (!changed) {
-          return `Failed to switch deck: ${resolved.deck.id}`;
-        }
-        return `Active deck: [${resolved.deck.id}] ${resolved.deck.name}.`;
-      }
-
-      if (subcommand === "delete") {
-        if (!activeDeck) {
-          return "No active deck to delete.";
-        }
-        if (rest.length > 2) {
-          return formatUsage("deck", "delete");
-        }
-        let force = false;
-        let selector = "";
-        if (rest.length === 1) {
-          if (String(rest[0]).toLowerCase() === "force") {
-            force = true;
-          } else {
-            selector = rest[0];
-          }
-        } else if (rest.length === 2) {
-          selector = rest[0];
-          if (String(rest[1]).toLowerCase() !== "force") {
-            return formatUsage("deck", "delete");
-          }
-          force = true;
-        }
-
-        let targetDeck = activeDeck;
-        if (selector) {
-          const resolved = resolveDeckToken(selector, decks);
-          if (!resolved.deck) {
-            return resolved.error;
-          }
-          targetDeck = resolved.deck;
-        }
-
-        if (targetDeck.id === defaultDeckId) {
-          return "Default deck cannot be deleted.";
-        }
-
-        try {
-          await api.deleteDeck(targetDeck.id, { force });
-        } catch (err) {
-          if (err && err.status === 409 && !force) {
-            return `Deck '${targetDeck.name}' is not empty. Retry with '/deck delete ${targetDeck.id} force'.`;
-          }
-          throw err;
-        }
-
-        const fallbackId = decks.find((deck) => deck.id !== targetDeck.id)?.id || defaultDeckId;
-        applyRuntimeEvent(
-          {
-            type: "deck.deleted",
-            deckId: targetDeck.id,
-            fallbackDeckId: fallbackId
-          },
-          { preferredActiveDeckId: fallbackId }
-        );
-        return `Deleted deck [${targetDeck.id}] ${targetDeck.name}.`;
-      }
-
-      return formatUsage("deck");
-    }
-
-    if (command === "move") {
-      if (args.length !== 2) {
-        return formatUsage("move");
-      }
-      const sessionSelector = args[0];
-      const deckSelector = args[1];
-      const resolvedTargets = resolveTargetSelectors(sessionSelector, sessions, { source: "slash" });
-      if (resolvedTargets.error) {
-        return resolvedTargets.error;
-      }
-      if (resolvedTargets.sessions.length === 0) {
-        return "No sessions resolved for /move.";
-      }
-      const resolvedDeck = resolveDeckToken(deckSelector, state.decks);
-      if (!resolvedDeck.deck) {
-        return resolvedDeck.error;
-      }
-
-      const moved = await Promise.all(
-        resolvedTargets.sessions.map((session) => api.moveSessionToDeck(resolvedDeck.deck.id, session.id))
-      );
-      for (const session of moved) {
-        applyRuntimeEvent({ type: "session.updated", session });
-      }
-      if (moved.length === 1) {
-        return `Moved session [${formatSessionToken(moved[0].id)}] to deck [${resolvedDeck.deck.id}] ${resolvedDeck.deck.name}.`;
-      }
-      return `Moved ${moved.length} sessions to deck [${resolvedDeck.deck.id}] ${resolvedDeck.deck.name}.`;
-    }
-
-    if (command === "size") {
-      const terminalSettings = getTerminalSettings();
-      const parsed = parseSizeCommandArgs(args, terminalSettings.cols, terminalSettings.rows);
-      if (!parsed.ok) {
-        return parsed.error;
-      }
-      await applyTerminalSizeSettings(parsed.cols, parsed.rows);
-      const activeDeck = getActiveDeck();
-      return `Terminal size set to ${parsed.cols}x${parsed.rows} (cols x rows) for deck '${activeDeck?.name || "unknown"}'.`;
-    }
-
-    if (command === "filter") {
-      const selectorText = args.join(" ").trim();
-      if (!selectorText) {
-        setSessionFilterText("");
-        return "Display filter cleared.";
-      }
-      const activeDeck = getActiveDeck();
-      let activeDeckId = activeDeck ? activeDeck.id : "";
-      const resolved = options.resolveFilterSelectors(selectorText, sessions, {
-        scopeMode: "active-deck",
-        activeDeckId
-      });
-      if (resolved.error) {
-        return resolved.error;
-      }
-      setSessionFilterText(selectorText);
-      if (selectorText.includes("::") && resolved.sessions.length > 0) {
-        const targetDeckId = resolveSessionDeckId(resolved.sessions[0]);
-        if (targetDeckId && targetDeckId !== activeDeckId) {
-          setActiveDeck(targetDeckId);
-          activeDeckId = targetDeckId;
-        }
-      }
-      if (resolved.sessions.length > 0 && !resolved.sessions.some((session) => session.id === activeSessionId)) {
-        store.setActiveSession(resolved.sessions[0].id);
-      }
-      const scopedCount = activeDeckId
-        ? store.getState().sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId).length
-        : store.getState().sessions.length;
-      return `Display filter active (${resolved.sessions.length}/${scopedCount}): ${selectorText}`;
-    }
-
-    if (command === "list") {
-      if (sessions.length === 0) {
-        return "No sessions available.";
-      }
-      const lines = sessions.map((session) => {
-        const marker = session.id === activeSessionId ? "*" : " ";
-        const token = formatSessionToken(session.id);
-        const stateValue = getSessionRuntimeState(session);
-        const stateSuffix = stateValue === "active" ? "" : ` [${stateValue}]`;
-        return `${marker} [${token}] ${formatSessionDisplayName(session)} (${session.id.slice(0, 8)})${stateSuffix}`;
-      });
-      return lines.join("\n");
-    }
-
-    if (command === "new") {
-      const payload = {};
-      if (args.length > 0) {
-        payload.shell = args[0];
-      }
-      const session = await api.createSession(payload);
-      applyRuntimeEvent({ type: "session.created", session });
-      store.setActiveSession(session.id);
-      return `Created session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
+    const operatorFeedback = await operatorHandlers.executeStructuredCommand({
+      command,
+      args,
+      interpreted,
+      sessions,
+      decks,
+      activeSessionId,
+      state
+    });
+    if (operatorFeedback !== null) {
+      return operatorFeedback;
     }
 
     const sessionCommandFeedback = await sessionHandlers.executeStructuredCommand({

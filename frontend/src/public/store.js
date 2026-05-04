@@ -1132,18 +1132,11 @@ export function createStore(options = {}) {
       dispatch({ type: "commands.replace", commands });
     },
     upsertCustomCommand(command) {
-      const before = state.customCommands;
       dispatch({ type: "command.upsert", command });
       const normalizedName = normalizeCustomCommandName(command?.name);
       const normalized = normalizeCustomCommandRecord(command);
       if (!normalizedName || !normalized) {
         return null;
-      }
-      if (before === state.customCommands) {
-        return this.getCustomCommand(normalizedName, {
-          scope: normalized.scope,
-          sessionId: normalized.sessionId
-        });
       }
       return this.getCustomCommand(normalizedName, {
         scope: normalized.scope,

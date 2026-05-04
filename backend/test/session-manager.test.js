@@ -910,11 +910,12 @@ test("SessionManager reconnects unexpected ssh exits and restores connected remo
   assert.equal(queued.ptys.length, 1);
 
   queued.ptys[0].kill();
-  await new Promise((resolve) => setTimeout(resolve, 1));
+  await waitFor(() => manager.get(created.id).meta.remoteRuntime.connectivityState === "degraded");
   assert.equal(manager.get(created.id).meta.remoteRuntime.connectivityState, "degraded");
   assert.equal(manager.get(created.id).meta.remoteRuntime.reconnectPolicy.maxAttempts, 3);
 
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await waitFor(() => queued.ptys.length === 2);
+  await waitFor(() => manager.get(created.id).meta.remoteRuntime.connectivityState === "connected");
   assert.equal(queued.ptys.length, 2);
   assert.equal(manager.get(created.id).meta.remoteRuntime.connectivityState, "connected");
   assert.equal(manager.get(created.id).meta.remoteRuntime.reconnectAttempts, 0);
@@ -1024,7 +1025,7 @@ test("SessionManager delete clears pending ssh reconnect timers so degraded sess
   });
 
   queued.ptys[0].kill();
-  await new Promise((resolve) => setTimeout(resolve, 1));
+  await waitFor(() => manager.get(created.id).meta.remoteRuntime.connectivityState === "degraded");
   assert.equal(manager.get(created.id).meta.remoteRuntime.connectivityState, "degraded");
 
   manager.delete(created.id);
