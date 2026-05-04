@@ -18,6 +18,20 @@ import {
   normalizeRemoteSecret,
   remoteAuthRequiresSecret
 } from "./session-launch-spec.js";
+import {
+  buildReconnectUnavailableErrorDetails,
+  buildRemoteReconnectAttemptState,
+  buildRemoteRuntimeConnectedState,
+  buildRemoteRuntimeMeta,
+  buildRemoteRuntimeUnavailableState,
+  DEFAULT_REMOTE_RECONNECT_DELAY_MS,
+  DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
+  planRemoteReconnectFailure,
+  planRemoteReconnectSchedule,
+  REMOTE_CONNECTIVITY_CONNECTED,
+  REMOTE_CONNECTIVITY_DEGRADED,
+  REMOTE_CONNECTIVITY_OFFLINE
+} from "./session-manager-remote-runtime.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import {
@@ -79,11 +93,6 @@ const SESSION_STATE_EXITED = "exited";
 const SESSION_ACTIVITY_STATE_ACTIVE = "active";
 const SESSION_ACTIVITY_STATE_INACTIVE = "inactive";
 const DEFAULT_SESSION_ACTIVITY_QUIET_MS = 1400;
-const REMOTE_CONNECTIVITY_CONNECTED = "connected";
-const REMOTE_CONNECTIVITY_DEGRADED = "degraded";
-const REMOTE_CONNECTIVITY_OFFLINE = "offline";
-const DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS = 3;
-const DEFAULT_REMOTE_RECONNECT_DELAY_MS = 1500;
 const DEFAULT_REMOTE_RECONNECT_STABLE_MS = 500;
 const DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS = 90;
 const DEFAULT_STARTUP_POST_INPUT_FALLBACK_MS = 1500;
@@ -275,32 +284,6 @@ function getTextLength(value) {
 
 function normalizeSessionKind(kind) {
   return String(kind || "").trim().toLowerCase() === SESSION_KIND_SSH ? SESSION_KIND_SSH : SESSION_KIND_LOCAL;
-}
-
-function buildRemoteRuntimeMeta({
-  reconnectMaxAttempts = DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
-  reconnectDelayMs = DEFAULT_REMOTE_RECONNECT_DELAY_MS
-} = {}) {
-  return {
-    connectivityState: REMOTE_CONNECTIVITY_CONNECTED,
-    reconnectPolicy: {
-      maxAttempts:
-        Number.isInteger(reconnectMaxAttempts) && reconnectMaxAttempts >= 0
-          ? reconnectMaxAttempts
-          : DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
-      delayMs:
-        Number.isInteger(reconnectDelayMs) && reconnectDelayMs > 0
-          ? reconnectDelayMs
-          : DEFAULT_REMOTE_RECONNECT_DELAY_MS
-    },
-    reconnectAttempts: 0,
-    disconnectedAt: null,
-    nextReconnectAt: null,
-    lastReconnectAt: null,
-    lastDisconnectReason: "",
-    lastExitCode: null,
-    lastExitSignal: ""
-  };
 }
 
 function countCursorPositionQueries(rawData) {
@@ -619,11 +602,10 @@ export class SessionManager {
       return;
     }
     this.clearRemoteReconnectTimers(session);
-    session.meta.remoteRuntime.connectivityState = REMOTE_CONNECTIVITY_CONNECTED;
-    session.meta.remoteRuntime.reconnectAttempts = 0;
-    session.meta.remoteRuntime.disconnectedAt = null;
-    session.meta.remoteRuntime.nextReconnectAt = null;
-    session.meta.remoteRuntime.lastReconnectAt = timestamp;
+    session.meta.remoteRuntime = buildRemoteRuntimeConnectedState(session.meta.remoteRuntime, timestamp, {
+      reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+      reconnectDelayMs: this.remoteReconnectDelayMs
+    });
     session.meta.updatedAt = timestamp;
     this.emitSessionUpdated(session);
   }
@@ -632,15 +614,16 @@ export class SessionManager {
     if (session?.meta?.kind !== SESSION_KIND_SSH || !session.meta.remoteRuntime) {
       return;
     }
-    session.meta.remoteRuntime.connectivityState = connectivityState;
-    session.meta.remoteRuntime.disconnectedAt = timestamp;
-    session.meta.remoteRuntime.nextReconnectAt =
-      Number.isInteger(details.nextReconnectAt) && details.nextReconnectAt > 0 ? details.nextReconnectAt : null;
-    session.meta.remoteRuntime.lastDisconnectReason =
-      typeof details.reason === "string" && details.reason ? details.reason : "";
-    session.meta.remoteRuntime.lastExitCode =
-      Number.isInteger(details.exitCode) || details.exitCode === null ? details.exitCode : null;
-    session.meta.remoteRuntime.lastExitSignal = typeof details.exitSignal === "string" ? details.exitSignal : "";
+    session.meta.remoteRuntime = buildRemoteRuntimeUnavailableState(
+      session.meta.remoteRuntime,
+      connectivityState,
+      timestamp,
+      details,
+      {
+        reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+        reconnectDelayMs: this.remoteReconnectDelayMs
+      }
+    );
     session.meta.updatedAt = timestamp;
     this.emitSessionUpdated(session);
   }
@@ -900,13 +883,10 @@ export class SessionManager {
   }
 
   buildReconnectUnavailableError(session) {
-    const connectivityState = session?.meta?.remoteRuntime?.connectivityState || REMOTE_CONNECTIVITY_OFFLINE;
-    const errorCode =
-      connectivityState === REMOTE_CONNECTIVITY_DEGRADED ? "RemoteSessionDegraded" : "RemoteSessionOffline";
-    const message =
-      connectivityState === REMOTE_CONNECTIVITY_DEGRADED
-        ? `Remote SSH session '${session.id}' is reconnecting. Wait for recovery or restart the session explicitly.`
-        : `Remote SSH session '${session.id}' is offline. Restart the session to retry immediately.`;
+    const { errorCode, message } = buildReconnectUnavailableErrorDetails({
+      sessionId: session?.id,
+      connectivityState: session?.meta?.remoteRuntime?.connectivityState || REMOTE_CONNECTIVITY_OFFLINE
+    });
     return new ApiError(409, errorCode, message);
   }
 
@@ -915,25 +895,25 @@ export class SessionManager {
       return false;
     }
     this.clearRemoteReconnectTimers(session);
-    const policy = session.meta.remoteRuntime.reconnectPolicy || buildRemoteRuntimeMeta();
     const timestamp = Number.isInteger(details.timestamp) ? details.timestamp : this.nowFn();
-    if (!Number.isInteger(policy.maxAttempts) || policy.maxAttempts <= 0) {
-      this.markRemoteSessionUnavailable(session, REMOTE_CONNECTIVITY_OFFLINE, timestamp, details);
-      return false;
-    }
-    if (session.meta.remoteRuntime.reconnectAttempts >= policy.maxAttempts) {
-      this.markRemoteSessionUnavailable(session, REMOTE_CONNECTIVITY_OFFLINE, timestamp, details);
-      return false;
-    }
-    const nextReconnectAt = timestamp + policy.delayMs;
-    this.markRemoteSessionUnavailable(session, REMOTE_CONNECTIVITY_DEGRADED, timestamp, {
-      ...details,
-      nextReconnectAt
+    const reconnectPlan = planRemoteReconnectSchedule(session.meta.remoteRuntime, {
+      timestamp,
+      reason: details.reason,
+      exitCode: details.exitCode,
+      exitSignal: details.exitSignal,
+      reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+      reconnectDelayMs: this.remoteReconnectDelayMs
     });
+    session.meta.remoteRuntime = reconnectPlan.remoteRuntime;
+    session.meta.updatedAt = timestamp;
+    this.emitSessionUpdated(session);
+    if (!reconnectPlan.shouldSchedule) {
+      return false;
+    }
     session.remoteReconnectTimer = this.setTimeoutFn(() => {
       session.remoteReconnectTimer = null;
       this.attemptRemoteReconnect(session.id, details.reason);
-    }, policy.delayMs);
+    }, reconnectPlan.delayMs);
     return true;
   }
 
@@ -945,11 +925,13 @@ export class SessionManager {
     if (session.ptyProcess) {
       return;
     }
-    const policy = session.meta.remoteRuntime?.reconnectPolicy || buildRemoteRuntimeMeta().reconnectPolicy;
     const timestamp = this.nowFn();
-    session.meta.remoteRuntime.reconnectAttempts += 1;
-    session.meta.remoteRuntime.nextReconnectAt = null;
-    session.meta.remoteRuntime.lastDisconnectReason = reason;
+    session.meta.remoteRuntime = buildRemoteReconnectAttemptState(session.meta.remoteRuntime, {
+      timestamp,
+      reason,
+      reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+      reconnectDelayMs: this.remoteReconnectDelayMs
+    });
     session.meta.updatedAt = timestamp;
     this.emitSessionUpdated(session);
 
@@ -979,25 +961,24 @@ export class SessionManager {
     } catch (error) {
       const retryTimestamp = this.nowFn();
       const failureReason = error instanceof Error && error.message ? error.message : reason;
-      if (session.meta.remoteRuntime.reconnectAttempts >= policy.maxAttempts) {
-        this.markRemoteSessionUnavailable(session, REMOTE_CONNECTIVITY_OFFLINE, retryTimestamp, {
-          reason: failureReason,
-          exitCode: null,
-          exitSignal: ""
-        });
-        return;
-      }
-      const nextReconnectAt = retryTimestamp + policy.delayMs;
-      this.markRemoteSessionUnavailable(session, REMOTE_CONNECTIVITY_DEGRADED, retryTimestamp, {
+      const reconnectPlan = planRemoteReconnectFailure(session.meta.remoteRuntime, {
+        timestamp: retryTimestamp,
         reason: failureReason,
         exitCode: null,
         exitSignal: "",
-        nextReconnectAt
+        reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+        reconnectDelayMs: this.remoteReconnectDelayMs
       });
+      session.meta.remoteRuntime = reconnectPlan.remoteRuntime;
+      session.meta.updatedAt = retryTimestamp;
+      this.emitSessionUpdated(session);
+      if (!reconnectPlan.shouldSchedule) {
+        return;
+      }
       session.remoteReconnectTimer = this.setTimeoutFn(() => {
         session.remoteReconnectTimer = null;
         this.attemptRemoteReconnect(session.id, failureReason);
-      }, policy.delayMs);
+      }, reconnectPlan.delayMs);
     }
   }
 

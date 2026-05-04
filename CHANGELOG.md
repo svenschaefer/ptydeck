@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-05-04
+
+- [x] `QLT-273` is now completed as the second delivered slice inside the still-active `v0.4.0-H168` quality wave, leaving `QLT-274` through `QLT-277` open in `TODO.md` / `ROADMAP.md`.
+- [x] `backend/src/session-manager.js` now delegates SSH remote-runtime reconnect and availability state shaping into the new `backend/src/session-manager-remote-runtime.js` helper seam instead of keeping reconnect policy normalization, degraded/offline scheduling decisions, reconnect-attempt mutation, and degraded-versus-offline operator error details inline inside the manager. The extraction reduces `backend/src/session-manager.js` from `2037` to `2018` lines without widening the shipped SSH restart/reconnect contract, and `backend/test/session-manager-remote-runtime.test.js` now locks down reconnect baseline normalization, degraded scheduling, fail-closed offline transitions, reconnect-attempt mutation, connected recovery state, and degraded-versus-offline error detail shaping directly.
+- [x] The validated backend hotspot snapshot after `QLT-273` now reports `backend/src/session-manager-remote-runtime.js` at `100.00%` line / `93.65%` branch coverage and the reduced `backend/src/session-manager.js` at `95.39%` line / `78.98%` branch coverage. Validated repo totals on the active tree are root tooling `92.82%` line / `77.09%` branch, backend `95.38%` line / `89.35%` branch, and frontend `97.02%` line / `89.60%` branch.
+- [x] Focused `QLT-273` validation passed with `node --check backend/src/session-manager-remote-runtime.js backend/src/session-manager.js`, `node --test backend/test/session-manager-remote-runtime.test.js backend/test/session-manager-lifecycle.test.js`, `node --test backend/test/session-manager.test.js`, and `npm --prefix backend run test:coverage` before the full repo quality gate.
+
 ## 2026-05-03
 
 - [x] `QLT-272` is now completed as the first delivered slice inside the still-active `v0.4.0-H168` quality wave, leaving `QLT-273` through `QLT-277` open in `TODO.md` / `ROADMAP.md`.
