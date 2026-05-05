@@ -4,6 +4,7 @@ import {
   parseCustomCommandInvocation,
   renderCustomCommandForSession
 } from "./custom-command-model.js";
+import { resolveSessionAppIdentity } from "./session-app-identity.js";
 
 export function createCommandComposerRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
@@ -87,6 +88,15 @@ export function createCommandComposerRuntimeController(options = {}) {
 
   let commandPreviewTimer = null;
   let pendingSend = null;
+
+  function resolveMultilineTransportMode(session, payload) {
+    const text = String(payload || "");
+    if (!text.includes("\n")) {
+      return "preserve-lf";
+    }
+    const identity = resolveSessionAppIdentity(session);
+    return identity.family === "shell" ? "configured" : "preserve-lf";
+  }
 
   function clearPreviewTimer() {
     if (commandPreviewTimer !== null) {
@@ -314,7 +324,8 @@ export function createCommandComposerRuntimeController(options = {}) {
       });
       await sendInputWithConfiguredTerminator(apiSendInput, session.id, plan.targetPayload, terminatorMode, {
         normalizeMode: normalizeSendTerminatorMode,
-        delayedSubmitMs
+        delayedSubmitMs,
+        multilineMode: resolveMultilineTransportMode(session, plan.targetPayload)
       });
       if (plan.source === "composer") {
         recordSendHistory(session.id, plan.targetPayload, { submittedAt });

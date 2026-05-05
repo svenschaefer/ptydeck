@@ -397,6 +397,41 @@ test("command-composer runtime controller records terminal paste observations af
   ]);
 });
 
+test("command-composer runtime controller routes multiline shell sends through configured internal separators", async () => {
+  const calls = [];
+  let value = "echo first\necho second";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+    },
+    interpretComposerInput: () => ({ kind: "input", data: "echo first\necho second" }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one", appIdentity: { family: "shell", label: "bash", source: "foreground-process", confidence: 1 } }],
+      activeSessionId: "s1"
+    }),
+    isSessionActionBlocked: () => false,
+    canWriteToSession: () => true,
+    getSessionSendTerminator: () => "CR",
+    sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload, mode, options) => {
+      calls.push(["send", sessionId, payload, mode, options.multilineMode]);
+    },
+    normalizeSendTerminatorMode: (mode) => mode,
+    recordSendHistory: () => {},
+    recordCommandSubmission: () => {},
+    setCommandPreview: () => {},
+    clearCommandSuggestions: () => {},
+    clearError: () => {},
+    resetSlashHistoryNavigationState: () => {},
+    render: () => {},
+    debugLog: () => {}
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [["send", "s1", "echo first\necho second", "CR", "configured"]]);
+});
+
 test("command-composer runtime controller retries a blocked send after control is reclaimed", async () => {
   const calls = [];
   const controller = createCommandComposerRuntimeController({

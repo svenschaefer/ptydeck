@@ -19,6 +19,17 @@ test("withSingleTrailingNewline preserves normal LF line breaks inside multiline
   assert.equal(withSingleTrailingNewline("alpha\r\nbeta\r\n", "cr"), "alpha\nbeta\r");
 });
 
+test("withSingleTrailingNewline can normalize internal multiline separators to the configured terminator", () => {
+  assert.equal(
+    withSingleTrailingNewline("alpha\nbeta\n", "crlf", { multilineMode: "configured" }),
+    "alpha\r\nbeta\r\n"
+  );
+  assert.equal(
+    normalizePayloadWithoutTrailingNewline("alpha\r\nbeta\r\n", "cr", { multilineMode: "configured" }),
+    "alpha\rbeta"
+  );
+});
+
 test("sendInputWithConfiguredTerminator emits delayed CR submit for cr_delay mode", async () => {
   const writes = [];
   await sendInputWithConfiguredTerminator(
@@ -35,6 +46,27 @@ test("sendInputWithConfiguredTerminator emits delayed CR submit for cr_delay mod
   );
   assert.deepEqual(writes, [
     { sessionId: "s1", payload: "hello\nworld" },
+    { sessionId: "s1", payload: "\r" }
+  ]);
+});
+
+test("sendInputWithConfiguredTerminator can normalize delayed-submit multiline shell payloads to configured separators", async () => {
+  const writes = [];
+  await sendInputWithConfiguredTerminator(
+    async (sessionId, payload) => {
+      writes.push({ sessionId, payload });
+    },
+    "s1",
+    "hello\nworld\n",
+    "cr_delay",
+    {
+      normalizeMode: (mode) => mode,
+      delayedSubmitMs: 0,
+      multilineMode: "configured"
+    }
+  );
+  assert.deepEqual(writes, [
+    { sessionId: "s1", payload: "hello\rworld" },
     { sessionId: "s1", payload: "\r" }
   ]);
 });

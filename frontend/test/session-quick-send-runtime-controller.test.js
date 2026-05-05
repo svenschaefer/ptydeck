@@ -331,6 +331,39 @@ test("session quick-send controller renders hover actions from server-backed ran
   assert.deepEqual(feedback, ["Executed /deploy on [1].", "Sent clipboard to [1] Alpha."]);
 });
 
+test("session quick-send controller routes multiline shell favorites through configured internal separators", async () => {
+  const calls = [];
+  const sessions = [
+    {
+      id: "s1",
+      name: "Alpha",
+      deckId: "default",
+      appIdentity: { family: "shell", label: "bash", source: "foreground-process", confidence: 1 },
+      quickSendUsage: [{ lookupKey: "project::deploy", count: 2, lastUsedAt: 100 }]
+    }
+  ];
+  const controller = createSessionQuickSendRuntimeController({
+    documentRef: createDocumentRef(),
+    listCustomCommands: () => [{ name: "deploy", scope: "project", content: "echo first\necho second" }],
+    getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
+    resolveDeckForSession: () => ({ id: "default", name: "Default" }),
+    apiSendInput: async () => {},
+    sendInputWithConfiguredTerminator: async (_sendInput, sessionId, payload, mode, runtimeOptions) => {
+      calls.push(["send", sessionId, payload, mode, runtimeOptions.multilineMode]);
+    },
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    getSessionSendTerminator: () => "CRLF",
+    normalizeSendTerminatorMode: (mode) => String(mode || "").toLowerCase(),
+    setCommandFeedback: () => {},
+    clearError: () => {},
+    requestRender: () => {}
+  });
+
+  await controller.sendCustomCommand("s1", "project::deploy");
+
+  assert.deepEqual(calls, [["send", "s1", "echo first\necho second", "CRLF", "configured"]]);
+});
+
 test("session quick-send controller fails closed for blocked sessions and unavailable clipboards", async () => {
   const errors = [];
   const sessions = [{ id: "s1", name: "Alpha", deckId: "default", quickSendUsage: [{ lookupKey: "project::deploy", count: 1, lastUsedAt: 1 }] }];

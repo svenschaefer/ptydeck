@@ -5,6 +5,7 @@ import {
   normalizeCustomCommandRecord,
   renderCustomCommandForSession
 } from "./custom-command-model.js";
+import { resolveSessionAppIdentity } from "./session-app-identity.js";
 import {
   cloneQuickSendUsageEntries,
   normalizeQuickSendUsageEntry,
@@ -122,6 +123,15 @@ export function createSessionQuickSendRuntimeController(options = {}) {
     typeof options.formatSessionDisplayName === "function"
       ? options.formatSessionDisplayName
       : (session) => String(session?.name || session?.id || "session");
+
+  function resolveMultilineTransportMode(session, payload) {
+    const text = String(payload || "");
+    if (!text.includes("\n")) {
+      return "preserve-lf";
+    }
+    const identity = resolveSessionAppIdentity(session);
+    return identity.family === "shell" ? "configured" : "preserve-lf";
+  }
 
   function buildCustomCommandUsageApiOptions(command) {
     const normalizedCommand = normalizeCustomCommandRecord(command);
@@ -246,7 +256,8 @@ export function createSessionQuickSendRuntimeController(options = {}) {
       await sendInputWithConfiguredTerminator(apiSendInput, session.id, payload, getSessionSendTerminator(session.id), {
         normalizeMode: normalizeSendTerminatorMode,
         delayedSubmitMs,
-        apiRequestOptions: buildCustomCommandUsageApiOptions(command)
+        apiRequestOptions: buildCustomCommandUsageApiOptions(command),
+        multilineMode: resolveMultilineTransportMode(session, payload)
       });
       recordCommandSubmission(session.id, {
         source: "custom-command",

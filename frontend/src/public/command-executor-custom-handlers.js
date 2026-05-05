@@ -3,6 +3,7 @@ import {
   normalizeCustomCommandRecord,
   parseCustomCommandInvocation
 } from "./custom-command-model.js";
+import { resolveSessionAppIdentity } from "./session-app-identity.js";
 
 export function createCommandExecutorCustomHandlers(options = {}) {
   const resolveCustomCommandTargets =
@@ -37,6 +38,15 @@ export function createCommandExecutorCustomHandlers(options = {}) {
       : (value) => String(value || "");
   const formatSessionToken = typeof options.formatSessionToken === "function" ? options.formatSessionToken : (id) => String(id || "");
   const api = options.api && typeof options.api === "object" ? options.api : {};
+
+  function resolveMultilineTransportMode(session, payload) {
+    const text = String(payload || "");
+    if (!text.includes("\n")) {
+      return "preserve-lf";
+    }
+    const identity = resolveSessionAppIdentity(session);
+    return identity.family === "shell" ? "configured" : "preserve-lf";
+  }
 
   async function executeCustomCommand(context = {}) {
     const commandRaw = String(context.commandRaw || "").trim();
@@ -98,7 +108,8 @@ export function createCommandExecutorCustomHandlers(options = {}) {
           {
             normalizeMode: normalizeSendTerminatorMode,
             delayedSubmitMs,
-            apiRequestOptions
+            apiRequestOptions,
+            multilineMode: resolveMultilineTransportMode(entry.session, normalizedPayload)
           }
         );
       })

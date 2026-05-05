@@ -180,3 +180,38 @@ test("custom command handlers fail closed on blocked targets and invalid templat
   );
   assert.deepEqual(calls, [["blocked", ["s1"]]]);
 });
+
+test("custom command handlers route multiline shell payloads through configured internal separators", async () => {
+  const calls = [];
+  const handlers = createHandlers({
+    renderCustomCommandForTargets: (_commandName, exactCustom, targetSessions) => ({
+      error: "",
+      entries: targetSessions.map((session) => ({
+        session,
+        text: "echo first\necho second",
+        custom: exactCustom || { name: "deploy", scope: "project", kind: "plain" }
+      }))
+    }),
+    sendInputWithConfiguredTerminator: async (_sendInput, sessionId, payload, terminator, runtimeOptions) => {
+      calls.push(["send", sessionId, payload, terminator, runtimeOptions.multilineMode]);
+    },
+    normalizeCustomCommandPayloadForShell: (value) => value
+  });
+
+  await handlers.executeCustomCommand({
+    commandRaw: "deploy",
+    interpreted: { raw: "/deploy" },
+    sessions: [
+      {
+        id: "s1",
+        name: "one",
+        appIdentity: { family: "shell", label: "bash", source: "foreground-process", confidence: 1 }
+      }
+    ],
+    decks: [],
+    activeSessionId: "s1",
+    allCustomCommands: [{ name: "deploy", content: "echo hi", kind: "plain", scope: "project" }]
+  });
+
+  assert.deepEqual(calls, [["send", "s1", "echo first\necho second", "CRLF", "configured"]]);
+});

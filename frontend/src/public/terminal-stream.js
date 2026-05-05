@@ -1,19 +1,29 @@
-export function withSingleTrailingNewline(value, mode = "auto") {
-  const normalizedLines = String(value || "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/\n+$/g, "");
-  const suffix =
-    mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : mode === "cr2" ? "\r\r" : "\r";
-  return `${normalizedLines}${suffix}`;
+function resolveConfiguredTerminatorText(mode = "auto") {
+  return mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : mode === "cr2" ? "\r\r" : "\r";
 }
 
-export function normalizePayloadWithoutTrailingNewline(value, mode = "auto") {
-  void mode;
+function normalizeLineBreakText(value, lineBreakMode = "preserve-lf", terminatorText = "\r") {
   const normalizedLines = String(value || "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/\n+$/g, "");
+  if (!normalizedLines || lineBreakMode !== "configured" || terminatorText === "\n") {
+    return normalizedLines;
+  }
+  return normalizedLines.split("\n").join(terminatorText);
+}
+
+export function withSingleTrailingNewline(value, mode = "auto", options = {}) {
+  const terminatorText = resolveConfiguredTerminatorText(mode);
+  const lineBreakMode = options?.multilineMode === "configured" ? "configured" : "preserve-lf";
+  const normalizedLines = normalizeLineBreakText(value, lineBreakMode, terminatorText);
+  return `${normalizedLines}${terminatorText}`;
+}
+
+export function normalizePayloadWithoutTrailingNewline(value, mode = "auto", options = {}) {
+  const terminatorText = resolveConfiguredTerminatorText(mode);
+  const lineBreakMode = options?.multilineMode === "configured" ? "configured" : "preserve-lf";
+  const normalizedLines = normalizeLineBreakText(value, lineBreakMode, terminatorText);
   return normalizedLines;
 }
 
@@ -21,13 +31,14 @@ export async function sendInputWithConfiguredTerminator(sendInput, sessionId, va
   const normalizeMode =
     typeof options.normalizeMode === "function" ? options.normalizeMode : (inputMode) => String(inputMode || "");
   const delayedSubmitMs = Number.isFinite(options.delayedSubmitMs) ? options.delayedSubmitMs : 90;
+  const multilineMode = options.multilineMode === "configured" ? "configured" : "preserve-lf";
   const apiRequestOptions =
     options.apiRequestOptions && typeof options.apiRequestOptions === "object" && !Array.isArray(options.apiRequestOptions)
       ? options.apiRequestOptions
       : undefined;
   const normalizedMode = normalizeMode(String(mode || "").toLowerCase());
   if (normalizedMode === "cr_delay") {
-    const body = normalizePayloadWithoutTrailingNewline(value, "lf");
+    const body = normalizePayloadWithoutTrailingNewline(value, normalizedMode, { multilineMode });
     if (body) {
       await sendInput(sessionId, body, apiRequestOptions);
     }
@@ -35,7 +46,7 @@ export async function sendInputWithConfiguredTerminator(sendInput, sessionId, va
     await sendInput(sessionId, "\r", body ? undefined : apiRequestOptions);
     return;
   }
-  const payload = withSingleTrailingNewline(value, normalizedMode);
+  const payload = withSingleTrailingNewline(value, normalizedMode, { multilineMode });
   await sendInput(sessionId, payload, apiRequestOptions);
 }
 
