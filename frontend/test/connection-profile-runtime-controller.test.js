@@ -1599,6 +1599,7 @@ test("connection profile runtime controller exposes fail-closed draft and trust 
   await controller.newDraftFlow("ssh");
   await assert.rejects(() => controller.saveTrustEntryFlow(), /Enter an SSH host and port before trusting a host key/);
   await assert.rejects(() => controller.deleteTrustEntryFlow(), /Select a trusted SSH host key to delete/);
+  assert.equal(controller.resolveProfile("").error, "Connection profile target is required.");
 });
 
 test("connection profile runtime controller surfaces secret and probing precondition errors deterministically", async () => {
@@ -1782,4 +1783,67 @@ test("connection profile runtime controller surfaces secret and probing precondi
     launch: probingController.getProfile("ops-probe").launch
   });
   await assert.rejects(() => probingController.applyProfileById("ops-probe"), /SSH host-key probing is not available/);
+});
+
+test("connection profile runtime controller uses ad hoc SSH launch context labels for one-shot secret prompts", async () => {
+  const ui = createConnectionProfileUiRefs();
+  const secretRequests = [];
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    requestSecret: async (options) => {
+      secretRequests.push(options);
+      return "runtime-secret";
+    },
+    api: {
+      async listSshTrustEntries() {
+        return [
+          {
+            id: "trust-adhoc",
+            host: "adhoc.example",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+            fingerprintSha256: "SHA256:existing"
+          }
+        ];
+      },
+      async createSession(payload) {
+        return {
+          id: "s-adhoc",
+          deckId: payload.deckId,
+          name: "Ad Hoc SSH",
+          kind: "ssh"
+        };
+      }
+    },
+    setActiveDeck: () => true,
+    setActiveSession: () => {},
+    applyRuntimeEvent: () => true,
+    requestRender: () => {},
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await controller.refreshSshTrustEntries({ silent: true });
+  const feedback = await controller.launchConnectionLaunch(
+    {
+      kind: "ssh",
+      deckId: "ops",
+      shell: "ssh",
+      startCwd: "~",
+      startCommand: "",
+      env: {},
+      tags: [],
+      activeThemeProfile: createThemeProfile("#111111"),
+      inactiveThemeProfile: createThemeProfile("#121212"),
+      remoteConnection: { host: "adhoc.example", port: 22, username: "ops" },
+      remoteAuth: { method: "password" }
+    },
+    { name: "Ad Hoc SSH" }
+  );
+
+  assert.equal(feedback, "Started session [s-adhoc] Ad Hoc SSH for ops@adhoc.example:22.");
+  assert.equal(secretRequests.length, 1);
+  assert.equal(secretRequests[0].title, "SSH Runtime Secret");
+  assert.match(secretRequests[0].message, /SSH target ops@adhoc\.example:22/);
 });

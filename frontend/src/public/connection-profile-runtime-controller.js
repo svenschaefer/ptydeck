@@ -40,6 +40,7 @@ import {
 import {
   buildConnectionProfileDraftViewState
 } from "./connection-profile-runtime-view-state.js";
+import { createConnectionProfileUiBindings } from "./connection-profile-ui-bindings.js";
 
 function clearChildren(element) {
   if (!element || typeof element.removeChild !== "function") {
@@ -193,7 +194,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
   let pendingDeleteProfileId = "";
   let isRenderingDraft = false;
   let loadingSshTrustEntries = false;
-  let uiEventsBound = false;
 
   function getSshLifecycleState() {
     return {
@@ -893,100 +893,78 @@ export function createConnectionProfileRuntimeController(options = {}) {
     cancelDeleteSelectedProfileFlow
   } = runtimeActions;
 
-  function bindUiEvents() {
-    if (uiEventsBound) {
-      return;
-    }
-    uiEventsBound = true;
-    selectEl?.addEventListener?.("change", () => {
-      selectedProfileId = normalizeText(selectEl.value);
-      syncSelection();
-      resetDraftFromSelectedProfile();
-    });
-    const bindDraftSync = (element, eventName = "input") => {
-      element?.addEventListener?.(eventName, () => {
-        syncDraftStateFromInputs();
-      });
-    };
-    newBtn?.addEventListener?.("click", () => {
-      newDraftFlow("local").catch((error) => setError(getErrorMessage(error, "Failed to open a new local connection profile draft.")));
-    });
-    newSshBtn?.addEventListener?.("click", () => {
-      newDraftFlow("ssh").catch((error) => setError(getErrorMessage(error, "Failed to open a new SSH connection profile draft.")));
-    });
-    saveBtn?.addEventListener?.("click", () => {
-      loadActiveDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to load the active session into a connection profile draft.")));
-    });
-    saveDraftBtn?.addEventListener?.("click", () => {
-      saveDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to save the connection profile draft.")));
-    });
-    saveAndLaunchBtn?.addEventListener?.("click", () => {
-      saveAndLaunchDraftFlow().catch((error) =>
-        setError(getErrorMessage(error, "Failed to save and launch the connection profile draft."))
-      );
-    });
-    resetDraftBtn?.addEventListener?.("click", () => {
-      resetDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to reset the connection profile draft.")));
-    });
-    applyBtn?.addEventListener?.("click", () => {
-      applySelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to apply connection profile.")));
-    });
-    duplicateBtn?.addEventListener?.("click", () => {
-      duplicateSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to duplicate connection profile.")));
-    });
-    renameBtn?.addEventListener?.("click", () => {
-      renameSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to rename connection profile.")));
-    });
-    deleteBtn?.addEventListener?.("click", () => {
-      deleteSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete connection profile.")));
-    });
-    deleteConfirmBtn?.addEventListener?.("click", () => {
-      deleteSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete connection profile.")));
-    });
-    deleteCancelBtn?.addEventListener?.("click", () => {
-      cancelDeleteSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to cancel connection profile deletion.")));
-    });
-    sshTrustRefreshBtn?.addEventListener?.("click", () => {
-      refreshSshTrustEntries().catch((error) => setError(getErrorMessage(error, "Failed to load SSH trust entries.")));
-    });
-    sshTrustProbeBtn?.addEventListener?.("click", () => {
-      probeSshHostKeysFlow().catch((error) => setError(getErrorMessage(error, "Failed to fetch SSH host keys.")));
-    });
-    sshTrustSaveBtn?.addEventListener?.("click", () => {
-      saveTrustEntryFlow().catch((error) => setError(getErrorMessage(error, "Failed to trust SSH host key.")));
-    });
-    sshTrustDeleteBtn?.addEventListener?.("click", () => {
-      deleteTrustEntryFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete SSH trust entry.")));
-    });
-    sshTrustReplaceBtn?.addEventListener?.("click", () => {
-      replaceTrustEntryFlow().catch((error) => setError(getErrorMessage(error, "Failed to replace SSH trust entry.")));
-    });
-    sshTrustSelectEl?.addEventListener?.("change", () => {
-      selectedSshTrustEntryId = normalizeText(sshTrustSelectEl.value);
-      renderDraftComputedState();
-    });
-    sshProbeSelectEl?.addEventListener?.("change", () => {
-      selectedSshProbeCandidateId = normalizeText(sshProbeSelectEl.value);
-      renderDraftComputedState();
-    });
-    bindDraftSync(draftNameInputEl);
-    bindDraftSync(draftKindSelectEl, "change");
-    bindDraftSync(draftDeckSelectEl, "change");
-    bindDraftSync(draftShellInputEl);
-    bindDraftSync(draftStartCwdInputEl);
-    bindDraftSync(draftStartCommandTextareaEl);
-    bindDraftSync(draftEnvTextareaEl);
-    bindDraftSync(draftTagsInputEl);
-    bindDraftSync(draftActiveThemeSelectEl, "change");
-    bindDraftSync(draftInactiveThemeSelectEl, "change");
-    bindDraftSync(draftRemoteHostInputEl);
-    bindDraftSync(draftRemotePortInputEl);
-    bindDraftSync(draftRemoteUsernameInputEl);
-    bindDraftSync(draftRemoteAuthMethodSelectEl, "change");
-    bindDraftSync(draftRemotePrivateKeyPathInputEl);
-    bindDraftSync(sshTrustKeyTypeInputEl);
-    bindDraftSync(sshTrustPublicKeyTextareaEl);
-  }
+  const { bindUiEvents } = createConnectionProfileUiBindings({
+    normalizeText,
+    getErrorMessage,
+    setError,
+    selectEl,
+    newBtn,
+    newSshBtn,
+    saveBtn,
+    saveDraftBtn,
+    saveAndLaunchBtn,
+    resetDraftBtn,
+    applyBtn,
+    duplicateBtn,
+    renameBtn,
+    deleteBtn,
+    deleteConfirmBtn,
+    deleteCancelBtn,
+    sshTrustRefreshBtn,
+    sshTrustProbeBtn,
+    sshTrustSaveBtn,
+    sshTrustDeleteBtn,
+    sshTrustReplaceBtn,
+    sshTrustSelectEl,
+    sshProbeSelectEl,
+    setSelectedProfileId: (value) => {
+      selectedProfileId = value;
+    },
+    syncSelection,
+    resetDraftFromSelectedProfile,
+    syncDraftStateFromInputs,
+    newDraftFlow,
+    loadActiveDraftFlow,
+    saveDraftFlow,
+    saveAndLaunchDraftFlow,
+    resetDraftFlow,
+    applySelectedProfileFlow,
+    duplicateSelectedProfileFlow,
+    renameSelectedProfileFlow,
+    deleteSelectedProfileFlow,
+    cancelDeleteSelectedProfileFlow,
+    refreshSshTrustEntries,
+    probeSshHostKeysFlow,
+    saveTrustEntryFlow,
+    deleteTrustEntryFlow,
+    replaceTrustEntryFlow,
+    setSelectedSshTrustEntryId: (value) => {
+      selectedSshTrustEntryId = value;
+    },
+    setSelectedSshProbeCandidateId: (value) => {
+      selectedSshProbeCandidateId = value;
+    },
+    renderDraftComputedState,
+    draftInputElements: [
+      draftNameInputEl,
+      { element: draftKindSelectEl, eventName: "change" },
+      { element: draftDeckSelectEl, eventName: "change" },
+      draftShellInputEl,
+      draftStartCwdInputEl,
+      draftStartCommandTextareaEl,
+      draftEnvTextareaEl,
+      draftTagsInputEl,
+      { element: draftActiveThemeSelectEl, eventName: "change" },
+      { element: draftInactiveThemeSelectEl, eventName: "change" },
+      draftRemoteHostInputEl,
+      draftRemotePortInputEl,
+      draftRemoteUsernameInputEl,
+      { element: draftRemoteAuthMethodSelectEl, eventName: "change" },
+      draftRemotePrivateKeyPathInputEl,
+      sshTrustKeyTypeInputEl,
+      sshTrustPublicKeyTextareaEl
+    ]
+  });
 
   bindUiEvents();
   render();
