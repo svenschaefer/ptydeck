@@ -5,6 +5,7 @@ import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
 import { createAppRuntimeInitializationController } from "./app-runtime-initialization-controller.js";
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
+import { createAppRuntimeSessionAccessAssembly } from "./app-runtime-session-access-assembly.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppRuntimeTrustedLocalComposition } from "./app-runtime-trusted-local-composition.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
@@ -14,10 +15,8 @@ import { createCommandPaletteRuntimeController } from "./command-palette-runtime
 import { createControlPaneRuntimeController } from "./control-pane-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
-import { createSessionControlRuntimeController } from "./session-control-runtime-controller.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
-import { createSessionQuickSendRuntimeController } from "./session-quick-send-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
@@ -522,17 +521,21 @@ const uiState = {
   startupGateCanSkip: false
 };
 
-sessionControlRuntimeController = createSessionControlRuntimeController({
+const sessionAccessAssembly = createAppRuntimeSessionAccessAssembly({
   windowRef: window,
   documentRef: document,
   config,
   uiState,
   api,
+  store,
+  debugLog,
   requestRender: () => appCommandUiFacadeController?.render?.(),
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   clearCommandFeedbackAction: (options) => appRuntimeStateController?.clearCommandFeedbackAction?.(options),
   setCommandFeedbackAction: (nextState) => appRuntimeStateController?.setCommandFeedbackAction?.(nextState),
   clearError: () => appRuntimeStateController?.clearError?.(),
+  setError: (message) => appCommandUiFacadeController?.setError?.(message),
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
   getSessions: () => {
     const state = store?.getState?.() || {};
     return Array.isArray(state.sessions) ? state.sessions : [];
@@ -546,29 +549,7 @@ sessionControlRuntimeController = createSessionControlRuntimeController({
   retryBlockedAction: (retryAction) => commandComposerRuntimeController?.retryBlockedAction?.(retryAction),
   applyResizeForSession: (sessionId, options) => sessionTerminalResizeController?.applyResizeForSession?.(sessionId, options),
   showControlPane: () => controlPaneRuntimeController?.show?.(),
-  debugLog
-});
-
-const setAccessState = sessionControlRuntimeController.setAccessState;
-const isReadOnlyMode = sessionControlRuntimeController.isReadOnlyMode;
-const getReadOnlyModeMessage = sessionControlRuntimeController.getReadOnlyModeMessage;
-const canWriteToSession = sessionControlRuntimeController.canWriteToSession;
-const getSessionWriteBlockMessage = sessionControlRuntimeController.getSessionWriteBlockMessage;
-const canTakeSessionControl = sessionControlRuntimeController.canTakeSessionControl;
-const setRuntimeClientId = sessionControlRuntimeController.setRuntimeClientId;
-const getRuntimeClientId = sessionControlRuntimeController.getRuntimeClientId;
-const renameTrustedLocalDevice = sessionControlRuntimeController.renameTrustedLocalDevice;
-const showBlockedWriteReclaimUi = sessionControlRuntimeController.showBlockedWriteReclaimUi;
-const renderSessionControl = sessionControlRuntimeController.renderSessionControl;
-const maybeRedirectToCanonicalOrigin = sessionControlRuntimeController.maybeRedirectToCanonicalOrigin;
-const maybeAutoRepairOriginHandoffControl = () => sessionControlRuntimeController.maybeAutoRepairOriginHandoffControl();
-
-sessionQuickSendRuntimeController = createSessionQuickSendRuntimeController({
-  windowRef: window,
-  documentRef: document,
   listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
-  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
-  getSessions: () => store.getState().sessions,
   resolveDeckForSession: (session) => {
     const deckId = appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID;
     const deck = store.getState().decks.find((entry) => entry.id === deckId) || null;
@@ -589,25 +570,27 @@ sessionQuickSendRuntimeController = createSessionQuickSendRuntimeController({
   getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   recordCommandSubmission: (sessionId, submission) => store.recordSessionCommandSubmission(sessionId, submission),
-  canWriteToSession,
   isSessionActionBlocked: (session) => sessionUiFacadeController?.isSessionActionBlocked?.(session) === true,
   getBlockedSessionActionMessage: (sessions, actionLabel) =>
     sessionUiFacadeController?.getBlockedSessionActionMessage?.(sessions, actionLabel) || "",
-  isReadOnlyMode,
-  getReadOnlyModeMessage,
-  getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
-  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
-  setError: (message) => appCommandUiFacadeController?.setError?.(message),
-  clearError: () => appRuntimeStateController?.clearError?.(),
-  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
-  requestRender: () => appCommandUiFacadeController?.render?.(),
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
+  defaultDeckId: DEFAULT_DECK_ID
 });
-
-function handleCommandFeedbackAction() {
-  return sessionControlRuntimeController.handleCommandFeedbackAction(uiState.commandFeedbackActionSessionId);
-}
+sessionControlRuntimeController = sessionAccessAssembly.sessionControlRuntimeController;
+sessionQuickSendRuntimeController = sessionAccessAssembly.sessionQuickSendRuntimeController;
+const setAccessState = sessionAccessAssembly.setAccessState;
+const isReadOnlyMode = sessionAccessAssembly.isReadOnlyMode;
+const getReadOnlyModeMessage = sessionAccessAssembly.getReadOnlyModeMessage;
+const canWriteToSession = sessionAccessAssembly.canWriteToSession;
+const getSessionWriteBlockMessage = sessionAccessAssembly.getSessionWriteBlockMessage;
+const canTakeSessionControl = sessionAccessAssembly.canTakeSessionControl;
+const setRuntimeClientId = sessionAccessAssembly.setRuntimeClientId;
+const getRuntimeClientId = sessionAccessAssembly.getRuntimeClientId;
+const renameTrustedLocalDevice = sessionAccessAssembly.renameTrustedLocalDevice;
+const showBlockedWriteReclaimUi = sessionAccessAssembly.showBlockedWriteReclaimUi;
+const renderSessionControl = sessionAccessAssembly.renderSessionControl;
+const maybeRedirectToCanonicalOrigin = sessionAccessAssembly.maybeRedirectToCanonicalOrigin;
+const maybeAutoRepairOriginHandoffControl = sessionAccessAssembly.maybeAutoRepairOriginHandoffControl;
+const handleCommandFeedbackAction = sessionAccessAssembly.handleCommandFeedbackAction;
 
 function installTestHooks() {
   if (!testHooks || typeof testHooks !== "object") {

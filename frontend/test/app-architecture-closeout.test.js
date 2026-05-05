@@ -13,6 +13,9 @@ const appRuntimeBootstrapAssemblyPath = fileURLToPath(
 const appRuntimeRecoveryCompositionPath = fileURLToPath(
   new URL("../src/public/app-runtime-recovery-composition.js", import.meta.url)
 );
+const appRuntimeSessionAccessAssemblyPath = fileURLToPath(
+  new URL("../src/public/app-runtime-session-access-assembly.js", import.meta.url)
+);
 const sessionGridControllerPath = fileURLToPath(new URL("../src/public/ui/session-grid-controller.js", import.meta.url));
 const sessionTerminalRuntimeControllerPath = fileURLToPath(
   new URL("../src/public/ui/session-terminal-runtime-controller.js", import.meta.url)
@@ -64,6 +67,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppLayoutDeckFacadeController",
     "createAppRuntimeInitializationController",
     "createAppRuntimeRecoveryComposition",
+    "createAppRuntimeSessionAccessAssembly",
     "createAppRuntimeStateController",
     "createAppRuntimeTrustedLocalComposition",
     "createAppSessionRuntimeFacadeController",
@@ -104,6 +108,23 @@ test("runtime recovery composition owns the delegated runtime-event recovery con
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime recovery marker ${marker}`);
+  }
+});
+
+test("runtime session access assembly owns the delegated session-control and quick-send composition contract", async () => {
+  const source = await readFile(appRuntimeSessionAccessAssemblyPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createSessionControlRuntimeController",
+    "createSessionQuickSendRuntimeController",
+    "const sessionControlRuntimeController = createSessionControlRuntimeController({",
+    "const sessionQuickSendRuntimeController = createSessionQuickSendRuntimeController({",
+    "function handleCommandFeedbackAction()",
+    "return sessionControlRuntimeController.handleCommandFeedbackAction(uiState.commandFeedbackActionSessionId);"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime session access marker ${marker}`);
   }
 });
 
