@@ -14,12 +14,12 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-293` Owner `BE`: isolate one more launch/reconnect/persistence lifecycle helper seam from `backend/src/session-manager.js` and close the remaining manager branch gaps with direct regressions.
+- None.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `BE` ownership role is active for `QLT-293`.
+- `BE` ownership role is currently inactive.
 - `FE` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.

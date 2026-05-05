@@ -12,7 +12,6 @@ import {
 } from "./node-pty-write-retry.js";
 import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.js";
 import {
-  buildSessionLaunchSpec,
   normalizeRemoteAuth,
   normalizeRemoteConnection,
   normalizeRemoteSecret,
@@ -30,19 +29,11 @@ import {
   clearStartupTerminalQueryFallback as clearSessionManagerStartupTerminalQueryFallback
 } from "./session-manager-cleanup.js";
 import {
-  buildReconnectUnavailableErrorDetails,
-  buildRemoteReconnectAttemptState,
-  buildRemoteRuntimeConnectedState,
   buildRemoteRuntimeMeta,
-  buildRemoteRuntimeUnavailableState,
   DEFAULT_REMOTE_RECONNECT_DELAY_MS,
   DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
-  planRemoteReconnectFailure,
-  planRemoteReconnectSchedule,
-  REMOTE_CONNECTIVITY_CONNECTED,
-  REMOTE_CONNECTIVITY_DEGRADED,
-  REMOTE_CONNECTIVITY_OFFLINE
 } from "./session-manager-remote-runtime.js";
+import { createSessionManagerLaunchRuntime } from "./session-manager-launch-runtime.js";
 import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
@@ -65,7 +56,6 @@ import {
 } from "./terminal-app-identity.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
 import { consumeTerminalSignals, createEmptyTerminalSignalState } from "./terminal-output-signals.js";
-import { createShellAdapter } from "./shell-adapter.js";
 import { buildRestartSessionCreatePayload } from "./session-manager-lifecycle.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
@@ -402,6 +392,45 @@ export class SessionManager {
           rows,
           env: env || process.env
         }));
+    this.launchRuntime = createSessionManagerLaunchRuntime({
+      baseEnv: process.env,
+      createPty: this.createPty,
+      sshAskpassPath: this.sshAskpassPath,
+      sshKnownHostsPath: this.sshKnownHostsPath,
+      resolveSshTrustedHostKeyTypes: this.resolveSshTrustedHostKeyTypes,
+      remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+      remoteReconnectDelayMs: this.remoteReconnectDelayMs,
+      remoteReconnectStableMs: this.remoteReconnectStableMs,
+      nowFn: this.nowFn,
+      setTimeoutFn: this.setTimeoutFn,
+      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
+      clearRemoteReconnectTimers: (session) => this.clearRemoteReconnectTimers(session),
+      clearSessionActivityTimer: (session) => this.clearSessionActivityTimer(session),
+      clearLaunchPostStartInputTimer: (session) => this.clearLaunchPostStartInputTimer(session),
+      clearStartupTerminalQueryFallback: (session) => this.clearStartupTerminalQueryFallback(session),
+      clearForegroundProcessRefreshTimer: (session) => this.clearForegroundProcessRefreshTimer(session),
+      clearRemoteReconnectStabilizeTimer: (session) => this.clearRemoteReconnectStabilizeTimer(session),
+      attachPtyProcess: (session, launchBundle) => this.attachPtyProcess(session, launchBundle),
+      emitSessionUpdated: (session) => this.emitSessionUpdated(session),
+      emitSessionExit: (session, { exitCode, exitSignal, exitTimestamp }) => {
+        const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+          sessionId: session.id,
+          source: session.traceSeed?.source || "pty"
+        });
+        this.updateSessionTraceSeed(session, trace, { source: session.traceSeed?.source || "pty" });
+        this.events.emit("session.exit", {
+          sessionId: session.id,
+          exitCode,
+          signal: exitSignal,
+          exitedAt: exitTimestamp,
+          updatedAt: session.meta.updatedAt,
+          session: { ...session.meta },
+          trace
+        });
+      },
+      getSessionById: (sessionId) => this.sessions.get(sessionId),
+      removeSessionById: (sessionId) => this.sessions.delete(sessionId)
+    });
     this.startupRuntime = createSessionManagerStartupRuntime({
       nowFn: this.nowFn,
       setTimeoutFn: this.setTimeoutFn,
@@ -551,73 +580,25 @@ export class SessionManager {
     remoteAuth,
     remoteSecret
   }) {
-    const launchSpec = buildSessionLaunchSpec({
+    return this.launchRuntime.buildLaunchBundle({
       kind,
       shell,
-      spawnCwd: cwd,
+      cwd,
       startCwd,
       startCommand,
+      env: normalizeSessionEnv(env),
       remoteConnection,
       remoteAuth,
-      remoteSecret,
-      trustedHostKeyTypes:
-        kind === SESSION_KIND_SSH && this.resolveSshTrustedHostKeyTypes && remoteConnection
-          ? this.resolveSshTrustedHostKeyTypes(remoteConnection.host, remoteConnection.port)
-          : undefined,
-      sshAskpassPath: this.sshAskpassPath,
-      sshKnownHostsPath: this.sshKnownHostsPath
+      remoteSecret
     });
-    const shellAdapter = createShellAdapter(launchSpec.shellAdapterId);
-    const ptyEnv = shellAdapter.prepareSpawnEnv({
-      ...process.env,
-      ...normalizeSessionEnv(env),
-      ...launchSpec.ptyEnvAdditions
-    });
-    const ptyProcess = this.createPty({
-      shell: launchSpec.command,
-      command: launchSpec.command,
-      args: launchSpec.args,
-      cwd: launchSpec.spawnCwd,
-      cols: 80,
-      rows: 24,
-      env: ptyEnv
-    });
-    return {
-      launchSpec,
-      shellAdapter,
-      ptyProcess
-    };
   }
 
   markRemoteSessionConnected(session, timestamp = this.nowFn()) {
-    if (session?.meta?.kind !== SESSION_KIND_SSH || !session.meta.remoteRuntime) {
-      return;
-    }
-    this.clearRemoteReconnectTimers(session);
-    session.meta.remoteRuntime = buildRemoteRuntimeConnectedState(session.meta.remoteRuntime, timestamp, {
-      reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-      reconnectDelayMs: this.remoteReconnectDelayMs
-    });
-    session.meta.updatedAt = timestamp;
-    this.emitSessionUpdated(session);
+    return this.launchRuntime.markRemoteSessionConnected(session, timestamp);
   }
 
   markRemoteSessionUnavailable(session, connectivityState, timestamp, details = {}) {
-    if (session?.meta?.kind !== SESSION_KIND_SSH || !session.meta.remoteRuntime) {
-      return;
-    }
-    session.meta.remoteRuntime = buildRemoteRuntimeUnavailableState(
-      session.meta.remoteRuntime,
-      connectivityState,
-      timestamp,
-      details,
-      {
-        reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-        reconnectDelayMs: this.remoteReconnectDelayMs
-      }
-    );
-    session.meta.updatedAt = timestamp;
-    this.emitSessionUpdated(session);
+    return this.launchRuntime.markRemoteSessionUnavailable(session, connectivityState, timestamp, details);
   }
 
   attachPtyProcess(session, { ptyProcess, shellAdapter, launchSpec }) {
@@ -711,7 +692,7 @@ export class SessionManager {
       });
       if (cleaned) {
         const activityTimestamp = getTimestamp();
-        if (session.meta.kind === SESSION_KIND_SSH && session.meta.remoteRuntime?.connectivityState !== REMOTE_CONNECTIVITY_CONNECTED) {
+        if (session.meta.kind === SESSION_KIND_SSH && session.meta.remoteRuntime?.connectivityState !== "connected") {
           this.markRemoteSessionConnected(session, activityTimestamp);
         }
         session.lastActivityAt = activityTimestamp;
@@ -803,155 +784,19 @@ export class SessionManager {
   }
 
   buildReconnectUnavailableError(session) {
-    const { errorCode, message } = buildReconnectUnavailableErrorDetails({
-      sessionId: session?.id,
-      connectivityState: session?.meta?.remoteRuntime?.connectivityState || REMOTE_CONNECTIVITY_OFFLINE
-    });
-    return new ApiError(409, errorCode, message);
+    return this.launchRuntime.buildReconnectUnavailableError(session);
   }
 
   scheduleRemoteReconnect(session, details = {}) {
-    if (session?.meta?.kind !== SESSION_KIND_SSH || !session.meta.remoteRuntime) {
-      return false;
-    }
-    this.clearRemoteReconnectTimers(session);
-    const timestamp = Number.isInteger(details.timestamp) ? details.timestamp : this.nowFn();
-    const reconnectPlan = planRemoteReconnectSchedule(session.meta.remoteRuntime, {
-      timestamp,
-      reason: details.reason,
-      exitCode: details.exitCode,
-      exitSignal: details.exitSignal,
-      reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-      reconnectDelayMs: this.remoteReconnectDelayMs
-    });
-    session.meta.remoteRuntime = reconnectPlan.remoteRuntime;
-    session.meta.updatedAt = timestamp;
-    this.emitSessionUpdated(session);
-    if (!reconnectPlan.shouldSchedule) {
-      return false;
-    }
-    session.remoteReconnectTimer = this.setTimeoutFn(() => {
-      session.remoteReconnectTimer = null;
-      this.attemptRemoteReconnect(session.id, details.reason);
-    }, reconnectPlan.delayMs);
-    return true;
+    return this.launchRuntime.scheduleRemoteReconnect(session, details);
   }
 
   attemptRemoteReconnect(sessionId, reason = "ssh-transport-exit") {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.meta.kind !== SESSION_KIND_SSH || session.expectedExitReason) {
-      return;
-    }
-    if (session.ptyProcess) {
-      return;
-    }
-    const timestamp = this.nowFn();
-    session.meta.remoteRuntime = buildRemoteReconnectAttemptState(session.meta.remoteRuntime, {
-      timestamp,
-      reason,
-      reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-      reconnectDelayMs: this.remoteReconnectDelayMs
-    });
-    session.meta.updatedAt = timestamp;
-    this.emitSessionUpdated(session);
-
-    try {
-      const launchBundle = this.buildLaunchBundle({
-        kind: session.meta.kind,
-        shell: session.meta.shell,
-        cwd: homedir(),
-        startCwd: session.meta.startCwd || session.meta.cwd,
-        startCommand: session.meta.startCommand || "",
-        env: session.meta.env || {},
-        remoteConnection: session.meta.remoteConnection,
-        remoteAuth: session.meta.remoteAuth,
-        remoteSecret: session.remoteSecret
-      });
-      session.meta.cwd = launchBundle.launchSpec.metaCwd;
-      session.meta.shell = launchBundle.launchSpec.command;
-      this.clearExpectedExitReason(session);
-      this.attachPtyProcess(session, launchBundle);
-      session.remoteReconnectStabilizeTimer = this.setTimeoutFn(() => {
-        session.remoteReconnectStabilizeTimer = null;
-        if (this.sessions.get(session.id) !== session || session.ptyProcess !== launchBundle.ptyProcess) {
-          return;
-        }
-        this.markRemoteSessionConnected(session, this.nowFn());
-      }, this.remoteReconnectStableMs);
-    } catch (error) {
-      const retryTimestamp = this.nowFn();
-      const failureReason = error instanceof Error && error.message ? error.message : reason;
-      const reconnectPlan = planRemoteReconnectFailure(session.meta.remoteRuntime, {
-        timestamp: retryTimestamp,
-        reason: failureReason,
-        exitCode: null,
-        exitSignal: "",
-        reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-        reconnectDelayMs: this.remoteReconnectDelayMs
-      });
-      session.meta.remoteRuntime = reconnectPlan.remoteRuntime;
-      session.meta.updatedAt = retryTimestamp;
-      this.emitSessionUpdated(session);
-      if (!reconnectPlan.shouldSchedule) {
-        return;
-      }
-      session.remoteReconnectTimer = this.setTimeoutFn(() => {
-        session.remoteReconnectTimer = null;
-        this.attemptRemoteReconnect(session.id, failureReason);
-      }, reconnectPlan.delayMs);
-    }
+    return this.launchRuntime.attemptRemoteReconnect(sessionId, reason);
   }
 
   handlePtyExit(session, exit) {
-    this.clearSessionActivityTimer(session);
-    this.clearLaunchPostStartInputTimer(session);
-    this.clearStartupTerminalQueryFallback(session);
-    this.clearForegroundProcessRefreshTimer(session);
-    this.clearRemoteReconnectStabilizeTimer(session);
-    const exitTimestamp = this.nowFn();
-    const exitCode = Number.isInteger(exit?.exitCode) ? exit.exitCode : null;
-    const exitSignal = typeof exit?.signal === "string" ? exit.signal : "";
-    session.meta.activityState = SESSION_ACTIVITY_STATE_INACTIVE;
-    session.meta.activityUpdatedAt = exitTimestamp;
-    session.meta.activityCompletedAt = exitTimestamp;
-    session.lastActivityAt = exitTimestamp;
-
-    const isExpectedExit = Boolean(session.expectedExitReason);
-    const current = this.sessions.get(session.id);
-    if (session.meta.kind === SESSION_KIND_SSH && !isExpectedExit && current === session) {
-      session.ptyProcess = null;
-      session.meta.updatedAt = exitTimestamp;
-      this.scheduleRemoteReconnect(session, {
-        timestamp: exitTimestamp,
-        reason: "ssh-transport-exit",
-        exitCode,
-        exitSignal
-      });
-      return;
-    }
-
-    session.meta.state = SESSION_STATE_EXITED;
-    session.meta.exitCode = exitCode;
-    session.meta.exitSignal = exitSignal;
-    session.meta.exitedAt = exitTimestamp;
-    session.meta.updatedAt = exitTimestamp;
-    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-      sessionId: session.id,
-      source: session.traceSeed?.source || "pty"
-    });
-    this.updateSessionTraceSeed(session, trace, { source: session.traceSeed?.source || "pty" });
-    this.events.emit("session.exit", {
-      sessionId: session.id,
-      exitCode: session.meta.exitCode,
-      signal: session.meta.exitSignal,
-      exitedAt: session.meta.exitedAt,
-      updatedAt: session.meta.updatedAt,
-      session: { ...session.meta },
-      trace
-    });
-    if (current === session) {
-      this.sessions.delete(session.id);
-    }
+    return this.launchRuntime.handlePtyExit(session, exit);
   }
 
   list() {

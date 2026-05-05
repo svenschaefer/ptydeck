@@ -14,13 +14,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H171` Repo-Wide Quality and Coverage Follow-Up
+  - none
 - Queued next waves:
   - none
 
 ## Active Wave Order
-
-- `QLT-293` Owner `BE`
 
 ## Wave Dependencies
 
