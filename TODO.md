@@ -14,12 +14,17 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- None.
+- `QLT-296` Owner `BE`: extract the next connection/share/workspace authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions on the reduced runtime hotspot.
+- `QLT-297` Owner `BE`: isolate the next session identity/output heuristic seam from `backend/src/session-manager.js` and harden the remaining branch gaps around app-identity refresh, signal observation, and foreground-process refresh orchestration.
+- `QLT-298` Owner `FE`: extract the next initialization/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
+- `QLT-299` Owner `FE`: harden the retained slash-command orchestration helpers and unresolved branch paths in `frontend/src/public/command-executor.js`.
+- `QLT-300` Owner `FE`: harden the remaining draft-selection / missing-trust branch gaps in `frontend/src/public/connection-profile-runtime-controller.js`.
+- `QLT-301` Owner `FE`: harden shared runtime-state and terminal-interaction coverage across `frontend/src/public/store.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js`.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `BE` ownership role is currently inactive.
-- `FE` ownership role is currently inactive.
+- `BE` ownership role (active): own `QLT-296` and `QLT-297`.
+- `FE` ownership role (active): own `QLT-298` through `QLT-301`.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.

@@ -22,6 +22,7 @@ import { createRuntimeSessionAuthority } from "./runtime-session-authority.js";
 import { createRuntimeSessionControlAuthority } from "./runtime-session-control-authority.js";
 import { createRuntimeSessionControlDispatch } from "./runtime-session-control-dispatch.js";
 import { createRuntimeSessionState } from "./runtime-session-state.js";
+import { createRuntimeSshTrust } from "./runtime-ssh-trust.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
 import { createRuntimeWsConnectionHandler } from "./runtime-ws-connection.js";
 import { createRuntimeWsUpgradeHandler } from "./runtime-ws-upgrade.js";
@@ -55,9 +56,6 @@ import { deriveTerminalAppIdentityFromSessionHints, normalizeTerminalAppIdentity
 import {
   computeSshTrustFingerprintSha256,
   DEFAULT_SSH_HOST_KEY_PROBE_TIMEOUT_MS,
-  formatSshTarget,
-  normalizeSshHostKeyProbeCandidate,
-  normalizeSshHostKeyProbeRequest,
   probeSshHostKeysWithKeyscan
 } from "./ssh-host-key-probe.js";
 import { validateRequest, validateResponse } from "./validation.js";
@@ -115,7 +113,6 @@ const REMOTE_USERNAME_MAX_LENGTH = 64;
 const REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH = 1024;
 const REMOTE_SECRET_MAX_LENGTH = 4096;
 const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
-const SSH_TRUST_ENTRY_ID_PATTERN = /^trust-[a-f0-9]{24}$/;
 const SSH_HOST_KEY_TYPE_MAX_LENGTH = 128;
 const SSH_HOST_KEY_PUBLIC_KEY_MAX_LENGTH = 8192;
 const SSH_HOST_KEY_TYPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9@._+-]{0,127}$/;
@@ -2229,6 +2226,28 @@ export function createRuntime(config) {
     Number.isInteger(config.sshHostKeyProbeTimeoutMs) && config.sshHostKeyProbeTimeoutMs > 0
       ? config.sshHostKeyProbeTimeoutMs
       : DEFAULT_SSH_HOST_KEY_PROBE_TIMEOUT_MS;
+  const probeSshHostKeys =
+    typeof config.probeSshHostKeys === "function"
+      ? config.probeSshHostKeys
+      : (target) => probeSshHostKeysWithKeyscan(target, { timeoutMs: sshHostKeyProbeTimeoutMs });
+  const sshTrustEntries = new Map();
+  const runtimeSshTrust = createRuntimeSshTrust({
+    sshTrustEntries,
+    sshKnownHostsPath,
+    normalizeSshTrustEntryPort,
+    normalizeSshTrustEntryEntity,
+    renderSshKnownHosts,
+    probeSshHostKeys
+  });
+  const {
+    findSshTrustConflict,
+    listSshTrustEntries,
+    listTrustedSshHostKeyTypes,
+    probeSshHostKeysOrThrow,
+    upsertSshTrustEntry,
+    deleteSshTrustEntry,
+    syncSshKnownHostsFile
+  } = runtimeSshTrust;
   const sessionFileTransferMaxBytes =
     Number.isInteger(config.sessionFileTransferMaxBytes) && config.sessionFileTransferMaxBytes > 0
       ? config.sessionFileTransferMaxBytes
@@ -2254,7 +2273,7 @@ export function createRuntime(config) {
     remoteReconnectDelayMs: config.remoteReconnectDelayMs,
     remoteReconnectStableMs: config.remoteReconnectStableMs,
     sshKnownHostsPath,
-    resolveSshTrustedHostKeyTypes: (host, port) => listTrustedSshHostKeyTypes(host, port),
+    resolveSshTrustedHostKeyTypes: listTrustedSshHostKeyTypes,
     createTraceId: () => createTraceId("mgr"),
     inspectTerminalForegroundProcess:
       typeof config.inspectTerminalForegroundProcess === "function" ? config.inspectTerminalForegroundProcess : undefined,
@@ -2291,17 +2310,12 @@ export function createRuntime(config) {
   const connectionProfiles = new Map();
   const layoutProfiles = new Map();
   const workspacePresets = new Map();
-  const sshTrustEntries = new Map();
   const shareLinks = new Map();
   const telegramTopicBindings = new Map();
   const sessionControlStaleClientTtlMs =
     Number.isInteger(config.sessionControlStaleClientTtlMs) && config.sessionControlStaleClientTtlMs >= 0
       ? config.sessionControlStaleClientTtlMs
       : DEFAULT_SESSION_CONTROL_STALE_CLIENT_TTL_MS;
-  const probeSshHostKeys =
-    typeof config.probeSshHostKeys === "function"
-      ? config.probeSshHostKeys
-      : (target) => probeSshHostKeysWithKeyscan(target, { timeoutMs: sshHostKeyProbeTimeoutMs });
   const sessionDeckAssignments = new Map();
   const sessionQuickIdAssignments = new Map();
   const { metrics, recordHttpDuration, recordWsError } = createRuntimeMetrics({
@@ -3613,141 +3627,6 @@ export function createRuntime(config) {
     return changed;
   }
 
-  function compareSshTrustEntries(a, b) {
-    const hostCompare = a.host.localeCompare(b.host, "en-US", { sensitivity: "base" });
-    if (hostCompare !== 0) {
-      return hostCompare;
-    }
-    if (a.port !== b.port) {
-      return a.port - b.port;
-    }
-    const keyTypeCompare = a.keyType.localeCompare(b.keyType, "en-US", { sensitivity: "base" });
-    if (keyTypeCompare !== 0) {
-      return keyTypeCompare;
-    }
-    if (a.createdAt !== b.createdAt) {
-      return a.createdAt - b.createdAt;
-    }
-    return a.id.localeCompare(b.id, "en-US", { sensitivity: "base" });
-  }
-
-  function toApiSshTrustEntry(entry) {
-    return {
-      id: entry.id,
-      host: entry.host,
-      port: entry.port,
-      keyType: entry.keyType,
-      publicKey: entry.publicKey,
-      fingerprintSha256: entry.fingerprintSha256,
-      createdAt: entry.createdAt,
-      updatedAt: entry.updatedAt
-    };
-  }
-
-  function listSshTrustEntries() {
-    return Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry);
-  }
-
-  function listTrustedSshHostKeyTypes(host, port) {
-    const normalizedHost = typeof host === "string" ? host.trim() : "";
-    const normalizedPort = Number.isInteger(port) ? port : normalizeSshTrustEntryPort(port, "port", { strict: false });
-    if (!normalizedHost) {
-      return [];
-    }
-    const types = [];
-    const seen = new Set();
-    for (const entry of Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries)) {
-      if (entry.host !== normalizedHost || entry.port !== normalizedPort || seen.has(entry.keyType)) {
-        continue;
-      }
-      seen.add(entry.keyType);
-      types.push(entry.keyType);
-    }
-    return types;
-  }
-
-  async function probeSshHostKeysOrThrow(input) {
-    const target = normalizeSshHostKeyProbeRequest(input, { strict: true });
-    const payload = await probeSshHostKeys(target);
-    const candidates = [];
-    const seen = new Set();
-    for (const entry of Array.isArray(payload) ? payload : []) {
-      const normalized = normalizeSshHostKeyProbeCandidate(entry, target, { strict: false });
-      if (!normalized) {
-        continue;
-      }
-      const dedupeKey = `${normalized.keyType}\n${normalized.publicKey}`;
-      if (seen.has(dedupeKey)) {
-        continue;
-      }
-      seen.add(dedupeKey);
-      candidates.push(normalized);
-    }
-    if (candidates.length === 0) {
-      throw new ApiError(
-        502,
-        "SshHostKeyProbeFailed",
-        `No SSH host keys were returned for ${formatSshTarget(target.host, target.port)}.`
-      );
-    }
-    return candidates;
-  }
-
-  function findSshTrustConflict(entry) {
-    for (const candidate of sshTrustEntries.values()) {
-      if (candidate.host !== entry.host || candidate.port !== entry.port || candidate.keyType !== entry.keyType) {
-        continue;
-      }
-      if (candidate.publicKey === entry.publicKey) {
-        return { type: "exact", entry: candidate };
-      }
-      return { type: "conflict", entry: candidate };
-    }
-    return null;
-  }
-
-  function upsertSshTrustEntry(body) {
-    const normalized = normalizeSshTrustEntryEntity(body, { strict: true });
-    const conflict = findSshTrustConflict(normalized);
-    if (conflict?.type === "exact") {
-      return { created: false, entry: toApiSshTrustEntry(conflict.entry) };
-    }
-    if (conflict?.type === "conflict") {
-      throw new ApiError(
-        409,
-        "SshHostKeyTrustConflict",
-        `SSH trust entry '${conflict.entry.id}' already trusts ${normalized.host}:${normalized.port} ${normalized.keyType} with a different public key. Delete the existing entry before trusting the new host key.`
-      );
-    }
-    const now = Date.now();
-    const entry = {
-      ...normalized,
-      createdAt: now,
-      updatedAt: now
-    };
-    sshTrustEntries.set(entry.id, entry);
-    return { created: true, entry: toApiSshTrustEntry(entry) };
-  }
-
-  function deleteSshTrustEntry(entryId) {
-    const normalizedEntryId = typeof entryId === "string" ? entryId.trim() : "";
-    if (!SSH_TRUST_ENTRY_ID_PATTERN.test(normalizedEntryId)) {
-      throw new ApiError(404, "SshTrustEntryNotFound", `SSH trust entry '${entryId}' was not found.`);
-    }
-    const entry = sshTrustEntries.get(normalizedEntryId);
-    if (!entry) {
-      throw new ApiError(404, "SshTrustEntryNotFound", `SSH trust entry '${entryId}' was not found.`);
-    }
-    sshTrustEntries.delete(normalizedEntryId);
-    return toApiSshTrustEntry(entry);
-  }
-
-  async function syncSshKnownHostsFile() {
-    const payload = renderSshKnownHosts(Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries));
-    await mkdir(dirname(sshKnownHostsPath), { recursive: true });
-    await writeFile(sshKnownHostsPath, payload, { encoding: "utf8", mode: 0o600 });
-  }
-
   function toApiShareLink(shareLink, options = {}) {
     const now = Date.now();
     return {
@@ -3821,7 +3700,7 @@ export function createRuntime(config) {
       connectionProfiles: Array.from(connectionProfiles.values()).map(toApiConnectionProfile),
       layoutProfiles: Array.from(layoutProfiles.values()).map(toApiLayoutProfile),
       workspacePresets: Array.from(workspacePresets.values()).map(toApiWorkspacePreset),
-      sshTrustEntries: Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry),
+      sshTrustEntries: listSshTrustEntries().map((entry) => ({ ...entry })),
       shareLinks: Array.from(shareLinks.values())
         .sort(compareShareLinkEntries)
         .map((entry) => ({ ...entry })),
