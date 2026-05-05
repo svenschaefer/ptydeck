@@ -41,15 +41,11 @@ import {
   buildConnectionProfileDraftViewState
 } from "./connection-profile-runtime-view-state.js";
 import { createConnectionProfileUiBindings } from "./connection-profile-ui-bindings.js";
-
-function clearChildren(element) {
-  if (!element || typeof element.removeChild !== "function") {
-    return;
-  }
-  while (element.firstChild) {
-    element.removeChild(element.firstChild);
-  }
-}
+import {
+  applyConnectionProfileDraftViewState,
+  renderConnectionProfileProfileSelect,
+  setConnectionProfileSelectOptions
+} from "./connection-profile-ui-render.js";
 
 export {
   buildConnectionProfileLaunchFromSession,
@@ -63,27 +59,6 @@ export {
 function authMethodRequiresSecret(remoteAuth) {
   const method = normalizeLower(remoteAuth?.method);
   return method === "password" || method === "keyboardinteractive";
-}
-
-function setSelectOptions(selectEl, options, selectedValue) {
-  if (!selectEl) {
-    return;
-  }
-  clearChildren(selectEl);
-  for (const optionConfig of Array.isArray(options) ? options : []) {
-    const option = optionConfig.documentRef?.createElement?.("option") || {
-      value: "",
-      textContent: "",
-      selected: false,
-      disabled: false
-    };
-    option.value = String(optionConfig.value || "");
-    option.textContent = String(optionConfig.label || option.value);
-    option.selected = option.value === String(selectedValue || "");
-    option.disabled = optionConfig.disabled === true;
-    selectEl.appendChild(option);
-  }
-  selectEl.value = String(selectedValue || "");
 }
 
 export function createConnectionProfileRuntimeController(options = {}) {
@@ -426,102 +401,43 @@ export function createConnectionProfileRuntimeController(options = {}) {
       documentRef,
       api
     });
-    selectedSshTrustEntryId = viewState.selectedSshTrustEntryId;
-    selectedSshProbeCandidateId = viewState.selectedSshProbeCandidateId;
-    if (summaryEl) {
-      summaryEl.textContent = viewState.summaryText;
-    }
-    if (sshFieldsEl) {
-      sshFieldsEl.hidden = viewState.sshFieldsHidden;
-    }
-    if (draftRemotePrivateKeyFieldEl) {
-      draftRemotePrivateKeyFieldEl.hidden = viewState.privateKeyFieldHidden;
-    }
-    if (authHintEl) {
-      authHintEl.textContent = viewState.authHintText;
-    }
-    if (secretHintEl) {
-      secretHintEl.textContent = viewState.secretHintText;
-    }
-    if (runtimeSecretFieldEl) {
-      runtimeSecretFieldEl.hidden = viewState.runtimeSecretFieldHidden;
-    }
-    if (runtimeSecretInputEl) {
-      runtimeSecretInputEl.hidden = viewState.runtimeSecretInputHidden;
-      runtimeSecretInputEl.disabled = viewState.runtimeSecretInputDisabled;
-      runtimeSecretInputEl.value = viewState.runtimeSecretInputValue;
-    }
-    if (draftLaunchTextareaEl) {
-      draftLaunchTextareaEl.readOnly = true;
-      draftLaunchTextareaEl.value = viewState.draftLaunchJson;
-    }
-    setDraftStatus(viewState.draftStatusText);
-    if (deleteBtn) {
-      deleteBtn.textContent = viewState.deleteButtonText;
-    }
-    if (deleteConfirmEl) {
-      deleteConfirmEl.hidden = viewState.deleteConfirmHidden;
-    }
-    if (deleteConfirmMessageEl) {
-      deleteConfirmMessageEl.textContent = viewState.deleteConfirmMessageText;
-    }
-    setSelectOptions(sshProbeSelectEl, viewState.probeOptions, selectedSshProbeCandidateId || viewState.probeOptions[0]?.value || "");
-    setSelectOptions(sshTrustSelectEl, viewState.trustOptions, selectedSshTrustEntryId || viewState.trustOptions[0]?.value || "");
-    if (sshTrustKeyTypeInputEl) {
-      sshTrustKeyTypeInputEl.value = viewState.trustKeyTypeValue;
-      sshTrustKeyTypeInputEl.readOnly = true;
-    }
-    if (sshTrustFingerprintInputEl) {
-      sshTrustFingerprintInputEl.value = viewState.trustFingerprintValue;
-      sshTrustFingerprintInputEl.readOnly = true;
-    }
-    if (sshTrustPublicKeyTextareaEl) {
-      sshTrustPublicKeyTextareaEl.value = viewState.trustPublicKeyValue;
-      sshTrustPublicKeyTextareaEl.readOnly = true;
-    }
-    if (sshTrustGuidanceEl) {
-      sshTrustGuidanceEl.textContent = viewState.trustGuidanceText;
-    }
-    if (sshTrustStatusEl) {
-      sshTrustStatusEl.textContent = viewState.trustStatusText;
-    }
-    if (sshTrustCompareEl) {
-      sshTrustCompareEl.hidden = viewState.trustCompareHidden;
-    }
-    if (sshTrustCompareStatusEl) {
-      sshTrustCompareStatusEl.textContent = viewState.trustCompareStatusText;
-    }
-    if (sshTrustCurrentKeyTypeInputEl) {
-      sshTrustCurrentKeyTypeInputEl.value = viewState.trustCurrentKeyTypeValue;
-      sshTrustCurrentKeyTypeInputEl.readOnly = true;
-    }
-    if (sshTrustCurrentFingerprintInputEl) {
-      sshTrustCurrentFingerprintInputEl.value = viewState.trustCurrentFingerprintValue;
-      sshTrustCurrentFingerprintInputEl.readOnly = true;
-    }
-    if (sshTrustCandidateKeyTypeInputEl) {
-      sshTrustCandidateKeyTypeInputEl.value = viewState.trustCandidateKeyTypeValue;
-      sshTrustCandidateKeyTypeInputEl.readOnly = true;
-    }
-    if (sshTrustCandidateFingerprintInputEl) {
-      sshTrustCandidateFingerprintInputEl.value = viewState.trustCandidateFingerprintValue;
-      sshTrustCandidateFingerprintInputEl.readOnly = true;
-    }
-    if (sshTrustProbeBtn) {
-      sshTrustProbeBtn.disabled = viewState.trustProbeDisabled;
-    }
-    if (sshTrustRefreshBtn) {
-      sshTrustRefreshBtn.disabled = viewState.trustRefreshDisabled;
-    }
-    if (sshTrustSaveBtn) {
-      sshTrustSaveBtn.disabled = viewState.trustSaveDisabled;
-    }
-    if (sshTrustDeleteBtn) {
-      sshTrustDeleteBtn.disabled = viewState.trustDeleteDisabled;
-    }
-    if (sshTrustReplaceBtn) {
-      sshTrustReplaceBtn.disabled = viewState.trustReplaceDisabled;
-    }
+    const nextSelection = applyConnectionProfileDraftViewState({
+      viewState,
+      setDraftStatus,
+      refs: {
+        summaryEl,
+        sshFieldsEl,
+        draftRemotePrivateKeyFieldEl,
+        authHintEl,
+        secretHintEl,
+        runtimeSecretFieldEl,
+        runtimeSecretInputEl,
+        draftLaunchTextareaEl,
+        deleteBtn,
+        deleteConfirmEl,
+        deleteConfirmMessageEl,
+        sshProbeSelectEl,
+        sshTrustSelectEl,
+        sshTrustKeyTypeInputEl,
+        sshTrustFingerprintInputEl,
+        sshTrustPublicKeyTextareaEl,
+        sshTrustGuidanceEl,
+        sshTrustStatusEl,
+        sshTrustCompareEl,
+        sshTrustCompareStatusEl,
+        sshTrustCurrentKeyTypeInputEl,
+        sshTrustCurrentFingerprintInputEl,
+        sshTrustCandidateKeyTypeInputEl,
+        sshTrustCandidateFingerprintInputEl,
+        sshTrustProbeBtn,
+        sshTrustRefreshBtn,
+        sshTrustSaveBtn,
+        sshTrustDeleteBtn,
+        sshTrustReplaceBtn
+      }
+    });
+    selectedSshTrustEntryId = nextSelection.selectedSshTrustEntryId;
+    selectedSshProbeCandidateId = nextSelection.selectedSshProbeCandidateId;
   }
 
   function renderDraft() {
@@ -533,7 +449,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (draftNameInputEl) {
       draftNameInputEl.value = draftState.name;
     }
-    setSelectOptions(
+    setConnectionProfileSelectOptions(
       draftKindSelectEl,
       [
         { value: "local", label: "Local", documentRef },
@@ -541,7 +457,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
       ],
       currentLaunch.kind
     );
-    setSelectOptions(
+    setConnectionProfileSelectOptions(
       draftDeckSelectEl,
       getDeckOptionsForDraft(draftState, { defaultDeckId, getDecks, documentRef }),
       currentLaunch.deckId
@@ -563,12 +479,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
     }
     const activeThemeSelection = resolveThemePresetSelectionId(themePresets, currentLaunch.activeThemeProfile);
     const inactiveThemeSelection = resolveThemePresetSelectionId(themePresets, currentLaunch.inactiveThemeProfile);
-    setSelectOptions(
+    setConnectionProfileSelectOptions(
       draftActiveThemeSelectEl,
       getThemePresetSelectOptions(themePresets, activeThemeSelection, documentRef),
       activeThemeSelection
     );
-    setSelectOptions(
+    setConnectionProfileSelectOptions(
       draftInactiveThemeSelectEl,
       getThemePresetSelectOptions(themePresets, inactiveThemeSelection, documentRef),
       inactiveThemeSelection
@@ -582,7 +498,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (draftRemoteUsernameInputEl) {
       draftRemoteUsernameInputEl.value = currentLaunch.remoteConnection?.username || "";
     }
-    setSelectOptions(
+    setConnectionProfileSelectOptions(
       draftRemoteAuthMethodSelectEl,
       [
         { value: "privateKey", label: "Private Key", documentRef },
@@ -677,24 +593,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
   }
 
   function render() {
-    if (selectEl) {
-      clearChildren(selectEl);
-      if (profiles.length === 0) {
-        const option = documentRef?.createElement?.("option") || { value: "", textContent: "" };
-        option.value = "";
-        option.textContent = "No connection profiles";
-        option.disabled = true;
-        option.selected = true;
-        selectEl.appendChild(option);
-      } else {
-        for (const profile of profiles) {
-          const option = documentRef?.createElement?.("option") || { value: "", textContent: "" };
-          option.value = profile.id;
-          option.textContent = `[${profile.id}] ${profile.name}`;
-          selectEl.appendChild(option);
-        }
-      }
-    }
+    renderConnectionProfileProfileSelect({ selectEl, profiles, documentRef });
     syncSelection();
     if (!draftState || (draftState.mode === "profile" && !getProfile(draftState.profileId))) {
       resetDraftFromSelectedProfile();
