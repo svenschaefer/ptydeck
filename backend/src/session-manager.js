@@ -41,22 +41,9 @@ import {
   normalizeQuickSendUsageEntries,
   recordQuickSendUsageEntry
 } from "./session-quick-send-usage.js";
-import {
-  createTerminalAppIdentityRuntimeState,
-  deriveTerminalAppIdentityCandidateFromForegroundProcess,
-  deriveTerminalAppIdentityCandidateFromOutputHeuristics,
-  deriveTerminalAppIdentityCandidateFromSessionHints,
-  deriveTerminalAppIdentityCandidatesFromTerminalSignals,
-  deriveTerminalAppIdentityFromForegroundProcess,
-  deriveTerminalAppIdentityFromSessionHints,
-  normalizeTerminalAppIdentityRuntimeState,
-  normalizeTerminalAppIdentity,
-  reconcileTerminalAppIdentityRuntimeState,
-  terminalAppIdentityEquals
-} from "./terminal-app-identity.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
-import { consumeTerminalSignals, createEmptyTerminalSignalState } from "./terminal-output-signals.js";
 import { buildRestartSessionCreatePayload } from "./session-manager-lifecycle.js";
+import { createSessionManagerAppIdentityRuntime } from "./session-manager-app-identity-runtime.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
 const DEFAULT_SSH_CLIENT = "ssh";
@@ -445,6 +432,15 @@ export class SessionManager {
       startupPostInputFallbackMs: this.startupPostInputFallbackMs,
       startupTerminalQueryFallbackWindowMs: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
       startupTerminalQueryFallbackMaxResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES
+    });
+    this.appIdentityRuntime = createSessionManagerAppIdentityRuntime({
+      nowFn: this.nowFn,
+      setTimeoutFn: this.setTimeoutFn,
+      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
+      inspectTerminalForegroundProcess: this.inspectTerminalForegroundProcess,
+      clearForegroundProcessRefreshTimer: (session) => this.clearForegroundProcessRefreshTimer(session),
+      emitSessionUpdated: (session, options) => this.emitSessionUpdated(session, options),
+      getSessionById: (sessionId) => this.sessions.get(sessionId)
     });
   }
 
@@ -963,62 +959,11 @@ export class SessionManager {
   }
 
   applySessionAppIdentity(session, nextIdentity, { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn() } = {}) {
-    const currentIdentity = normalizeTerminalAppIdentity(session?.meta?.appIdentity, {
-      fallbackUpdatedAt: updatedAt
-    });
-    const normalizedNextIdentity = normalizeTerminalAppIdentity(nextIdentity, {
-      fallbackUpdatedAt: updatedAt
-    });
-    const runtimeState = normalizeTerminalAppIdentityRuntimeState(session?.appIdentityState, {
-      session: session?.meta,
-      currentIdentity,
+    return this.appIdentityRuntime.applySessionAppIdentity(session, nextIdentity, {
+      emitUpdatedEvent,
+      trace,
       updatedAt
     });
-    const nextRuntimeState = {
-      ...runtimeState,
-      current: normalizedNextIdentity,
-      candidates: {
-        ...runtimeState.candidates
-      },
-      recentCandidates: [...runtimeState.recentCandidates]
-    };
-    if (normalizedNextIdentity.source !== "unknown" && Object.prototype.hasOwnProperty.call(nextRuntimeState.candidates, normalizedNextIdentity.source)) {
-      const previousCandidate = normalizeTerminalAppIdentity(nextRuntimeState.candidates[normalizedNextIdentity.source], {
-        fallbackUpdatedAt: updatedAt
-      });
-      nextRuntimeState.candidates[normalizedNextIdentity.source] = normalizedNextIdentity;
-      if (!terminalAppIdentityEquals(previousCandidate, normalizedNextIdentity)) {
-        nextRuntimeState.recentCandidates.push({
-          source: normalizedNextIdentity.source,
-          candidateSource: normalizedNextIdentity.source,
-          family: normalizedNextIdentity.family,
-          label: normalizedNextIdentity.label,
-          confidence: normalizedNextIdentity.confidence,
-          observedAt: updatedAt
-        });
-        nextRuntimeState.recentCandidates = nextRuntimeState.recentCandidates.slice(-12);
-      }
-      if (normalizedNextIdentity.source === "foreground-process") {
-        nextRuntimeState.lastForegroundProbeAt = updatedAt;
-      }
-      if (normalizedNextIdentity.source === "output-heuristic") {
-        nextRuntimeState.lastOutputHintAt = updatedAt;
-      }
-    }
-    session.appIdentityState = nextRuntimeState;
-    if (terminalAppIdentityEquals(currentIdentity, normalizedNextIdentity, { includeUpdatedAt: false })) {
-      session.meta.appIdentity = currentIdentity;
-      return session.meta.appIdentity;
-    }
-    session.meta.appIdentity = normalizedNextIdentity;
-    session.meta.updatedAt = updatedAt;
-    if (emitUpdatedEvent) {
-      this.emitSessionUpdated(session, {
-        trace,
-        updatedAt
-      });
-    }
-    return session.meta.appIdentity;
   }
 
   reconcileSessionAppIdentity(
@@ -1026,58 +971,17 @@ export class SessionManager {
     candidateUpdates,
     { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn(), metaChanged = false } = {}
   ) {
-    const currentIdentity = normalizeTerminalAppIdentity(session?.meta?.appIdentity, {
-      fallbackUpdatedAt: updatedAt
+    return this.appIdentityRuntime.reconcileSessionAppIdentity(session, candidateUpdates, {
+      emitUpdatedEvent,
+      trace,
+      updatedAt,
+      metaChanged
     });
-    const currentState = normalizeTerminalAppIdentityRuntimeState(session?.appIdentityState, {
-      session: session?.meta,
-      currentIdentity,
-      updatedAt
-    });
-    const reconciled = reconcileTerminalAppIdentityRuntimeState(currentState, candidateUpdates, {
-      session: session?.meta,
-      currentIdentity,
-      updatedAt
-    });
-    session.appIdentityState = reconciled.state;
-    const identityChanged = !terminalAppIdentityEquals(currentIdentity, reconciled.current, { includeUpdatedAt: false });
-    session.meta.appIdentity = identityChanged ? reconciled.current : currentIdentity;
-    const nextMetaChanged = metaChanged || identityChanged;
-    if (nextMetaChanged) {
-      session.meta.updatedAt = updatedAt;
-    }
-    if (emitUpdatedEvent && nextMetaChanged) {
-      this.emitSessionUpdated(session, {
-        trace,
-        updatedAt
-      });
-    }
-    return {
-      identity: session.meta.appIdentity,
-      identityChanged,
-      metaChanged: nextMetaChanged,
-      state: session.appIdentityState
-    };
   }
 
   refreshSessionAppIdentity(sessionId, options = {}) {
     const session = typeof sessionId === "string" ? this.get(sessionId) : sessionId;
-    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
-    const nextCandidate = deriveTerminalAppIdentityCandidateFromSessionHints(session.meta, {
-      updatedAt
-    });
-    const reconciled = this.reconcileSessionAppIdentity(
-      session,
-      {
-        "explicit-hint": nextCandidate
-      },
-      {
-        emitUpdatedEvent: options.emitUpdatedEvent === true,
-        trace: options.trace || null,
-        updatedAt
-      }
-    );
-    return reconciled.identity;
+    return this.appIdentityRuntime.refreshSessionAppIdentity(session, options);
   }
 
   setSessionAppIdentity(sessionId, appIdentity, options = {}) {
@@ -1092,144 +996,25 @@ export class SessionManager {
 
   refreshSessionForegroundProcessIdentity(sessionId, options = {}) {
     const session = typeof sessionId === "string" ? this.get(sessionId) : sessionId;
-    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
-    if (!session || session.meta.kind !== SESSION_KIND_LOCAL || !session.ptyProcess || !Number.isInteger(session.ptyProcess.pid)) {
-      return normalizeTerminalAppIdentity(session?.meta?.appIdentity, {
-        fallbackUpdatedAt: updatedAt
-      });
-    }
-    const inspection = this.inspectTerminalForegroundProcess(session.ptyProcess.pid, {
-      sessionId: session.id,
-      ptyPath: session.ptyProcess._pty || "",
-      updatedAt
-    });
-    const nextCandidate = deriveTerminalAppIdentityCandidateFromForegroundProcess(inspection, {
-      updatedAt
-    });
-    const reconciled = this.reconcileSessionAppIdentity(
-      session,
-      {
-        "foreground-process": nextCandidate
-      },
-      {
-        emitUpdatedEvent: options.emitUpdatedEvent === true,
-        trace: options.trace || null,
-        updatedAt
-      }
-    );
-    return reconciled.identity;
+    return this.appIdentityRuntime.refreshSessionForegroundProcessIdentity(session, options);
   }
 
   observeSessionTerminalSignals(session, chunk, options = {}) {
-    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
-    if (!session) {
-      return {
-        state: createEmptyTerminalSignalState(),
-        signals: [],
-        appIdentityChanged: false,
-        cwdChanged: false
-      };
-    }
-    const currentState = session.terminalSignalState || createEmptyTerminalSignalState();
-    const result = consumeTerminalSignals(currentState, chunk, { updatedAt });
-    session.terminalSignalState = result.state;
-    if (!Array.isArray(result.signals) || result.signals.length === 0) {
-      return {
-        ...result,
-        appIdentityChanged: false,
-        cwdChanged: false,
-        metaChanged: false
-      };
-    }
-    const nextCwd = typeof result.state.currentDirectory === "string" ? result.state.currentDirectory.trim() : "";
-    const cwdChanged = Boolean(nextCwd && nextCwd !== session.meta.cwd);
-    if (cwdChanged) {
-      session.meta.cwd = nextCwd;
-      session.meta.updatedAt = updatedAt;
-    }
-    const reconciled = this.reconcileSessionAppIdentity(
-      session,
-      deriveTerminalAppIdentityCandidatesFromTerminalSignals(result.state, session.meta, {
-        updatedAt
-      }),
-      {
-        emitUpdatedEvent: options.emitUpdatedEvent === true,
-        trace: options.trace || null,
-        updatedAt,
-        metaChanged: cwdChanged
-      }
-    );
-    return {
-      ...result,
-      appIdentityChanged: reconciled.identityChanged,
-      cwdChanged,
-      metaChanged: reconciled.metaChanged
-    };
+    return this.appIdentityRuntime.observeSessionTerminalSignals(session, chunk, options);
   }
 
   observeSessionOutputHeuristics(session, output, options = {}) {
-    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
-    if (!session) {
-      return {
-        candidateMatched: false,
-        appIdentityChanged: false,
-        metaChanged: false
-      };
-    }
-    const nextCandidate = deriveTerminalAppIdentityCandidateFromOutputHeuristics(output, {
-      updatedAt
-    });
-    if (nextCandidate.source !== "output-heuristic") {
-      return {
-        candidateMatched: false,
-        appIdentityChanged: false,
-        metaChanged: false
-      };
-    }
-    const reconciled = this.reconcileSessionAppIdentity(
-      session,
-      {
-        "output-heuristic": nextCandidate
-      },
-      {
-        emitUpdatedEvent: options.emitUpdatedEvent === true,
-        trace: options.trace || null,
-        updatedAt
-      }
-    );
-    return {
-      candidateMatched: true,
-      appIdentityChanged: reconciled.identityChanged,
-      metaChanged: reconciled.metaChanged
-    };
+    return this.appIdentityRuntime.observeSessionOutputHeuristics(session, output, options);
   }
 
   scheduleSessionForegroundProcessIdentityRefresh(
     session,
     { delayMs = this.foregroundProcessRefreshDelayMs, trace = null } = {}
   ) {
-    if (
-      !session ||
-      session.meta.kind !== SESSION_KIND_LOCAL ||
-      !session.ptyProcess ||
-      !Number.isInteger(session.ptyProcess.pid) ||
-      session.ptyProcess.pid <= 0
-    ) {
-      return false;
-    }
-    this.clearForegroundProcessRefreshTimer(session);
-    const currentPtyProcess = session.ptyProcess;
-    session.foregroundProcessRefreshTimer = this.setTimeoutFn(() => {
-      session.foregroundProcessRefreshTimer = null;
-      if (this.sessions.get(session.id) !== session || session.ptyProcess !== currentPtyProcess) {
-        return;
-      }
-      this.refreshSessionForegroundProcessIdentity(session, {
-        emitUpdatedEvent: true,
-        trace
-      });
-    }, Math.max(0, delayMs));
-    return true;
+    return this.appIdentityRuntime.scheduleSessionForegroundProcessIdentityRefresh(session, {
+      delayMs,
+      trace
+    });
   }
 
   transitionToRunning(session) {
@@ -1350,7 +1135,7 @@ export class SessionManager {
     });
 
     const initialReplayOutput = this.buildReplayRetentionResult(replayOutput);
-    const initialAppIdentity = deriveTerminalAppIdentityFromSessionHints(
+    const identityRuntime = this.appIdentityRuntime.createInitialIdentityRuntime(
       {
         kind: normalizedKind,
         shell: normalizedShell,
@@ -1359,23 +1144,13 @@ export class SessionManager {
       },
       { updatedAt: updatedTimestamp }
     );
+    const initialAppIdentity = identityRuntime.appIdentity;
     const session = {
       id,
       ptyProcess: null,
       shellAdapter: null,
-      appIdentityState: createTerminalAppIdentityRuntimeState(
-        {
-          kind: normalizedKind,
-          shell: normalizedShell,
-          ...(typeof name === "string" ? { name } : {}),
-          startCommand: normalizedStartCommand
-        },
-        {
-          currentIdentity: initialAppIdentity,
-          updatedAt: updatedTimestamp
-        }
-      ),
-      terminalSignalState: createEmptyTerminalSignalState(),
+      appIdentityState: identityRuntime.appIdentityState,
+      terminalSignalState: identityRuntime.terminalSignalState,
       cwdTrackingBuffer: "",
       outputBuffer: initialReplayOutput.value,
       outputTruncated: replayOutputTruncated === true || initialReplayOutput.truncated,

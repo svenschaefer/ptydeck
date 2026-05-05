@@ -20,11 +20,10 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Active Wave Order
 
-1. `QLT-297` Owner `BE`
-2. `QLT-298` Owner `FE`
-3. `QLT-299` Owner `FE`
-4. `QLT-300` Owner `FE`
-5. `QLT-301` Owner `FE`
+1. `QLT-298` Owner `FE`
+2. `QLT-299` Owner `FE`
+3. `QLT-300` Owner `FE`
+4. `QLT-301` Owner `FE`
 
 ## Wave Dependencies
 
