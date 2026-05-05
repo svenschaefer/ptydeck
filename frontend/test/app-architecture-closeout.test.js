@@ -10,6 +10,9 @@ const appRuntimeCompositionPath = fileURLToPath(
 const appRuntimeBootstrapAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-bootstrap-assembly.js", import.meta.url)
 );
+const appRuntimeOperatorSupportAssemblyPath = fileURLToPath(
+  new URL("../src/public/app-runtime-operator-support-assembly.js", import.meta.url)
+);
 const appRuntimeRecoveryCompositionPath = fileURLToPath(
   new URL("../src/public/app-runtime-recovery-composition.js", import.meta.url)
 );
@@ -66,10 +69,10 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppCommandUiFacadeController",
     "createAppLayoutDeckFacadeController",
     "createAppRuntimeInitializationController",
+    "createAppRuntimeOperatorSupportAssembly",
     "createAppRuntimeRecoveryComposition",
     "createAppRuntimeSessionAccessAssembly",
     "createAppRuntimeStateController",
-    "createAppRuntimeTrustedLocalComposition",
     "createAppSessionRuntimeFacadeController",
     "createDeckRuntimeController",
     "createSessionRuntimeController",
@@ -90,6 +93,27 @@ test("runtime composition controller owns the delegated runtime assembly contrac
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+});
+
+test("runtime operator support assembly owns the delegated workspace, trusted-local, paste, and broadcast composition contract", async () => {
+  const source = await readFile(appRuntimeOperatorSupportAssemblyPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createWorkspaceManagerRuntimeController",
+    "createSendHistoryRuntimeController",
+    "createAppRuntimeTrustedLocalComposition",
+    "createPasteObservationRuntimeController",
+    "createBroadcastInputRuntimeController",
+    "const workspaceManagerRuntimeController = createWorkspaceManagerRuntimeController({",
+    "const sendHistoryRuntimeController = createSendHistoryRuntimeController({",
+    "} = createAppRuntimeTrustedLocalComposition({",
+    "const pasteObservationRuntimeController = createPasteObservationRuntimeController({",
+    "const broadcastInputRuntimeController = createBroadcastInputRuntimeController({"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime operator support marker ${marker}`);
   }
 });
 

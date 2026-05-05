@@ -4,10 +4,10 @@ import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-co
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
 import { createAppRuntimeInitializationController } from "./app-runtime-initialization-controller.js";
+import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-support-assembly.js";
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
 import { createAppRuntimeSessionAccessAssembly } from "./app-runtime-session-access-assembly.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
-import { createAppRuntimeTrustedLocalComposition } from "./app-runtime-trusted-local-composition.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createConnectionProfileRuntimeController } from "./connection-profile-runtime-controller.js";
@@ -20,8 +20,6 @@ import { createSessionRuntimeController } from "./session-runtime-controller.js"
 import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
-import { createPasteObservationRuntimeController } from "./paste-observation-runtime-controller.js";
-import { createWorkspaceManagerRuntimeController } from "./workspace-manager-runtime-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
   getTerminalCellHeightPx,
@@ -43,7 +41,6 @@ import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
 import { createReplayViewerRuntimeController } from "./replay-viewer-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
-import { createSendHistoryRuntimeController } from "./send-history-runtime-controller.js";
 import { normalizeControlText } from "./session-control-runtime-state.js";
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
@@ -991,7 +988,19 @@ workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
   setDeckSplitLayouts: (nextLayouts) => splitLayoutRuntimeController?.replaceDeckSplitLayouts?.(nextLayouts)
 });
 
-workspaceManagerRuntimeController = createWorkspaceManagerRuntimeController({
+({
+  workspaceManagerRuntimeController,
+  sendHistoryRuntimeController,
+  trustedLocalLayoutRuntimeController,
+  trustedLocalHandoffRuntimeController,
+  pasteObservationRuntimeController,
+  broadcastInputRuntimeController
+} = createAppRuntimeOperatorSupportAssembly({
+  windowRef: window,
+  documentRef: document,
+  localStorageRef: window?.localStorage || null,
+  store,
+  commandInput,
   dialogEl: workspaceManagerDialogEl,
   openBtn: workspaceManagerOpenBtn,
   closeBtn: workspaceManagerCloseBtn,
@@ -1008,120 +1017,68 @@ workspaceManagerRuntimeController = createWorkspaceManagerRuntimeController({
   workspaceGroupSummaryEl,
   getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
   getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
-  getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID
-});
-
-sendHistoryRuntimeController = createSendHistoryRuntimeController({
-  windowRef: window,
-  documentRef: document,
-  localStorageRef: window?.localStorage || null,
-  dialogEl: sendHistoryDialogEl,
-  openBtn: sendHistoryOpenBtn,
-  closeBtn: sendHistoryCloseBtn,
-  switchSessionBtn: sendHistorySwitchSessionBtn,
-  metaEl: sendHistoryMetaEl,
-  searchInputEl: sendHistorySearchInputEl,
-  deleteSelectedBtn: sendHistoryDeleteSelectedBtn,
-  clearSessionBtn: sendHistoryClearSessionBtn,
-  emptyEl: sendHistoryEmptyEl,
-  listEl: sendHistoryListEl,
-  detailMetaEl: sendHistoryDetailMetaEl,
-  detailTextEl: sendHistoryDetailTextEl,
-  useBtn: sendHistoryUseBtn,
-  getActiveSession: () => {
-    const state = store.getState() || {};
-    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
-    return sessions.find((session) => session.id === state.activeSessionId) || null;
-  },
-  getSessionById: (sessionId) => {
-    const state = store.getState() || {};
-    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
-    return sessions.find((session) => session.id === sessionId) || null;
-  },
+  sendHistoryDialogEl,
+  sendHistoryOpenBtn,
+  sendHistoryCloseBtn,
+  sendHistorySwitchSessionBtn,
+  sendHistoryMetaEl,
+  sendHistorySearchInputEl,
+  sendHistoryDeleteSelectedBtn,
+  sendHistoryClearSessionBtn,
+  sendHistoryEmptyEl,
+  sendHistoryListEl,
+  sendHistoryDetailMetaEl,
+  sendHistoryDetailTextEl,
+  sendHistoryUseBtn,
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
-  getCommandValue: () => String(commandInput?.value || ""),
-  setCommandValue: (value) => {
-    commandInput.value = value;
-  },
-  focusCommandInput: () => {
-    commandInput?.focus?.();
-    const value = String(commandInput?.value || "");
-    commandInput?.setSelectionRange?.(value.length, value.length);
-  },
   confirmAction: (options) => actionDialogController?.confirm(options),
   scheduleCommandPreview: () => appCommandUiFacadeController?.scheduleCommandPreview?.(),
   scheduleCommandSuggestions: () => appCommandUiFacadeController?.scheduleCommandSuggestions?.(),
-  requestRender: () => appCommandUiFacadeController?.render?.()
-});
-
-({
-  trustedLocalLayoutRuntimeController,
-  trustedLocalHandoffRuntimeController
-} = createAppRuntimeTrustedLocalComposition({
-  windowRef: window,
-  localStorageRef: window?.localStorage || null,
+  requestRender: () => appCommandUiFacadeController?.render?.(),
   captureCurrentLayout: () => layoutProfileRuntimeController?.captureCurrentLayout?.() || {},
-  applyLayoutSnapshot: (layout, runtimeOptions) => layoutProfileRuntimeController?.applyLayoutSnapshot?.(layout, runtimeOptions) || "",
+  applyLayoutSnapshot: (layout, runtimeOptions) =>
+    layoutProfileRuntimeController?.applyLayoutSnapshot?.(layout, runtimeOptions) || "",
   promptEl: trustedLocalHandoffPromptEl,
   promptMessageEl: trustedLocalHandoffPromptMessageEl,
   promptYesBtn: trustedLocalHandoffPromptYesBtn,
   promptNoBtn: trustedLocalHandoffPromptNoBtn,
-  openBtn: trustedLocalControlOpenBtn,
-  dialogEl: trustedLocalControlDialogEl,
-  dialogMetaEl: trustedLocalControlMetaEl,
-  dialogCloseBtn: trustedLocalControlCloseBtn,
-  dialogTakeAllBtn: trustedLocalControlTakeAllBtn,
-  dialogTakeDeckBtn: trustedLocalControlTakeDeckBtn,
-  dialogTakeSessionBtn: trustedLocalControlTakeSessionBtn,
-  getState: () => store?.getState?.() || {},
-  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  trustedLocalControlOpenBtn,
+  trustedLocalControlDialogEl,
+  trustedLocalControlMetaEl,
+  trustedLocalControlCloseBtn,
+  trustedLocalControlTakeAllBtn,
+  trustedLocalControlTakeDeckBtn,
+  trustedLocalControlTakeSessionBtn,
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
-  getActiveDeckId: () => store?.getState?.().activeDeckId || "",
-  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || "",
+  getActiveDeckId: () => store?.getState?.().activeDeckId || DEFAULT_DECK_ID,
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID,
   resolveDeckName: (deckId) => appLayoutDeckFacadeController?.resolveDeckName?.(deckId) || deckId,
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
   canTakeSessionControl,
   isReadOnlyMode,
   getRuntimeClientId,
   takeSessionControl: (sessionId) => api.takeSessionControl(sessionId),
   takeSessionControlScope: (payload) => api.takeSessionControlScope(payload),
-  applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
+  applyRuntimeEvent: (event, runtimeOptions) =>
+    appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
-  requestRender: () => appCommandUiFacadeController?.render?.()
-}));
-
-pasteObservationRuntimeController = createPasteObservationRuntimeController({
-  windowRef: window,
-  panelEl: pasteObservationEl,
-  summaryEl: pasteObservationSummaryEl,
-  detailEl: pasteObservationDetailEl,
-  continueBtn: pasteObservationContinueBtn,
-  getActiveSession: () => {
-    const state = store.getState() || {};
-    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
-    return sessions.find((session) => session.id === state.activeSessionId) || null;
-  },
-  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  pasteObservationEl,
+  pasteObservationSummaryEl,
+  pasteObservationDetailEl,
+  pasteObservationContinueBtn,
   requestContinuePaste: (sessionId, runtimeOptions) =>
     commandComposerRuntimeController?.continueObservedPaste?.(sessionId, runtimeOptions),
-  showCommandUi: () => controlPaneRuntimeController?.show?.()
-});
-
-broadcastInputRuntimeController = createBroadcastInputRuntimeController({
-  getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,
+  showCommandUi: () => controlPaneRuntimeController?.show?.(),
   getSessions: () => store.getState().sessions || [],
-  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID,
   sortSessionsByQuickId: (sessions) => appSessionRuntimeFacadeController?.sortSessionsByQuickId?.(sessions) || [],
   listGroupsForDeck: (deckId) => workspacePresetRuntimeController?.listGroupsForDeck?.(deckId) || [],
   getActiveGroupIdForDeck: (deckId) => workspacePresetRuntimeController?.getActiveGroupIdForDeck?.(deckId) || "",
-  applyGroupLocally: (groupId, deckId) => workspacePresetRuntimeController?.applyGroupLocally?.(groupId, deckId) || null
-});
+  applyGroupLocally: (groupId, deckId) => workspacePresetRuntimeController?.applyGroupLocally?.(groupId, deckId) || null,
+  defaultDeckId: DEFAULT_DECK_ID
+}));
 
 if (typeof window.Terminal !== "function") {
   appRuntimeStateController.setError("Terminal library failed to load.");
