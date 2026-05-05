@@ -19,6 +19,9 @@ const appRuntimeRecoveryCompositionPath = fileURLToPath(
 const appRuntimeSessionAccessAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-session-access-assembly.js", import.meta.url)
 );
+const appRuntimeStartupCompositionPath = fileURLToPath(
+  new URL("../src/public/app-runtime-startup-composition.js", import.meta.url)
+);
 const sessionGridControllerPath = fileURLToPath(new URL("../src/public/ui/session-grid-controller.js", import.meta.url));
 const sessionTerminalRuntimeControllerPath = fileURLToPath(
   new URL("../src/public/ui/session-terminal-runtime-controller.js", import.meta.url)
@@ -65,13 +68,12 @@ test("runtime composition controller owns the delegated runtime assembly contrac
   const source = await readFile(appRuntimeCompositionPath, "utf8");
 
   const requiredDelegationMarkers = [
-    "createAppRuntimeBootstrapAssembly",
     "createAppCommandUiFacadeController",
     "createAppLayoutDeckFacadeController",
-    "createAppRuntimeInitializationController",
     "createAppRuntimeOperatorSupportAssembly",
     "createAppRuntimeRecoveryComposition",
     "createAppRuntimeSessionAccessAssembly",
+    "createAppRuntimeStartupComposition",
     "createAppRuntimeStateController",
     "createAppSessionRuntimeFacadeController",
     "createDeckRuntimeController",
@@ -86,7 +88,6 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createSessionSettingsDialogController",
     "createSessionSettingsStateController",
     "createWorkspaceRenderController",
-    "bootstrapUiAndRuntime: () => appBootstrapCompositionController.bootstrapUiAndRuntime()",
     "initialize: () => appRuntimeInitializationController.initialize(),",
     "setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)"
   ];
@@ -166,6 +167,27 @@ test("runtime bootstrap assembly owns the delegated bootstrap controller contrac
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime bootstrap assembly marker ${marker}`);
+  }
+});
+
+test("runtime startup composition owns the delegated workflow, palette, and initialization contract", async () => {
+  const source = await readFile(appRuntimeStartupCompositionPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createAppRuntimeBootstrapAssembly",
+    "createSlashWorkflowRuntimeController",
+    "createCommandPaletteRuntimeController",
+    "createAppRuntimeInitializationController",
+    "const slashWorkflowRuntimeController = createSlashWorkflowRuntimeController({",
+    "const bootstrapComposition = createAppRuntimeBootstrapAssembly({",
+    "const commandPaletteRuntimeController = createCommandPaletteRuntimeController({",
+    "const appRuntimeInitializationController = createAppRuntimeInitializationController({",
+    "bootstrapUiAndRuntime: () => appBootstrapCompositionController?.bootstrapUiAndRuntime?.()",
+    "slashWorkflowRuntimeController,"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime startup composition marker ${marker}`);
   }
 });
 

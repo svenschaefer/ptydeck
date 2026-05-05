@@ -1,24 +1,21 @@
-import { createAppRuntimeBootstrapAssembly } from "./app-runtime-bootstrap-assembly.js";
 import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
-import { createAppRuntimeInitializationController } from "./app-runtime-initialization-controller.js";
 import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-support-assembly.js";
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
 import { createAppRuntimeSessionAccessAssembly } from "./app-runtime-session-access-assembly.js";
+import { createAppRuntimeStartupComposition } from "./app-runtime-startup-composition.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createConnectionProfileRuntimeController } from "./connection-profile-runtime-controller.js";
-import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
 import { createControlPaneRuntimeController } from "./control-pane-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
-import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
@@ -1618,8 +1615,11 @@ sessionGridController = createSessionGridController({
   wsRuntimeController,
   commandComposerAutocompleteController,
   commandComposerRuntimeController,
-  appLifecycleController
-} = createAppRuntimeBootstrapAssembly({
+  appLifecycleController,
+  slashWorkflowRuntimeController,
+  commandPaletteRuntimeController,
+  appRuntimeInitializationController
+} = createAppRuntimeStartupComposition({
   store,
   api,
   config,
@@ -1666,7 +1666,6 @@ sessionGridController = createSessionGridController({
   broadcastInputRuntimeController,
   sessionTerminalResizeController,
   sessionQuickSendRuntimeController,
-  slashWorkflowRuntimeController,
   createBtn,
   deckCreateBtn,
   startupWarmupSkipBtn,
@@ -1684,67 +1683,12 @@ sessionGridController = createSessionGridController({
   showBlockedWriteReclaimUi,
   setAccessState,
   handleCommandFeedbackAction,
-  devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
-  devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
-  devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS
-}));
-
-slashWorkflowRuntimeController = createSlashWorkflowRuntimeController({
-  store,
-  executeControlCommandDetailed: (interpreted) =>
-    appCommandUiFacadeController?.executeControlCommandDetailed?.(interpreted) || { ok: true, feedback: "" },
-  setWorkflowRunState: (nextState) => appRuntimeStateController?.setWorkflowRunState?.(nextState),
-  clearWorkflowRunState: (runtimeOptions) => appRuntimeStateController?.clearWorkflowRunState?.(runtimeOptions),
-  requestRender: () => appCommandUiFacadeController?.render?.(),
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
-  getTerminalEntry: (sessionId) => terminals.get(sessionId) || null,
-  apiInterruptSession: (sessionId) => api.interruptSession(sessionId),
-  apiKillSession: (sessionId) => api.killSession(sessionId),
-  debugLog
-});
-
-commandPaletteRuntimeController = createCommandPaletteRuntimeController({
-  windowRef: window,
-  documentRef: document,
-  dialogEl: commandPaletteDialogEl,
-  searchInputEl: commandPaletteInputEl,
-  resultsEl: commandPaletteResultsEl,
-  emptyEl: commandPaletteEmptyEl,
-  metaEl: commandPaletteMetaEl,
-  closeBtn: commandPaletteCloseBtn,
-  commandInput,
-  systemSlashCommands: SYSTEM_SLASH_COMMANDS,
-  getState: () => store.getState(),
-  getUsageScore: (key) => commandDiscoveryUsageStore.getUsageScore(key),
-  recordUsage: (key) => commandDiscoveryUsageStore.record(key),
-  listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
-  activateSessionTarget: (session) => commandTargetRuntimeController?.activateSessionTarget?.(session) || { ok: false, message: "" },
-  activateDeckTarget: (deck) => commandTargetRuntimeController?.activateDeckTarget?.(deck) || { ok: false, message: "" },
-  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
-  setComposerValue: (value) => {
-    if (!commandInput) {
-      return;
-    }
-    commandInput.value = String(value || "");
-    if (typeof commandInput.setSelectionRange === "function") {
-      const length = commandInput.value.length;
-      commandInput.setSelectionRange(length, length);
-    }
-    commandInput.focus?.();
-    if (typeof commandInput.dispatchEvent === "function") {
-      if (typeof window?.Event === "function") {
-        commandInput.dispatchEvent(new window.Event("input", { bubbles: true }));
-      } else {
-        commandInput.dispatchEvent({ type: "input" });
-      }
-    }
-  }
-});
-
-appRuntimeInitializationController = createAppRuntimeInitializationController({
+  commandPaletteDialogEl,
+  commandPaletteMetaEl,
+  commandPaletteInputEl,
+  commandPaletteResultsEl,
+  commandPaletteEmptyEl,
+  commandPaletteCloseBtn,
   maybeRedirectToCanonicalOrigin,
   consumeOriginHandoffSourceFromWindow: () => sessionControlRuntimeController.consumeOriginHandoffSourceFromWindow(),
   ensureStartupBackup: () => startupBackupRuntimeController.ensureStartupBackup(),
@@ -1754,9 +1698,11 @@ appRuntimeInitializationController = createAppRuntimeInitializationController({
     sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(value),
   setTrustedLocalClientLabel: (label) => sessionControlRuntimeController.setTrustedLocalClientLabel(label),
   setRuntimeClientId,
-  bootstrapUiAndRuntime: () => appBootstrapCompositionController.bootstrapUiAndRuntime(),
-  applyInitializationError: (message) => appCommandUiFacadeController?.setError?.(message)
-});
+  applyInitializationError: (message) => appCommandUiFacadeController?.setError?.(message),
+  devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
+  devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
+  devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS
+}));
 
 return {
   initialize: () => appRuntimeInitializationController.initialize(),
