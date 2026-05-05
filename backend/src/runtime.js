@@ -21,6 +21,7 @@ import { createRuntimeSessionDispatch } from "./runtime-session-dispatch.js";
 import { createRuntimeSessionAuthority } from "./runtime-session-authority.js";
 import { createRuntimeSessionControlAuthority } from "./runtime-session-control-authority.js";
 import { createRuntimeSessionControlDispatch } from "./runtime-session-control-dispatch.js";
+import { createRuntimeSessionState } from "./runtime-session-state.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
 import { createRuntimeWsConnectionHandler } from "./runtime-ws-connection.js";
 import { createRuntimeWsUpgradeHandler } from "./runtime-ws-upgrade.js";
@@ -2303,7 +2304,6 @@ export function createRuntime(config) {
       : (target) => probeSshHostKeysWithKeyscan(target, { timeoutMs: sshHostKeyProbeTimeoutMs });
   const sessionDeckAssignments = new Map();
   const sessionQuickIdAssignments = new Map();
-  const sessionQuickIdRank = new Map(SESSION_QUICK_ID_POOL.map((token, index) => [token, index]));
   const { metrics, recordHttpDuration, recordWsError } = createRuntimeMetrics({
     httpDurationBucketsMs: HTTP_DURATION_BUCKETS_MS,
     bumpMetricCounter
@@ -2517,6 +2517,35 @@ export function createRuntime(config) {
     ttlSeconds: authWsTicketTtlSeconds,
     normalizeSessionControlClientLabel
   });
+  const runtimeSessionState = createRuntimeSessionState({
+    manager,
+    unrestoredSessions,
+    decks,
+    defaultDeckId: DEFAULT_DECK_ID,
+    buildDefaultDeck,
+    getDeckOrThrow,
+    sessionDeckAssignments,
+    sessionQuickIdAssignments,
+    sessionQuickIdPool: SESSION_QUICK_ID_POOL,
+    sessionQuickIdFallback: SESSION_QUICK_ID_FALLBACK,
+    cleanupLayoutProfiles,
+    cleanupWorkspacePresets,
+    getApiSessionOrThrow: (sessionId) => getApiSessionOrThrow(sessionId)
+  });
+  const {
+    assignSessionQuickIdToken,
+    deleteSessionQuickIdToken,
+    ensureDefaultDeck,
+    ensureSessionExistsOrThrow,
+    getSessionQuickIdToken,
+    moveSessionToDeck,
+    resolveSessionControlModel,
+    resolveSessionDeckId,
+    setSessionDeckAssignment,
+    setSessionQuickIdToken,
+    swapSessionQuickIds,
+    withDeckId
+  } = runtimeSessionState;
   const runtimeSessionAuthority = createRuntimeSessionAuthority({
     manager,
     unrestoredSessions,
@@ -3719,223 +3748,6 @@ export function createRuntime(config) {
     await writeFile(sshKnownHostsPath, payload, { encoding: "utf8", mode: 0o600 });
   }
 
-  function ensureSessionExistsOrThrow(sessionId) {
-    try {
-      manager.get(sessionId);
-      return;
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.statusCode !== 404) {
-        throw error;
-      }
-    }
-    if (unrestoredSessions.has(sessionId)) {
-      return;
-    }
-    throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
-  }
-
-  function moveSessionToDeck(sessionId, deckId) {
-    getDeckOrThrow(deckId);
-    ensureSessionExistsOrThrow(sessionId);
-    const sourceDeckId = resolveSessionDeckId(sessionId);
-    if (sourceDeckId === deckId) {
-      return false;
-    }
-    setSessionDeckAssignment(sessionId, deckId);
-    cleanupLayoutProfiles();
-    cleanupWorkspacePresets();
-    return true;
-  }
-
-  function ensureDefaultDeck() {
-    if (decks.has(DEFAULT_DECK_ID)) {
-      return decks.get(DEFAULT_DECK_ID);
-    }
-    const defaultDeck = buildDefaultDeck();
-    decks.set(defaultDeck.id, defaultDeck);
-    return defaultDeck;
-  }
-
-  function resolveSessionDeckId(sessionId) {
-    const assigned = sessionDeckAssignments.get(sessionId);
-    if (assigned && decks.has(assigned)) {
-      return assigned;
-    }
-    ensureDefaultDeck();
-    setSessionDeckAssignment(sessionId, DEFAULT_DECK_ID);
-    return DEFAULT_DECK_ID;
-  }
-
-  function setSessionDeckAssignment(sessionId, deckId) {
-    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
-    const normalizedDeckId =
-      typeof deckId === "string" && deckId.trim() && decks.has(deckId.trim())
-        ? deckId.trim()
-        : DEFAULT_DECK_ID;
-    if (!normalizedSessionId) {
-      return normalizedDeckId;
-    }
-    sessionDeckAssignments.set(normalizedSessionId, normalizedDeckId);
-    try {
-      const activeSession = manager.get(normalizedSessionId).meta;
-      if (activeSession && activeSession.deckId !== normalizedDeckId) {
-        activeSession.deckId = normalizedDeckId;
-      }
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.statusCode !== 404) {
-        throw error;
-      }
-    }
-    const unrestoredSession = unrestoredSessions.get(normalizedSessionId);
-    if (unrestoredSession && unrestoredSession.deckId !== normalizedDeckId) {
-      unrestoredSession.deckId = normalizedDeckId;
-    }
-    return normalizedDeckId;
-  }
-
-  function normalizeQuickIdToken(value) {
-    if (typeof value !== "string") {
-      return "";
-    }
-    const normalized = value.trim().toUpperCase();
-    if (!normalized) {
-      return "";
-    }
-    if (normalized === SESSION_QUICK_ID_FALLBACK) {
-      return SESSION_QUICK_ID_FALLBACK;
-    }
-    return sessionQuickIdRank.has(normalized) ? normalized : "";
-  }
-
-  function getSessionRecordRef(sessionId) {
-    try {
-      return manager.get(sessionId);
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.statusCode !== 404) {
-        throw error;
-      }
-    }
-    const unrestored = unrestoredSessions.get(sessionId);
-    if (unrestored) {
-      return { meta: unrestored };
-    }
-    return null;
-  }
-
-  function findNextQuickIdToken(excludedSessionIds = []) {
-    const excluded = new Set((Array.isArray(excludedSessionIds) ? excludedSessionIds : []).map((entry) => String(entry || "").trim()));
-    const used = new Set();
-    for (const [sessionId, token] of sessionQuickIdAssignments.entries()) {
-      if (!excluded.has(sessionId)) {
-        used.add(token);
-      }
-    }
-    for (const candidate of SESSION_QUICK_ID_POOL) {
-      if (!used.has(candidate)) {
-        return candidate;
-      }
-    }
-    return SESSION_QUICK_ID_FALLBACK;
-  }
-
-  function assignSessionQuickIdToken(sessionId, preferredToken = "") {
-    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
-    if (!normalizedSessionId) {
-      return SESSION_QUICK_ID_FALLBACK;
-    }
-    const existing = normalizeQuickIdToken(sessionQuickIdAssignments.get(normalizedSessionId));
-    if (existing) {
-      return existing;
-    }
-    const preferred = normalizeQuickIdToken(preferredToken);
-    let nextToken = preferred;
-    if (
-      !nextToken ||
-      (nextToken !== SESSION_QUICK_ID_FALLBACK &&
-        Array.from(sessionQuickIdAssignments.entries()).some(
-          ([otherSessionId, otherToken]) => otherSessionId !== normalizedSessionId && otherToken === nextToken
-        ))
-    ) {
-      nextToken = findNextQuickIdToken([normalizedSessionId]);
-    }
-    sessionQuickIdAssignments.set(normalizedSessionId, nextToken);
-    const record = getSessionRecordRef(normalizedSessionId);
-    if (record?.meta) {
-      record.meta.quickIdToken = nextToken;
-    }
-    return nextToken;
-  }
-
-  function getSessionQuickIdToken(sessionId) {
-    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
-    if (!normalizedSessionId) {
-      return SESSION_QUICK_ID_FALLBACK;
-    }
-    return assignSessionQuickIdToken(normalizedSessionId);
-  }
-
-  function setSessionQuickIdToken(sessionId, token) {
-    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
-    if (!normalizedSessionId) {
-      throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
-    }
-    const nextToken = normalizeQuickIdToken(token) || findNextQuickIdToken([normalizedSessionId]);
-    sessionQuickIdAssignments.set(normalizedSessionId, nextToken);
-    const record = getSessionRecordRef(normalizedSessionId);
-    if (record?.meta) {
-      record.meta.quickIdToken = nextToken;
-      record.meta.updatedAt = Date.now();
-    }
-    return nextToken;
-  }
-
-  function deleteSessionQuickIdToken(sessionId) {
-    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
-    if (!normalizedSessionId) {
-      return false;
-    }
-    return sessionQuickIdAssignments.delete(normalizedSessionId);
-  }
-
-  function swapSessionQuickIds(sessionIdA, sessionIdB) {
-    const leftSessionId = typeof sessionIdA === "string" ? sessionIdA.trim() : "";
-    const rightSessionId = typeof sessionIdB === "string" ? sessionIdB.trim() : "";
-    if (!leftSessionId || !rightSessionId || leftSessionId === rightSessionId) {
-      throw new ApiError(400, "ValidationError", "Swap requires two different session ids.");
-    }
-    ensureSessionExistsOrThrow(leftSessionId);
-    ensureSessionExistsOrThrow(rightSessionId);
-    const leftToken = getSessionQuickIdToken(leftSessionId);
-    const rightToken = getSessionQuickIdToken(rightSessionId);
-    setSessionQuickIdToken(leftSessionId, rightToken);
-    setSessionQuickIdToken(rightSessionId, leftToken);
-    return {
-      leftSession: getApiSessionOrThrow(leftSessionId),
-      rightSession: getApiSessionOrThrow(rightSessionId)
-    };
-  }
-
-  function withDeckId(session) {
-    const sessionId = typeof session?.id === "string" ? session.id : "";
-    const explicitDeckId =
-      typeof session?.deckId === "string" && session.deckId.trim() && decks.has(session.deckId.trim())
-        ? session.deckId.trim()
-        : "";
-    const assignedDeckId =
-      sessionId && typeof sessionDeckAssignments.get(sessionId) === "string" && decks.has(sessionDeckAssignments.get(sessionId))
-        ? sessionDeckAssignments.get(sessionId)
-        : "";
-    const effectiveDeckId = assignedDeckId || explicitDeckId || resolveSessionDeckId(sessionId);
-    if (sessionId) {
-      setSessionDeckAssignment(sessionId, effectiveDeckId);
-    }
-    return {
-      ...session,
-      deckId: effectiveDeckId,
-      quickIdToken: getSessionQuickIdToken(sessionId)
-    };
-  }
-
   function toApiShareLink(shareLink, options = {}) {
     const now = Date.now();
     return {
@@ -3983,18 +3795,6 @@ export function createRuntime(config) {
 
   function deleteSessionControlState(sessionId) {
     sessionControlStates.delete(sessionId);
-  }
-
-  function resolveSessionControlModel(sessionId) {
-    try {
-      return withDeckId(manager.get(sessionId).meta);
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.statusCode !== 404) {
-        throw error;
-      }
-    }
-    const unrestored = unrestoredSessions.get(sessionId);
-    return unrestored ? withDeckId(unrestored) : null;
   }
 
   function snapshotRuntimeState() {
