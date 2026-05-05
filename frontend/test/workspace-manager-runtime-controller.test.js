@@ -334,3 +334,35 @@ test("workspace manager runtime controller rerenders from select changes and tol
   controller.close();
   assert.equal(dialogEl.open, false);
 });
+
+test("workspace manager runtime controller tolerates missing optional refs and routes connection-tab clicks back to connections", () => {
+  const minimalController = createWorkspaceManagerRuntimeController({
+    getConnectionProfileRuntimeController: () => null,
+    getWorkspacePresetRuntimeController: () => null
+  });
+
+  minimalController.open();
+  minimalController.close();
+  minimalController.setActiveTab("workspace");
+  assert.equal(minimalController.getActiveTab(), "workspace");
+
+  const connectionsTabBtn = new FakeElement("button");
+  const workspaceTabBtn = new FakeElement("button");
+  const connectionsPanelEl = new FakeElement("section");
+  const workspacePanelEl = new FakeElement("section");
+  const controller = createWorkspaceManagerRuntimeController({
+    connectionsTabBtn,
+    workspaceTabBtn,
+    connectionsPanelEl,
+    workspacePanelEl,
+    getConnectionProfileRuntimeController: () => null,
+    getWorkspacePresetRuntimeController: () => null
+  });
+
+  controller.setActiveTab("workspace");
+  connectionsTabBtn.click();
+
+  assert.equal(controller.getActiveTab(), "connections");
+  assert.equal(connectionsPanelEl.hidden, false);
+  assert.equal(workspacePanelEl.hidden, true);
+});

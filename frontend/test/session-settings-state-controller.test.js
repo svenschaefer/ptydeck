@@ -953,3 +953,167 @@ test("session-settings state controller handles inert fallbacks and dirty mismat
   };
   assert.equal(controller.isSessionSettingsDirty(inputSafetyMismatchEntry, session), true);
 });
+
+test("session-settings state controller covers legacy theme drafts and fail-closed helper branches", () => {
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: {
+      background: "#000000",
+      foreground: "#ffffff"
+    },
+    terminalThemePresetMap: new Map([
+      [
+        "legacy-dark",
+        {
+          id: "legacy-dark",
+          category: "dark",
+          name: "Legacy Dark",
+          profile: {
+            background: "#112233",
+            foreground: "#445566"
+          }
+        }
+      ]
+    ]),
+    terminalThemePresets: [
+      {
+        id: "legacy-dark",
+        category: "dark",
+        name: "Legacy Dark",
+        profile: {
+          background: "#112233",
+          foreground: "#445566"
+        }
+      }
+    ],
+    terminalThemeModeSet: new Set(["custom", "legacy-dark"]),
+    sessionThemeDrafts: new Map([
+      [
+        "s1",
+        {
+          slot: "active",
+          profile: {
+            background: "#112233",
+            foreground: "#445566"
+          }
+        }
+      ]
+    ]),
+    getSessionById: () => ({
+      id: "s1",
+      note: "note",
+      activeThemeProfile: {
+        background: "#010101",
+        foreground: "#fefefe"
+      },
+      inactiveThemeProfile: {
+        background: "#020202",
+        foreground: "#ededed"
+      }
+    })
+  });
+
+  const entry = {
+    themeSlotSelect: new FakeSelect(),
+    themeCategory: createInput(),
+    themeSearch: createInput(),
+    themeSelect: new FakeSelect(),
+    themeBg: createInput(),
+    themeFg: createInput(),
+    themeExportPayload: createInput("stale")
+  };
+
+  controller.syncSessionThemeControls(entry, "s1");
+
+  assert.equal(controller.getThemePresetById(""), null);
+  assert.equal(entry.themeSlotSelect.value, "active");
+  assert.equal(entry.themeSelect.value, "legacy-dark");
+  assert.equal(entry.themeBg.value, "#112233");
+  assert.equal(entry.themeFg.value, "#445566");
+  assert.equal(entry.themeBg.disabled, true);
+  assert.equal(entry.themeExportPayload.value, "");
+  assert.equal(controller.normalizeSessionNoteText(undefined), "");
+  assert.deepEqual(controller.importThemeProfileIntoDraft(entry, "s1", { payload: "{}", format: "bogus" }), {
+    ok: false,
+    error: "Unsupported theme import format: bogus"
+  });
+  assert.deepEqual(controller.exportThemeProfileFromDraft(entry, "s1", { format: "bogus" }), {
+    ok: false,
+    error: "Unsupported theme export format: bogus"
+  });
+  controller.syncSessionThemeControls(null, "s1");
+  controller.applyThemeForSession("missing", { themeSlot: "active" });
+  controller.setStartupSettingsFeedback({}, "ignored", true);
+  controller.syncSessionStartupControls({}, { id: "s1" });
+  controller.syncSessionNoteControls({}, { note: "ignored" });
+  assert.equal(controller.setActiveSettingsTab(null, "theme"), "startup");
+  assert.equal(
+    controller.stabilizeSettingsLayout({
+      settingsLayout: { style: {} },
+      settingsPanelStartup: { hidden: true }
+    }),
+    0
+  );
+});
+
+test("session-settings state controller marks startup and active-theme mismatches as dirty individually", () => {
+  const session = {
+    id: "s1",
+    note: "stable note",
+    activeThemeProfile: {
+      background: "#111111",
+      foreground: "#eeeeee"
+    },
+    inactiveThemeProfile: {
+      background: "#111111",
+      foreground: "#eeeeee"
+    }
+  };
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: {
+      background: "#000000",
+      foreground: "#ffffff"
+    },
+    parseSessionEnv: () => ({ ok: true, env: {} }),
+    parseSessionTags: () => ({ ok: true, tags: [] }),
+    normalizeSessionStartupFromSession: () => ({
+      startCwd: "/workspace",
+      startCommand: "npm run dev",
+      env: {},
+      tags: [],
+      mouseForwardingMode: "off"
+    }),
+    getSessionById: () => session,
+    getSessionSendTerminator: () => "auto"
+  });
+
+  const entry = {
+    themeSlotSelect: createInput("active"),
+    startCwdInput: createInput("/workspace"),
+    startCommandInput: createInput("npm run dev"),
+    startEnvInput: createInput(""),
+    mouseForwardingModeSelect: createInput("off"),
+    sessionNoteInput: createInput("stable note"),
+    sessionTagsInput: createInput(""),
+    sessionSendTerminatorSelect: createInput("auto"),
+    inputSafetyControls: createInputSafetyControls(),
+    themeInputs: {
+      background: createInput("#111111"),
+      foreground: createInput("#eeeeee")
+    }
+  };
+
+  assert.equal(controller.isSessionSettingsDirty(entry, session), false);
+
+  entry.startCwdInput.value = "/tmp";
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+
+  entry.startCwdInput.value = "/workspace";
+  entry.startCommandInput.value = "pwd";
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+
+  entry.startCommandInput.value = "npm run dev";
+  entry.themeInputs.background.value = "#222222";
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+});

@@ -2471,3 +2471,44 @@ test("session-terminal-runtime controller uses the default browser clipboard hel
   assert.deepEqual(clipboardWrites, ["pwd"]);
   assert.deepEqual(pasted, [["s1", "55"]]);
 });
+
+test("session-terminal-runtime controller reruns resize from observer callbacks and ignores empty middle-click clipboard reads", async () => {
+  const resizeCalls = [];
+  const terminalObservers = new Map();
+  const refs = createTerminalCardRefs("observer-refresh");
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    readClipboardText: async () => "",
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => {}
+  });
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1", mouseForwardingMode: "off" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers,
+    onTerminalPaste() {},
+    applyResizeForSession(sessionId) {
+      resizeCalls.push(sessionId);
+    }
+  });
+
+  const observer = terminalObservers.get("s1");
+  assert.ok(observer instanceof FakeResizeObserver);
+
+  observer.callback();
+  refs.mount.dispatchEvent(createMouseEvent("mousedown", 1));
+  await flushAsyncEvents();
+
+  assert.ok(resizeCalls.length >= 2);
+  assert.equal(entry.terminal.focusCalls >= 1, true);
+});
