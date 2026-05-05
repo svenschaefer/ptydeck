@@ -10,6 +10,14 @@ import { createCommandExecutorCustomAdminHandlers } from "./command-executor-cus
 import { createCommandExecutorDomainHandlers } from "./command-executor-domain-handlers.js";
 import { createCommandExecutorOperatorHandlers } from "./command-executor-operator-handlers.js";
 import { createCommandExecutorReportingHandlers } from "./command-executor-reporting-handlers.js";
+import {
+  createCommandExecutorRuntimeRouter,
+  formatConnectionDraftReport,
+  formatShareLinkSummary,
+  normalizeKeyword,
+  parseJsonObjectToken,
+  resolveSlashCommandWithRegistry
+} from "./command-executor-runtime-router.js";
 import { createCommandExecutorSettingsHandlers } from "./command-executor-settings-handlers.js";
 import {
   createCommandExecutorSessionHandlers,
@@ -160,146 +168,12 @@ export function createCommandExecutor(options = {}) {
   const writeClipboardText = typeof options.writeClipboardText === "function" ? options.writeClipboardText : async () => false;
   const slashCommandRegistry = createSlashCommandRegistry(systemSlashCommands);
 
-  function buildCommandExecutionResult(ok, feedback) {
-    return Object.freeze({
-      ok: ok === true,
-      feedback: typeof feedback === "string" ? feedback : String(feedback || "")
-    });
-  }
-
-  function isCommandExecutionFailure(feedback) {
-    const text = String(feedback || "").trim();
-    if (!text) {
-      return false;
-    }
-    return [
-      /^Usage: /,
-      /^Unknown command: /,
-      /^No /,
-      /^Unknown /,
-      /^Ambiguous /,
-      /^Missing /,
-      /^Failed /,
-      /^Display filter failed/i,
-      /must resolve to exactly one session/i,
-      /^Default deck cannot be deleted\./,
-      /^Deck '.+' is not empty\./,
-      /^Scoped custom command /,
-      /^Custom command not found:/,
-      /^Custom command definition error:/,
-      /^Multiple scoped custom commands share /,
-      /^Field '.+'/
-    ].some((pattern) => pattern.test(text));
-  }
-
   function formatUsage(commandName, subcommandName = "") {
     return `Usage: ${getSlashCommandUsage(commandName, subcommandName, systemSlashCommands)}`;
   }
 
   function resolveSlashCommand(interpreted) {
-    const resolved = slashCommandRegistry.resolve(interpreted?.command);
-    if (!resolved) {
-      return Object.freeze({
-        commandRaw: String(interpreted?.command || ""),
-        command: String(interpreted?.command || "").toLowerCase(),
-        args: Array.isArray(interpreted?.args) ? interpreted.args.slice() : [],
-        matchedAlias: null
-      });
-    }
-    return Object.freeze({
-      commandRaw: String(interpreted?.command || ""),
-      command: resolved.canonicalCommand || String(interpreted?.command || "").toLowerCase(),
-      args: [...resolved.argsPrefix, ...(Array.isArray(interpreted?.args) ? interpreted.args : [])],
-      matchedAlias: resolved.entry?.isAlias === true ? resolved.entry : null
-    });
-  }
-
-  function normalizeKeyword(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-
-  function isValidHexColor(value) {
-    return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim());
-  }
-
-  function parseBooleanToken(value) {
-    const normalized = normalizeKeyword(value);
-    if (["true", "1", "yes", "on", "enabled"].includes(normalized)) {
-      return true;
-    }
-    if (["false", "0", "no", "off", "disabled"].includes(normalized)) {
-      return false;
-    }
-    return null;
-  }
-
-  function parseJsonObjectToken(text, label) {
-    let parsed;
-    try {
-      parsed = JSON.parse(String(text || "").trim());
-    } catch (error) {
-      throw new Error(`${label} JSON is invalid: ${error instanceof Error ? error.message : String(error)}`);
-    }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error(`${label} JSON must be an object.`);
-    }
-    return parsed;
-  }
-
-  function formatConnectionDraftReport(draft) {
-    if (!draft || typeof draft !== "object") {
-      return "No connection profile draft available.";
-    }
-    const normalizedLaunch = normalizeConnectionProfileLaunch(draft.launch) || {};
-    return [
-      "Connection profile draft",
-      `mode=${JSON.stringify(String(draft.mode || "blank"))}`,
-      `profileId=${JSON.stringify(String(draft.profileId || ""))}`,
-      `name=${JSON.stringify(String(draft.name || ""))}`,
-      `launch=${JSON.stringify(normalizedLaunch, null, 2)}`
-    ].join("\n");
-  }
-
-  function formatShareTargetLabel(shareLink, sessions, decks) {
-    if (!shareLink || typeof shareLink !== "object") {
-      return "unknown";
-    }
-    if (shareLink.targetType === "session") {
-      const session = Array.isArray(sessions) ? sessions.find((entry) => entry.id === shareLink.targetId) || null : null;
-      if (session) {
-        return `session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
-      }
-      return `session ${shareLink.targetId || "unknown"}`;
-    }
-    if (shareLink.targetType === "deck") {
-      const deck = Array.isArray(decks) ? decks.find((entry) => entry.id === shareLink.targetId) || null : null;
-      if (deck) {
-        return `deck [${deck.id}] ${deck.name}`;
-      }
-      return `deck ${shareLink.targetId || "unknown"}`;
-    }
-    return "unknown";
-  }
-
-  function formatShareLinkStatus(shareLink) {
-    if (!shareLink || typeof shareLink !== "object") {
-      return "unknown";
-    }
-    if (shareLink.revokedAt) {
-      return "revoked";
-    }
-    if (shareLink.active === true) {
-      return "active";
-    }
-    return "expired";
-  }
-
-  function formatShareLinkSummary(shareLink, sessions, decks) {
-    const targetLabel = formatShareTargetLabel(shareLink, sessions, decks);
-    const permissionMode = String(shareLink?.permissionMode || "read_only");
-    const shareStatus = formatShareLinkStatus(shareLink);
-    const expiresAt = Number.isInteger(shareLink?.expiresAt) ? new Date(shareLink.expiresAt).toISOString() : "-";
-    return `[${shareLink?.id || "unknown"}] ${targetLabel} · ${permissionMode} · ${shareStatus} · expires=${expiresAt}`;
+    return resolveSlashCommandWithRegistry(interpreted, slashCommandRegistry);
   }
 
   function resolveSingleSessionForCommand(selectorText, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
@@ -384,7 +258,7 @@ export function createCommandExecutor(options = {}) {
     getConnectionProfileDraft,
     setConnectionProfileDraft,
     loadConnectionProfileDraftFromActive,
-    formatConnectionDraftReport,
+    formatConnectionDraftReport: (draft) => formatConnectionDraftReport(draft, normalizeConnectionProfileLaunch),
     normalizeConnectionProfileLaunch,
     saveConnectionProfileDraft,
     resetConnectionProfileDraft,
@@ -423,7 +297,8 @@ export function createCommandExecutor(options = {}) {
     revokeShareLink,
     writeClipboardText,
     resolveDeckToken,
-    formatShareLinkSummary
+    formatShareLinkSummary: (shareLink, sessions, decks) =>
+      formatShareLinkSummary(shareLink, sessions, decks, { formatSessionToken, formatSessionDisplayName })
   });
 
   const sessionHandlers = createCommandExecutorSessionHandlers({
@@ -538,108 +413,77 @@ export function createCommandExecutor(options = {}) {
     formatSessionDisplayName
   });
 
-  async function execute(interpreted) {
-    const resolvedSlashCommand = resolveSlashCommand(interpreted);
-    const commandRaw = resolvedSlashCommand.commandRaw;
-    const command = resolvedSlashCommand.command;
-    const args = resolvedSlashCommand.args;
-    const state = store.getState();
-    const sessions = sortSessionsByQuickId(state.sessions);
-    const decks = Array.isArray(state.decks) ? state.decks : [];
-    const activeSessionId = state.activeSessionId;
-
-    const operatorFeedback = await operatorHandlers.executeStructuredCommand({
-      command,
-      args,
-      interpreted,
-      sessions,
-      decks,
-      activeSessionId,
-      state
-    });
-    if (operatorFeedback !== null) {
-      return operatorFeedback;
-    }
-
-    const sessionCommandFeedback = await sessionHandlers.executeStructuredCommand({
-      command,
-      args,
-      interpreted,
-      sessions,
-      activeSessionId
-    });
-    if (sessionCommandFeedback !== null) {
-      return sessionCommandFeedback;
-    }
-
-    const reportingFeedback = await reportingHandlers.executeStructuredCommand({
-      command,
-      args,
-      interpreted,
-      sessions,
-      activeSessionId
-    });
-    if (reportingFeedback !== null) {
-      return reportingFeedback;
-    }
-
-    const structuredDomainFeedback = await domainHandlers.executeStructuredCommand({
-      command,
-      args,
-      interpreted,
-      sessions,
-      decks,
-      activeSessionId
-    });
-    if (structuredDomainFeedback !== null) {
-      return structuredDomainFeedback;
-    }
-
-    const settingsFeedback = await settingsHandlers.executeStructuredCommand({
-      command,
-      args,
-      interpreted,
-      sessions,
-      activeSessionId
-    });
-    if (settingsFeedback !== null) {
-      return settingsFeedback;
-    }
-
-    const customAdminFeedback = await customAdminHandlers.executeStructuredCommand({
-      command,
-      args,
-      interpreted,
-      sessions,
-      decks,
-      activeSessionId
-    });
-    if (customAdminFeedback !== null) {
-      return customAdminFeedback;
-    }
-
-    const customFeedback = await customHandlers.executeCustomCommand({
-      commandRaw,
-      interpreted,
-      sessions,
-      decks,
-      activeSessionId,
-      allCustomCommands: customAdminHandlers.listNormalizedCustomCommands()
-    });
-    if (customFeedback !== null) {
-      return customFeedback;
-    }
-
-    return `Unknown command: /${commandRaw}`;
-  }
-
-  async function executeDetailed(interpreted) {
-    const feedback = await execute(interpreted);
-    return buildCommandExecutionResult(!isCommandExecutionFailure(feedback), feedback);
-  }
+  const runtimeRouter = createCommandExecutorRuntimeRouter({
+    getState: () => store.getState(),
+    sortSessionsByQuickId,
+    resolveSlashCommand,
+    handlers: [
+      ({ command, args, interpreted, sessions, decks, activeSessionId, state }) =>
+        operatorHandlers.executeStructuredCommand({
+          command,
+          args,
+          interpreted,
+          sessions,
+          decks,
+          activeSessionId,
+          state
+        }),
+      ({ command, args, interpreted, sessions, activeSessionId }) =>
+        sessionHandlers.executeStructuredCommand({
+          command,
+          args,
+          interpreted,
+          sessions,
+          activeSessionId
+        }),
+      ({ command, args, interpreted, sessions, activeSessionId }) =>
+        reportingHandlers.executeStructuredCommand({
+          command,
+          args,
+          interpreted,
+          sessions,
+          activeSessionId
+        }),
+      ({ command, args, interpreted, sessions, decks, activeSessionId }) =>
+        domainHandlers.executeStructuredCommand({
+          command,
+          args,
+          interpreted,
+          sessions,
+          decks,
+          activeSessionId
+        }),
+      ({ command, args, interpreted, sessions, activeSessionId }) =>
+        settingsHandlers.executeStructuredCommand({
+          command,
+          args,
+          interpreted,
+          sessions,
+          activeSessionId
+        }),
+      ({ command, args, interpreted, sessions, decks, activeSessionId }) =>
+        customAdminHandlers.executeStructuredCommand({
+          command,
+          args,
+          interpreted,
+          sessions,
+          decks,
+          activeSessionId
+        }),
+      ({ commandRaw, interpreted, sessions, decks, activeSessionId }) =>
+        customHandlers.executeCustomCommand({
+          commandRaw,
+          interpreted,
+          sessions,
+          decks,
+          activeSessionId,
+          allCustomCommands: customAdminHandlers.listNormalizedCustomCommands()
+        })
+    ]
+  });
 
   return Object.freeze({
-    execute,
-    executeDetailed
+    execute: runtimeRouter.execute,
+    executeDetailed: runtimeRouter.executeDetailed
   });
 }

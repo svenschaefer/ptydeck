@@ -667,6 +667,59 @@ test("session-terminal-runtime controller copies the terminal selection on plain
   assert.deepEqual(calls, []);
 });
 
+test("session-terminal-runtime controller resolves ctrl-c selection copy and cancel flows through the guarded action seam", async () => {
+  const clipboardWrites = [];
+  const forwarded = [];
+  let requestedSelection = "";
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    canWriteClipboardText: () => true,
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    },
+    requestTerminalCtrlCAction: async ({ selection }) => {
+      requestedSelection = selection;
+      return clipboardWrites.length === 0 ? "copy" : "cancel";
+    }
+  });
+  const refs = createTerminalCardRefs("ctrl-c");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => forwarded.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "copied text";
+  const firstCtrlC = createCtrlCEvent();
+  refs.mount.dispatchEvent(firstCtrlC);
+  await flushAsyncEvents();
+
+  assert.equal(firstCtrlC.defaultPrevented, true);
+  assert.equal(requestedSelection, "copied text");
+  assert.deepEqual(clipboardWrites, ["copied text"]);
+  assert.deepEqual(forwarded, []);
+
+  const secondCtrlC = createCtrlCEvent();
+  refs.mount.dispatchEvent(secondCtrlC);
+  await flushAsyncEvents();
+
+  assert.equal(secondCtrlC.defaultPrevented, true);
+  assert.deepEqual(forwarded, [["s1", "\u0003"]]);
+  assert.equal(entry.terminal.focusCalls >= 2, true);
+});
+
 test("session-terminal-runtime controller pastes clipboard text into the terminal on middle click", async () => {
   const pasted = [];
   const controller = createSessionTerminalRuntimeController({
@@ -786,6 +839,41 @@ test("session-terminal-runtime controller swallows clipboard-read failures for m
   assert.equal(middleDown.defaultPrevented, true);
   assert.deepEqual(pasted, []);
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller suppresses duplicate clipboard events and restores the custom key handler on dispose", () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const refs = createTerminalCardRefs("paste-dup");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const duplicateEvent = createClipboardPasteEvent("echo once");
+  refs.mount.dispatchEvent(duplicateEvent);
+  refs.mount.helperTextarea.dispatchEvent(duplicateEvent);
+
+  assert.deepEqual(pasted, [["s1", "echo once"]]);
+  assert.equal(duplicateEvent.defaultPrevented, true);
+  assert.equal(duplicateEvent.propagationStopped, true);
+
+  entry.disposeClipboardBindings();
+  assert.equal(entry.terminal.customKeyEventHandler?.(createPasteShortcutEvent()), true);
 });
 
 test("session-terminal-runtime controller does not intercept middle click when mouse forwarding is enabled", async () => {

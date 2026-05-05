@@ -519,6 +519,81 @@ test("store bounds command correlation history and ignores no-op interpretation 
   assert.ok(latestCorrelation?.firstOutputAt >= latestCorrelation?.matchedAt);
 });
 
+test("store normalizes correlation edge cases and preserves state on no-op reducer branches", () => {
+  const store = createStore();
+  store.setDecks([
+    { id: "default", name: "Default" },
+    { id: "ops", name: "Ops" }
+  ]);
+  store.setSessions([
+    {
+      id: "s1",
+      deckId: "ops",
+      state: "running",
+      commandCorrelations: [
+        {
+          id: " corr-1 ",
+          text: "\n\n   \nA very long command line that should be summarized after the empty prefix lines because it exceeds the default label width by a comfortable margin.",
+          progress: {
+            filesDone: "7",
+            filesTotal: "x",
+            bytesDone: " 12MiB ",
+            bytesTotal: "",
+            speed: " 2MiB/s "
+          },
+          artifacts: [
+            null,
+            { id: "summary", kind: "summary", title: "Summary" },
+            { id: "", kind: "summary", title: "ignored" }
+          ],
+          notificationCount: -1,
+          lastNotificationMessage: "  updated  "
+        }
+      ]
+    }
+  ]);
+
+  let session = store.getState().sessions[0];
+  assert.match(session.commandCorrelations[0].label, /^A very long command line/);
+  assert.equal(session.commandCorrelations[0].label.endsWith("…"), true);
+  assert.deepEqual(session.commandCorrelations[0].progress, {
+    filesDone: 7,
+    filesTotal: null,
+    bytesDone: "12MiB",
+    bytesTotal: "",
+    speed: "2MiB/s"
+  });
+  assert.deepEqual(session.commandCorrelations[0].artifacts, [
+    { id: "summary", kind: "summary", title: "Summary" },
+    { id: "ignored", kind: "summary", title: "ignored" }
+  ]);
+  assert.equal(session.commandCorrelations[0].notificationCount, 0);
+  assert.equal(session.commandCorrelations[0].lastNotificationMessage, "updated");
+
+  store.applySessionInterpretationActions("s1", [
+    { type: "setSessionBadges", badges: [{ id: "ops", text: "Ops", tone: "mystery" }] },
+    {
+      type: "pushSessionNotification",
+      notification: { id: "n1", level: "fatal", message: "  Hello  ", data: [] }
+    }
+  ]);
+  session = store.getState().sessions[0];
+  assert.deepEqual(session.pluginBadges, [{ id: "ops", text: "Ops", tone: "info", pluginId: "" }]);
+  assert.equal(session.notifications.at(-1)?.level, "info");
+  assert.equal(session.notifications.at(-1)?.message, "Hello");
+
+  const stateBefore = store.getState();
+  store.setConnectionState("connecting");
+  store.setActiveDeck("missing");
+  store.removeDeck("missing");
+  store.removeSession("missing");
+  store.markSessionExited("missing");
+  store.removeCustomCommand("", {});
+  store.setSessionFilterText("");
+  const stateAfter = store.getState();
+  assert.deepEqual(stateAfter, stateBefore);
+});
+
 test("store trims and replaces correlation artifacts while counting only valid correlation notifications", () => {
   const store = createStore();
   store.setSessions([{ id: "s1", state: "running" }]);

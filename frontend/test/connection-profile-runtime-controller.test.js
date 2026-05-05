@@ -1602,6 +1602,41 @@ test("connection profile runtime controller exposes fail-closed draft and trust 
   assert.equal(controller.resolveProfile("").error, "Connection profile target is required.");
 });
 
+test("connection profile runtime controller tolerates draft sync and render calls before a draft is seeded", async () => {
+  const ui = createConnectionProfileUiRefs();
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {},
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  assert.doesNotThrow(() => controller.render());
+
+  ui.draftRemoteHostInputEl.value = "ops-a.example";
+  ui.draftRemoteHostInputEl.dispatch("input");
+  ui.draftRemotePortInputEl.value = "22";
+  ui.draftRemotePortInputEl.dispatch("input");
+  assert.deepEqual(controller.getDraftState(), {
+    mode: "blank",
+    profileId: "",
+    name: "New Local Connection",
+    launch: {
+      kind: "local",
+      deckId: "default",
+      shell: "bash",
+      startCwd: "/",
+      startCommand: "",
+      env: {},
+      tags: [],
+      themeProfile: createThemeProfile("#090909"),
+      activeThemeProfile: createThemeProfile("#090909"),
+      inactiveThemeProfile: createThemeProfile("#090909")
+    }
+  });
+  assert.deepEqual(await controller.refreshSshTrustEntries({ silent: true }), []);
+});
+
 test("connection profile runtime controller surfaces secret and probing precondition errors deterministically", async () => {
   const inlineUi = createConnectionProfileUiRefs();
   const inlineSecretController = createConnectionProfileRuntimeController({
