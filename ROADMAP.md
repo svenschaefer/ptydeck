@@ -20,8 +20,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Active Wave Order
 
-- `QLT-278` Owner `BE`
-- `QLT-279` Owner `BE`
 - `QLT-280` Owner `FE`
 - `QLT-281` Owner `FE`
 - `QLT-282` Owner `FE`
@@ -29,7 +27,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `QLT-278 -> QLT-279`
 - `QLT-280 -> QLT-283`
 
 ## Sequencing Rules

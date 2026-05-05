@@ -19,6 +19,17 @@ import {
   remoteAuthRequiresSecret
 } from "./session-launch-spec.js";
 import {
+  clearExpectedExitReason as clearSessionManagerExpectedExitReason,
+  clearForegroundProcessRefreshTimer as clearSessionManagerForegroundProcessRefreshTimer,
+  clearLaunchPostStartInputTimer as clearSessionManagerLaunchPostStartInputTimer,
+  clearPendingLaunchPostStartInput as clearSessionManagerPendingLaunchPostStartInput,
+  clearRemoteReconnectStabilizeTimer as clearSessionManagerRemoteReconnectStabilizeTimer,
+  clearRemoteReconnectTimer as clearSessionManagerRemoteReconnectTimer,
+  clearRemoteReconnectTimers as clearSessionManagerRemoteReconnectTimers,
+  clearSessionActivityTimer as clearSessionManagerActivityTimer,
+  clearStartupTerminalQueryFallback as clearSessionManagerStartupTerminalQueryFallback
+} from "./session-manager-cleanup.js";
+import {
   buildReconnectUnavailableErrorDetails,
   buildRemoteReconnectAttemptState,
   buildRemoteRuntimeConnectedState,
@@ -419,74 +430,39 @@ export class SessionManager {
   }
 
   clearSessionActivityTimer(session) {
-    if (!session?.activityTimer) {
-      return;
-    }
-    this.clearTimeoutFn(session.activityTimer);
-    session.activityTimer = null;
+    clearSessionManagerActivityTimer(session, this.clearTimeoutFn);
   }
 
   clearLaunchPostStartInputTimer(session) {
-    if (!session?.launchPostStartInputTimer) {
-      return;
-    }
-    this.clearTimeoutFn(session.launchPostStartInputTimer);
-    session.launchPostStartInputTimer = null;
+    clearSessionManagerLaunchPostStartInputTimer(session, this.clearTimeoutFn);
   }
 
   clearForegroundProcessRefreshTimer(session) {
-    if (!session?.foregroundProcessRefreshTimer) {
-      return;
-    }
-    this.clearTimeoutFn(session.foregroundProcessRefreshTimer);
-    session.foregroundProcessRefreshTimer = null;
+    clearSessionManagerForegroundProcessRefreshTimer(session, this.clearTimeoutFn);
   }
 
   clearRemoteReconnectTimer(session) {
-    if (!session?.remoteReconnectTimer) {
-      return;
-    }
-    this.clearTimeoutFn(session.remoteReconnectTimer);
-    session.remoteReconnectTimer = null;
+    clearSessionManagerRemoteReconnectTimer(session, this.clearTimeoutFn);
   }
 
   clearRemoteReconnectStabilizeTimer(session) {
-    if (!session?.remoteReconnectStabilizeTimer) {
-      return;
-    }
-    this.clearTimeoutFn(session.remoteReconnectStabilizeTimer);
-    session.remoteReconnectStabilizeTimer = null;
+    clearSessionManagerRemoteReconnectStabilizeTimer(session, this.clearTimeoutFn);
   }
 
   clearRemoteReconnectTimers(session) {
-    this.clearRemoteReconnectTimer(session);
-    this.clearRemoteReconnectStabilizeTimer(session);
+    clearSessionManagerRemoteReconnectTimers(session, this.clearTimeoutFn);
   }
 
   clearPendingLaunchPostStartInput(session) {
-    if (!session) {
-      return;
-    }
-    this.clearLaunchPostStartInputTimer(session);
-    session.pendingLaunchPostStartInput = null;
+    clearSessionManagerPendingLaunchPostStartInput(session, this.clearTimeoutFn);
   }
 
   clearStartupTerminalQueryFallback(session) {
-    if (!session) {
-      return;
-    }
-    session.pendingStartupTerminalQueryFallback = null;
+    clearSessionManagerStartupTerminalQueryFallback(session);
   }
 
   clearExpectedExitReason(session) {
-    if (!session) {
-      return;
-    }
-    if (session.expectedExitReasonTimer) {
-      this.clearTimeoutFn(session.expectedExitReasonTimer);
-      session.expectedExitReasonTimer = null;
-    }
-    session.expectedExitReason = "";
+    clearSessionManagerExpectedExitReason(session, this.clearTimeoutFn);
   }
 
   emitSessionActivityStarted(session, timestamp) {

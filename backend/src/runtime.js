@@ -14,6 +14,8 @@ import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { createRuntimeHttpHelpers } from "./runtime-http-helpers.js";
 import { createRuntimeHttpRequestHandler } from "./runtime-http-request-handler.js";
+import { createRuntimeAccessPolicy } from "./runtime-access-policy.js";
+import { createRuntimeMetrics } from "./runtime-metrics.js";
 import { createRuntimeResourceDispatch } from "./runtime-resource-dispatch.js";
 import { createRuntimeSessionDispatch } from "./runtime-session-dispatch.js";
 import { createRuntimeSessionAuthority } from "./runtime-session-authority.js";
@@ -2301,26 +2303,10 @@ export function createRuntime(config) {
   const sessionDeckAssignments = new Map();
   const sessionQuickIdAssignments = new Map();
   const sessionQuickIdRank = new Map(SESSION_QUICK_ID_POOL.map((token, index) => [token, index]));
-  const metrics = {
-    httpRequestsTotal: 0,
-    httpErrorsTotal: 0,
-    httpDurationMsSum: 0,
-    httpDurationMsCount: 0,
-    sessionsCreatedTotal: 0,
-    sessionsStartedTotal: 0,
-    sessionsExitedTotal: 0,
-    sessionsUnrestoredTotal: 0,
-    wsConnectionsOpenedTotal: 0,
-    wsConnectionsClosedTotal: 0,
-    wsReconnectsTotal: 0,
-    wsErrorsTotal: 0,
-    httpRequestsByStatus: new Map(),
-    httpRequestsByRoute: new Map(),
-    httpRequestDurationMsBuckets: new Map(),
-    wsErrorsByReason: new Map(),
-    wsDisconnectsByReason: new Map(),
-    wsReconnectsByReason: new Map()
-  };
+  const { metrics, recordHttpDuration, recordWsError } = createRuntimeMetrics({
+    httpDurationBucketsMs: HTTP_DURATION_BUCKETS_MS,
+    bumpMetricCounter
+  });
   const wsClientConnections = new Map();
   const customCommandMaxCount =
     Number.isInteger(config.customCommandMaxCount) && config.customCommandMaxCount > 0
@@ -2463,6 +2449,17 @@ export function createRuntime(config) {
     requestMessagingReplayExcerpt,
     logDebug
   });
+  const runtimeAccessPolicy = createRuntimeAccessPolicy({
+    shareLinks,
+    shareLinkPermissionModeReadOnly: SHARE_LINK_PERMISSION_MODE_READ_ONLY
+  });
+  const {
+    ensureShareLinkAuthActive,
+    ensureShareRouteAllowed,
+    getShareLinkOrThrow,
+    isSpectatorAuth,
+    resolveWsTicketFromProtocols
+  } = runtimeAccessPolicy;
   const runtimeHttpHelpers = createRuntimeHttpHelpers({
     config,
     corsAllowedOrigins,
@@ -2572,94 +2569,6 @@ export function createRuntime(config) {
     wsServer,
     onAccepted: handleAcceptedWsConnection
   });
-
-  function isSpectatorAuth(auth) {
-    return (
-      auth &&
-      auth.accessMode === "spectator" &&
-      auth.permissionMode === SHARE_LINK_PERMISSION_MODE_READ_ONLY &&
-      typeof auth.shareLinkId === "string" &&
-      auth.shareLinkId
-    );
-  }
-
-  function getShareLinkOrThrow(shareId) {
-    const normalizedShareId = typeof shareId === "string" ? shareId.trim() : "";
-    const shareLink = shareLinks.get(normalizedShareId);
-    if (!shareLink) {
-      throw new ApiError(404, "ShareLinkNotFound", `Share link '${normalizedShareId}' was not found.`);
-    }
-    return shareLink;
-  }
-
-  function ensureShareLinkAuthActive(auth) {
-    if (!isSpectatorAuth(auth)) {
-      return null;
-    }
-    const shareLink = getShareLinkOrThrow(auth.shareLinkId);
-    if (shareLink.permissionMode !== SHARE_LINK_PERMISSION_MODE_READ_ONLY) {
-      throw new ApiError(403, "Forbidden", "Share link permission mode is not supported.");
-    }
-    if (shareLink.revokedAt) {
-      throw new ApiError(403, "Forbidden", "Share link has been revoked.");
-    }
-    if (shareLink.expiresAt <= Date.now()) {
-      throw new ApiError(403, "Forbidden", "Share link has expired.");
-    }
-    if (shareLink.tokenId !== auth.shareTokenId) {
-      throw new ApiError(403, "Forbidden", "Share link token is no longer active.");
-    }
-    if (shareLink.targetType !== auth.shareTargetType || shareLink.targetId !== auth.shareTargetId) {
-      throw new ApiError(403, "Forbidden", "Share link target does not match token claims.");
-    }
-    return shareLink;
-  }
-
-  function ensureShareRouteAllowed(auth, kind) {
-    if (!isSpectatorAuth(auth)) {
-      return;
-    }
-    if (
-      kind === "listSessions" ||
-      kind === "getSession" ||
-      kind === "listDecks" ||
-      kind === "getDeck" ||
-      kind === "wsTicket"
-    ) {
-      return;
-    }
-    throw new ApiError(403, "Forbidden", "Read-only spectator access does not allow this action.");
-  }
-
-  function recordWsError(reason) {
-    metrics.wsErrorsTotal += 1;
-    bumpMetricCounter(metrics.wsErrorsByReason, reason);
-  }
-
-  function recordHttpDuration(durationMs) {
-    for (const bucketLimitMs of HTTP_DURATION_BUCKETS_MS) {
-      if (durationMs <= bucketLimitMs) {
-        bumpMetricCounter(metrics.httpRequestDurationMsBuckets, bucketLimitMs);
-      }
-    }
-  }
-
-  function parseRequestedProtocols(headerValue) {
-    if (typeof headerValue !== "string" || !headerValue.trim()) {
-      return [];
-    }
-    return headerValue.split(",").map((entry) => entry.trim()).filter(Boolean);
-  }
-
-  function resolveWsTicketFromProtocols(request) {
-    const protocols = parseRequestedProtocols(request.headers["sec-websocket-protocol"]);
-    for (const protocol of protocols) {
-      if (protocol.startsWith("ptydeck.auth.")) {
-        return protocol.slice("ptydeck.auth.".length);
-      }
-    }
-    return "";
-  }
 
   function listCustomCommands({ scope = null, sessionId = null } = {}) {
     const entries = Array.from(customCommands.values());
