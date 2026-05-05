@@ -2411,6 +2411,145 @@ test("command executor reports unavailable replay paste paths directly", async (
   );
 });
 
+test("command executor covers retained replay router usage and fallback branches", async () => {
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "transfer", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => sessions.length,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    loadSessionReplayExcerpt: async (session, selector) => {
+      if (selector === "missing") {
+        return null;
+      }
+      if (selector === "empty") {
+        return {
+          selector,
+          selectorKind: "lines",
+          resolvedCount: 0,
+          availableCount: 20,
+          selectorSatisfied: false,
+          chars: 0,
+          lines: 0,
+          data: ""
+        };
+      }
+      if (selector === "preview") {
+        return {
+          selector,
+          selectorKind: "lines",
+          resolvedCount: 2,
+          availableCount: 2,
+          selectorSatisfied: true,
+          chars: 10,
+          lines: 2,
+          data: "row1\nrow2\n"
+        };
+      }
+      return {
+        selector,
+        selectorKind: "chars",
+        resolvedCount: 5,
+        availableCount: 5,
+        selectorSatisfied: true,
+        chars: 5,
+        lines: 1,
+        data: "copy!"
+      };
+    },
+    previewSessionReplayExcerpt: () => "",
+    copySessionReplayExcerpt: async () => ({})
+  });
+
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["preview", "8"], raw: "/replay preview 8" }),
+    "Usage: /replay preview <sourceSelector> <sliceSelector>"
+  );
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["copy", "8"], raw: "/replay copy 8" }),
+    "Usage: /replay copy | /replay copy <sourceSelector> <sliceSelector>"
+  );
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["paste", "8", "7"], raw: "/replay paste 8 7" }),
+    "Usage: /replay paste <sourceSelector> <targetSelector> <sliceSelector>"
+  );
+  assert.equal(
+    await executor.execute({ command: "transfer", args: ["download"], raw: "/transfer download" }),
+    "Usage: /transfer download <path>"
+  );
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["preview", "8", "missing"], raw: "/replay preview 8 missing" }),
+    "Failed to load replay excerpt."
+  );
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["preview", "8", "empty"], raw: "/replay preview 8 empty" }),
+    "No replay excerpt matched empty on [8] two."
+  );
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["preview", "8", "preview"], raw: "/replay preview 8 preview" }),
+    "Preview from [8] two (preview -> 2/2 units, 10 chars, 2 lines).\n\nrow1\nrow2\n"
+  );
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["copy", "8", "copy"], raw: "/replay copy 8 copy" }),
+    "Copied replay excerpt from [8] two (copy -> 5/5 units, 5 chars, 1 lines)."
+  );
+  assert.deepEqual(
+    await executor.executeDetailed({ command: "replay", args: ["preview", "8", "empty"], raw: "/replay preview 8 empty" }),
+    {
+      ok: false,
+      feedback: "No replay excerpt matched empty on [8] two."
+    }
+  );
+});
+
 test("command executor applies explicit input safety profiles through settings payloads", async () => {
   const calls = [];
   const sessions = [{ id: "s1", name: "one", deckId: "default" }];

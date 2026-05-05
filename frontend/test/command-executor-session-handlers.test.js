@@ -71,8 +71,20 @@ test("session command helpers resolve active, direct, and selector-based targets
     resolveActiveOrDirectTargetSession({}, sessions, "s1", "No active session.", "Selector", resolveTargetSelectors),
     { error: "", session: sessions[0] }
   );
+  assert.deepEqual(
+    resolveSingleSessionForCommand("active", sessions, "s1", "No active session.", "Selector", resolveTargetSelectors),
+    { error: "", session: sessions[0] }
+  );
+  assert.deepEqual(
+    resolveDirectTargetSession({}, sessions, "s1", "No active session.", "Selector", resolveTargetSelectors),
+    { error: "", session: null }
+  );
   assert.equal(
     resolveActiveOrDirectTargetSession({}, sessions, "", "No active session.", "Selector", resolveTargetSelectors).error,
+    "No active session."
+  );
+  assert.equal(
+    resolveSingleSessionForCommand("", sessions, "missing", "No active session.", "Selector", resolveTargetSelectors).error,
     "No active session."
   );
 });
@@ -399,4 +411,124 @@ test("session handlers propagate selector failures and reject invalid backend sw
     }),
     "usage:rename:"
   );
+});
+
+test("session handlers cover retained fallback and success branches", async () => {
+  const calls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" },
+    { id: "s3", name: "three", deckId: "ops" }
+  ];
+  const handlers = createHandlers({
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    setActiveDeck: (deckId) => {
+      calls.push(["deck", deckId]);
+      return true;
+    },
+    setActiveSession: (sessionId) => calls.push(["active", sessionId]),
+    requestRender: () => calls.push(["render"]),
+    formatSessionToken: (id) => (id === "s1" ? "1" : id === "s2" ? "2" : id === "s3" ? "3" : String(id || "")),
+    resolveTargetSelectors: (selector) => {
+      if (selector === "one") {
+        return { sessions: [sessions[0]], error: "" };
+      }
+      if (selector === "two") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      if (selector === "both") {
+        return { sessions: [sessions[0], sessions[1]], error: "" };
+      }
+      if (selector === "many") {
+        return { sessions: [sessions[1], sessions[2]], error: "" };
+      }
+      return { sessions: [], error: "" };
+    },
+    swapSessionTokens: (leftId, rightId) => {
+      calls.push(["swap-fallback", leftId, rightId]);
+      return true;
+    },
+    api: {
+      async deleteSession(sessionId) {
+        calls.push(["delete", sessionId]);
+      },
+      async updateSession(sessionId, payload) {
+        calls.push(["patch", sessionId, payload]);
+        const current = sessions.find((session) => session.id === sessionId) || { id: sessionId, name: sessionId };
+        return { ...current, ...payload, note: payload.note ?? current.note ?? "" };
+      },
+      async restartSession(sessionId) {
+        calls.push(["restart", sessionId]);
+        const current = sessions.find((session) => session.id === sessionId) || { id: sessionId, name: sessionId };
+        return { ...current, restarted: true };
+      }
+    },
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session?.id || event.sessionId])
+  });
+
+  assert.equal(
+    await handlers.executeStructuredCommand({ command: "close", args: [], sessions, activeSessionId: "" }),
+    "No active session to close."
+  );
+  assert.equal(
+    await handlers.executeStructuredCommand({ command: "close", args: ["missing"], sessions, activeSessionId: "s1" }),
+    "No active session to close."
+  );
+  assert.equal(
+    await handlers.executeStructuredCommand({ command: "close", args: [], sessions, activeSessionId: "s1" }),
+    "Closed session s1."
+  );
+  assert.equal(
+    await handlers.executeStructuredCommand({ command: "swap", args: ["one", "two"], sessions }),
+    "Swapped quick IDs: [1] one <-> [2] two."
+  );
+  assert.equal(
+    await handlers.executeStructuredCommand({ command: "prev", args: [], sessions, activeSessionId: "missing" }),
+    "Active session: [2] two."
+  );
+  assert.equal(
+    await handlers.executeStructuredCommand({
+      command: "rename",
+      args: ["Primary shell"],
+      interpreted: {},
+      sessions,
+      activeSessionId: "s1"
+    }),
+    "Renamed session [1] to Primary shell."
+  );
+  assert.equal(
+    await handlers.executeStructuredCommand({
+      command: "restart",
+      args: ["many"],
+      interpreted: {},
+      sessions,
+      activeSessionId: "s1"
+    }),
+    "Restarted 2 sessions."
+  );
+  assert.equal(
+    await handlers.executeStructuredCommand({
+      command: "restart",
+      args: [],
+      interpreted: {},
+      sessions,
+      activeSessionId: ""
+    }),
+    "No active session to restart."
+  );
+
+  assert.deepEqual(calls, [
+    ["delete", "s1"],
+    ["event", "session.closed", "s1"],
+    ["swap-fallback", "s1", "s2"],
+    ["render"],
+    ["active", "s2"],
+    ["patch", "s1", { name: "Primary shell" }],
+    ["event", "session.updated", "s1"],
+    ["restart", "s2"],
+    ["restart", "s3"],
+    ["event", "session.updated", "s2"],
+    ["event", "session.updated", "s3"],
+    ["active", "s2"]
+  ]);
 });

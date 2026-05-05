@@ -28,46 +28,49 @@ function createHarness(overrides = {}) {
     }
   };
 
+  const api = {
+    async createDeck(payload) {
+      calls.push(["create-deck", payload]);
+      const deck = { id: "deck-new", name: payload.name };
+      state.decks.push(deck);
+      return deck;
+    },
+    async updateDeck(deckId, payload) {
+      calls.push(["update-deck", deckId, payload]);
+      const deck = state.decks.find((entry) => entry.id === deckId);
+      assert.ok(deck);
+      deck.name = payload.name;
+      return { ...deck };
+    },
+    async deleteDeck(deckId, options) {
+      calls.push(["delete-deck", deckId, options]);
+      const deck = state.decks.find((entry) => entry.id === deckId);
+      if (deckId === "ops" && options.force !== true && overrides.deleteConflict !== false) {
+        const error = new Error("conflict");
+        error.status = 409;
+        throw error;
+      }
+      state.decks = state.decks.filter((entry) => entry.id !== deckId);
+    },
+    async moveSessionToDeck(deckId, sessionId) {
+      calls.push(["move-session", deckId, sessionId]);
+      const session = state.sessions.find((entry) => entry.id === sessionId);
+      assert.ok(session);
+      session.deckId = deckId;
+      return { ...session };
+    },
+    async createSession(payload) {
+      calls.push(["create-session", payload]);
+      const session = { id: "s-new", name: payload.shell || "New shell", deckId: activeDeckId };
+      state.sessions.push(session);
+      return session;
+    },
+    ...(overrides.api || {})
+  };
+
   const handlers = createCommandExecutorOperatorHandlers({
     store,
-    api: {
-      async createDeck(payload) {
-        calls.push(["create-deck", payload]);
-        const deck = { id: "deck-new", name: payload.name };
-        state.decks.push(deck);
-        return deck;
-      },
-      async updateDeck(deckId, payload) {
-        calls.push(["update-deck", deckId, payload]);
-        const deck = state.decks.find((entry) => entry.id === deckId);
-        assert.ok(deck);
-        deck.name = payload.name;
-        return { ...deck };
-      },
-      async deleteDeck(deckId, options) {
-        calls.push(["delete-deck", deckId, options]);
-        const deck = state.decks.find((entry) => entry.id === deckId);
-        if (deckId === "ops" && options.force !== true && overrides.deleteConflict !== false) {
-          const error = new Error("conflict");
-          error.status = 409;
-          throw error;
-        }
-        state.decks = state.decks.filter((entry) => entry.id !== deckId);
-      },
-      async moveSessionToDeck(deckId, sessionId) {
-        calls.push(["move-session", deckId, sessionId]);
-        const session = state.sessions.find((entry) => entry.id === sessionId);
-        assert.ok(session);
-        session.deckId = deckId;
-        return { ...session };
-      },
-      async createSession(payload) {
-        calls.push(["create-session", payload]);
-        const session = { id: "s-new", name: payload.shell || "New shell", deckId: activeDeckId };
-        state.sessions.push(session);
-        return session;
-      }
-    },
+    api,
     defaultDeckId: "default",
     systemSlashCommands: ["deck", "filter", "help", "list", "move", "new", "run", "size"],
     formatUsage: (commandName, subcommandName = "") => `usage:${commandName}${subcommandName ? `:${subcommandName}` : ""}`,
@@ -376,4 +379,261 @@ test("operator handlers honor extracted deck rename and delete edge cases", asyn
     ["delete-deck", "ops", { force: true }],
     ["event", { type: "deck.deleted", deckId: "ops", fallbackDeckId: "default" }, { preferredActiveDeckId: "default" }]
   ]);
+});
+
+test("operator handlers fail closed across retained operator edge cases", async () => {
+  const noDeckHarness = createHarness({ getActiveDeck: () => null });
+  assert.equal(
+    await noDeckHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["rename", "Ops"],
+      sessions: noDeckHarness.state.sessions,
+      decks: noDeckHarness.state.decks,
+      activeSessionId: noDeckHarness.state.activeSessionId,
+      state: noDeckHarness.state
+    }),
+    "No active deck to rename."
+  );
+  assert.equal(
+    await noDeckHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["delete"],
+      sessions: noDeckHarness.state.sessions,
+      decks: noDeckHarness.state.decks,
+      activeSessionId: noDeckHarness.state.activeSessionId,
+      state: noDeckHarness.state
+    }),
+    "No active deck to delete."
+  );
+
+  const unavailableHarness = createHarness({
+    api: {
+      createDeck: null,
+      updateDeck: null,
+      deleteDeck: null,
+      moveSessionToDeck: null,
+      createSession: null
+    }
+  });
+  assert.equal(
+    await unavailableHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["new", "Ops"],
+      sessions: unavailableHarness.state.sessions,
+      decks: unavailableHarness.state.decks,
+      activeSessionId: unavailableHarness.state.activeSessionId,
+      state: unavailableHarness.state
+    }),
+    "Deck creation is unavailable."
+  );
+  assert.equal(
+    await unavailableHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["rename", "Ops"],
+      sessions: unavailableHarness.state.sessions,
+      decks: unavailableHarness.state.decks,
+      activeSessionId: unavailableHarness.state.activeSessionId,
+      state: unavailableHarness.state
+    }),
+    "Deck rename is unavailable."
+  );
+  assert.equal(
+    await unavailableHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["delete"],
+      sessions: unavailableHarness.state.sessions,
+      decks: unavailableHarness.state.decks,
+      activeSessionId: unavailableHarness.state.activeSessionId,
+      state: unavailableHarness.state
+    }),
+    "Deck deletion is unavailable."
+  );
+  assert.equal(
+    await unavailableHarness.handlers.executeStructuredCommand({
+      command: "move",
+      args: ["s-default", "ops"],
+      sessions: unavailableHarness.state.sessions,
+      decks: unavailableHarness.state.decks,
+      activeSessionId: unavailableHarness.state.activeSessionId,
+      state: unavailableHarness.state
+    }),
+    "Session move is unavailable."
+  );
+  assert.equal(
+    await unavailableHarness.handlers.executeStructuredCommand({
+      command: "new",
+      args: ["bash"],
+      sessions: unavailableHarness.state.sessions,
+      decks: unavailableHarness.state.decks,
+      activeSessionId: unavailableHarness.state.activeSessionId,
+      state: unavailableHarness.state
+    }),
+    "Session creation is unavailable."
+  );
+
+  const fallbackHarness = createHarness({
+    resolveTargetSelectors: (selector, sessions) => {
+      if (selector === "none") {
+        return { sessions: [], error: "" };
+      }
+      if (selector === "many") {
+        return { sessions: sessions.slice(), error: "" };
+      }
+      if (selector === "bad") {
+        return { sessions: [], error: "Target resolution failed." };
+      }
+      if (selector === "ops::s-ops") {
+        return { sessions: sessions.filter((session) => session.id === "s-ops"), error: "" };
+      }
+      return { sessions: sessions.filter((session) => session.id === selector), error: "" };
+    },
+    resolveFilterSelectors: (selectorText, sessions) => {
+      if (selectorText === "bad-filter") {
+        return { sessions: [], error: "Display filter failed." };
+      }
+      if (selectorText === "ops::s-ops") {
+        return { sessions: sessions.filter((session) => session.id === "s-ops"), error: "" };
+      }
+      return { sessions: [], error: "" };
+    },
+    resolveDeckToken: (selector, decks) => {
+      const deck = decks.find((entry) => entry.id === selector) || null;
+      return deck ? { deck, error: "" } : { deck: null, error: `Unknown deck: ${selector}` };
+    },
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    setActiveDeck: () => false
+  });
+
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "help",
+      args: ["unknown"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "Commands: @ > / deck filter help list move new run size"
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["new"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "usage:deck:new"
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["switch", "ops"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "Failed to switch deck: ops"
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "deck",
+      args: ["delete", "ops", "later"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "usage:deck:delete"
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "move",
+      args: ["bad", "ops"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "Target resolution failed."
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "move",
+      args: ["none", "ops"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "No sessions resolved for /move."
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "move",
+      args: ["many", "ops"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "Moved 2 sessions to deck [ops] Ops."
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "size",
+      args: ["bad"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "bad size"
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "filter",
+      args: [],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "Display filter cleared."
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "filter",
+      args: ["bad-filter"],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "Display filter failed."
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "list",
+      args: [],
+      sessions: [],
+      decks: fallbackHarness.state.decks,
+      activeSessionId: "",
+      state: { ...fallbackHarness.state, sessions: [], activeSessionId: "" }
+    }),
+    "No sessions available."
+  );
+  assert.equal(
+    await fallbackHarness.handlers.executeStructuredCommand({
+      command: "new",
+      args: [],
+      sessions: fallbackHarness.state.sessions,
+      decks: fallbackHarness.state.decks,
+      activeSessionId: fallbackHarness.state.activeSessionId,
+      state: fallbackHarness.state
+    }),
+    "Created session [NEW] New shell."
+  );
 });
