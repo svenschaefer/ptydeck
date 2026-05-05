@@ -43,6 +43,7 @@ import {
   REMOTE_CONNECTIVITY_DEGRADED,
   REMOTE_CONNECTIVITY_OFFLINE
 } from "./session-manager-remote-runtime.js";
+import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import {
@@ -401,6 +402,21 @@ export class SessionManager {
           rows,
           env: env || process.env
         }));
+    this.startupRuntime = createSessionManagerStartupRuntime({
+      nowFn: this.nowFn,
+      setTimeoutFn: this.setTimeoutFn,
+      getSessionById: (sessionId) => this.sessions.get(sessionId),
+      clearPendingLaunchPostStartInput: (session) => this.clearPendingLaunchPostStartInput(session),
+      clearLaunchPostStartInputTimer: (session) => this.clearLaunchPostStartInputTimer(session),
+      clearStartupTerminalQueryFallback: (session) => this.clearStartupTerminalQueryFallback(session),
+      sendInput: (sessionId, data, options) => this.sendInput(sessionId, data, options),
+      normalizeTraceSeed,
+      countCursorPositionQueries,
+      buildCursorPositionReport,
+      startupPostInputFallbackMs: this.startupPostInputFallbackMs,
+      startupTerminalQueryFallbackWindowMs: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
+      startupTerminalQueryFallbackMaxResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES
+    });
   }
 
   emitSessionUpdated(session) {
@@ -743,95 +759,23 @@ export class SessionManager {
   }
 
   dispatchLaunchPostStartInput(session) {
-    if (!session?.ptyProcess || !session.pendingLaunchPostStartInput?.input) {
-      return false;
-    }
-    const pending = session.pendingLaunchPostStartInput;
-    this.clearPendingLaunchPostStartInput(session);
-    session.pendingStartupTerminalQueryFallback = {
-      expiresAt: this.nowFn() + DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
-      remainingResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES,
-      trace: pending.trace || session.traceSeed || null
-    };
-    this.sendInput(session.id, pending.input, {
-      writeKind: "startup_submit_cr",
-      trace: pending.trace || session.traceSeed || null
-    });
-    return true;
+    return this.startupRuntime.dispatchLaunchPostStartInput(session);
   }
 
   scheduleLaunchPostStartInputDispatch(session, _reason = "", delayMs = 0) {
-    if (!session?.pendingLaunchPostStartInput?.input || !session.ptyProcess) {
-      return false;
-    }
-    this.clearLaunchPostStartInputTimer(session);
-    const currentPtyProcess = session.ptyProcess;
-    session.launchPostStartInputTimer = this.setTimeoutFn(() => {
-      session.launchPostStartInputTimer = null;
-      if (this.sessions.get(session.id) !== session || session.ptyProcess !== currentPtyProcess) {
-        return;
-      }
-      this.dispatchLaunchPostStartInput(session);
-    }, Math.max(0, delayMs));
-    return true;
+    return this.startupRuntime.scheduleLaunchPostStartInputDispatch(session, _reason, delayMs);
   }
 
   armLaunchPostStartInput(session, launchSpec, options = {}) {
-    if (!session?.ptyProcess || !launchSpec?.postStartInput) {
-      return false;
-    }
-    this.clearPendingLaunchPostStartInput(session);
-    this.clearStartupTerminalQueryFallback(session);
-    session.pendingLaunchPostStartInput = {
-      input: launchSpec.postStartInput,
-      trace: normalizeTraceSeed(options.trace) || session.traceSeed || null,
-      observedPtyData: false
-    };
-    this.scheduleLaunchPostStartInputDispatch(session, "startup_fallback", this.startupPostInputFallbackMs);
-    return true;
+    return this.startupRuntime.armLaunchPostStartInput(session, launchSpec, options);
   }
 
   observePendingLaunchPostStartInput(session, { rawData = "", promptBoundaries = [] } = {}) {
-    if (!session?.pendingLaunchPostStartInput) {
-      return false;
-    }
-    if (typeof rawData === "string" && rawData.length > 0) {
-      session.pendingLaunchPostStartInput.observedPtyData = true;
-    }
-    if (Array.isArray(promptBoundaries) && promptBoundaries.length > 0) {
-      return this.scheduleLaunchPostStartInputDispatch(session, "prompt_boundary");
-    }
-    return false;
+    return this.startupRuntime.observePendingLaunchPostStartInput(session, { rawData, promptBoundaries });
   }
 
   observeStartupTerminalQueryFallback(session, { rawData = "", trace = null } = {}) {
-    const pending = session?.pendingStartupTerminalQueryFallback;
-    if (!session?.ptyProcess || !pending) {
-      return false;
-    }
-    if (!Number.isInteger(pending.expiresAt) || pending.expiresAt <= this.nowFn()) {
-      this.clearStartupTerminalQueryFallback(session);
-      return false;
-    }
-    if (!Number.isInteger(pending.remainingResponses) || pending.remainingResponses <= 0) {
-      this.clearStartupTerminalQueryFallback(session);
-      return false;
-    }
-    const queryCount = countCursorPositionQueries(rawData);
-    if (queryCount <= 0) {
-      return false;
-    }
-    const responseCount = Math.min(queryCount, pending.remainingResponses);
-    pending.remainingResponses -= responseCount;
-    const response = buildCursorPositionReport().repeat(responseCount);
-    this.sendInput(session.id, response, {
-      writeKind: "startup_terminal_query_response",
-      trace: trace || pending.trace || session.traceSeed || null
-    });
-    if (pending.remainingResponses <= 0) {
-      this.clearStartupTerminalQueryFallback(session);
-    }
-    return true;
+    return this.startupRuntime.observeStartupTerminalQueryFallback(session, { rawData, trace });
   }
 
   handleAsyncPtyWriteEvent(session, event = {}) {

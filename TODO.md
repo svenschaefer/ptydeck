@@ -14,7 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-285` Owner `BE`: isolate one more reconnect/persistence/cleanup lifecycle helper seam from `backend/src/session-manager.js` and harden the remaining manager branch gaps.
 - `QLT-286` Owner `FE`: extract the next initialization/handoff/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
 - `QLT-287` Owner `FE`: harden retained operator command/router coverage across `frontend/src/public/command-executor.js`, `frontend/src/public/command-executor-operator-handlers.js`, and `frontend/src/public/command-executor-session-handlers.js`.
 - `QLT-288` Owner `FE`: isolate the next SSH/profile/workspace operator seam from `frontend/src/public/connection-profile-runtime-controller.js` and close the remaining branch gaps with direct regressions.
@@ -24,6 +23,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
 - `FE` ownership role is active for `QLT-286` through `QLT-289`.
-- `BE` ownership role is active for `QLT-285`.
+- `BE` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.
