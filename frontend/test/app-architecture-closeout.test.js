@@ -10,6 +10,9 @@ const appRuntimeCompositionPath = fileURLToPath(
 const appRuntimeBootstrapAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-bootstrap-assembly.js", import.meta.url)
 );
+const appRuntimeRecoveryCompositionPath = fileURLToPath(
+  new URL("../src/public/app-runtime-recovery-composition.js", import.meta.url)
+);
 const sessionGridControllerPath = fileURLToPath(new URL("../src/public/ui/session-grid-controller.js", import.meta.url));
 const sessionTerminalRuntimeControllerPath = fileURLToPath(
   new URL("../src/public/ui/session-terminal-runtime-controller.js", import.meta.url)
@@ -60,11 +63,11 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppCommandUiFacadeController",
     "createAppLayoutDeckFacadeController",
     "createAppRuntimeInitializationController",
+    "createAppRuntimeRecoveryComposition",
     "createAppRuntimeStateController",
     "createAppRuntimeTrustedLocalComposition",
     "createAppSessionRuntimeFacadeController",
     "createDeckRuntimeController",
-    "createRuntimeEventController",
     "createSessionRuntimeController",
     "createSessionStreamAuthorityController",
     "createSessionViewModel",
@@ -83,6 +86,24 @@ test("runtime composition controller owns the delegated runtime assembly contrac
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+});
+
+test("runtime recovery composition owns the delegated runtime-event recovery contract", async () => {
+  const source = await readFile(appRuntimeRecoveryCompositionPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createRuntimeEventController",
+    "const runtimeEventController = createRuntimeEventController({",
+    "setSessions: (sessions) => {",
+    "upsertSession: (session) => {",
+    "Promise.resolve(maybeAutoRepairOriginHandoffControl()).catch(() => {});",
+    'traceDebugController.record("terminal.input.error", payload);',
+    'debugLog("terminal.input.error", payload);'
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime recovery marker ${marker}`);
   }
 });
 

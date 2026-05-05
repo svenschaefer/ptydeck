@@ -2114,6 +2114,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     }
   };
   fixture.elements.commandInput.value = "echo still-multiline-normal";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await tick();
   fixture.elements.commandInput.dispatchEvent(nonSlashArrowUp);
   await tick();
   assert.equal(nonSlashArrowUp.defaultPrevented, false);
@@ -2148,7 +2150,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.settingsCols.value = "90";
   fixture.elements.settingsRows.value = "30";
   fixture.elements.settingsApply.click();
-  await sleep(520);
+  await waitFor(() => resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30), { timeoutMs: 1000 });
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
     "expected resize request with updated settings"
@@ -2358,7 +2360,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   fixture.elements.commandInput.value = "/size 80 50";
   fixture.elements.sendCommand.click();
-  await sleep(520);
+  await waitFor(
+    () =>
+      fixture.elements.commandFeedback.textContent ===
+        "Terminal size set to 80x50 (cols x rows) for deck 'Default'." &&
+      resizePayloads.some((entry) => entry.cols === 80 && entry.rows === 50),
+    { timeoutMs: 1000 }
+  );
   assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 80x50 (cols x rows) for deck 'Default'.");
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 80 && entry.rows === 50),
@@ -2367,7 +2375,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   fixture.elements.commandInput.value = "/size c90";
   fixture.elements.sendCommand.click();
-  await sleep(520);
+  await waitFor(
+    () =>
+      fixture.elements.commandFeedback.textContent ===
+        "Terminal size set to 90x50 (cols x rows) for deck 'Default'." &&
+      resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 50),
+    { timeoutMs: 1000 }
+  );
   assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x50 (cols x rows) for deck 'Default'.");
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 50),
@@ -2376,7 +2390,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   fixture.elements.commandInput.value = "/size r30";
   fixture.elements.sendCommand.click();
-  await sleep(520);
+  await waitFor(
+    () =>
+      fixture.elements.commandFeedback.textContent ===
+        "Terminal size set to 90x30 (cols x rows) for deck 'Default'." &&
+      resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
+    { timeoutMs: 1000 }
+  );
   assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x30 (cols x rows) for deck 'Default'.");
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
@@ -2588,7 +2608,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(visibleDeckNewCards[0].classList.contains("active"), true);
   fixture.elements.commandInput.value = "/size 101 33";
   fixture.elements.sendCommand.click();
-  await sleep(520);
+  await waitFor(
+    () => fixture.elements.commandFeedback.textContent === "Terminal size set to 101x33 (cols x rows) for deck 'Ops'.",
+    { timeoutMs: 1000 }
+  );
   assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 101x33 (cols x rows) for deck 'Ops'.");
 
   fixture.elements.commandInput.value = "/deck switch default";

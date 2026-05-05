@@ -4,6 +4,7 @@ import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-co
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
 import { createAppRuntimeInitializationController } from "./app-runtime-initialization-controller.js";
+import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppRuntimeTrustedLocalComposition } from "./app-runtime-trusted-local-composition.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
@@ -15,7 +16,6 @@ import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
 import { createSessionControlRuntimeController } from "./session-control-runtime-controller.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
-import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionQuickSendRuntimeController } from "./session-quick-send-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
@@ -1184,14 +1184,19 @@ sessionRuntimeController = createSessionRuntimeController({
   windowRef: window
 });
 
-runtimeEventController = createRuntimeEventController({
+({
+  runtimeEventController
+} = createAppRuntimeRecoveryComposition({
   defaultDeckId: DEFAULT_DECK_ID,
+  store,
+  traceDebugController,
+  debugLog,
+  maybeAutoRepairOriginHandoffControl,
   getPreferredActiveDeckId: () => store.getState().activeDeckId,
   setDecks: (nextDecks, options) => appLayoutDeckFacadeController?.setDecks(nextDecks, options),
   replaceCustomCommandState: (commands) => appCommandUiFacadeController?.replaceCustomCommands(commands),
   setSessions: (sessions) => {
     store.setSessions(sessions);
-    Promise.resolve(maybeAutoRepairOriginHandoffControl()).catch(() => {});
   },
   replaySnapshotOutputs: (outputs, attempt) => appSessionRuntimeFacadeController?.replaySnapshotOutputs(outputs, attempt),
   scheduleSnapshotTerminalStabilization: (sessionIds) =>
@@ -1204,7 +1209,6 @@ runtimeEventController = createRuntimeEventController({
   applySessionInterpretationActions: (sessionId, actions) => store.applySessionInterpretationActions(sessionId, actions),
   upsertSession: (nextSession) => {
     appSessionRuntimeFacadeController?.upsertSession(nextSession);
-    Promise.resolve(maybeAutoRepairOriginHandoffControl()).catch(() => {});
   },
   markSessionExited: (sessionId, exitDetails) => appSessionRuntimeFacadeController?.markSessionExited(sessionId, exitDetails),
   markSessionClosed: (sessionId) => appSessionRuntimeFacadeController?.markSessionClosed(sessionId),
@@ -1224,21 +1228,9 @@ runtimeEventController = createRuntimeEventController({
   isReadOnlyMode,
   getReadOnlyModeMessage,
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage(error, fallback) || fallback,
-  reportTerminalInputError: (sessionId, error, options = {}) => {
-    const message = appCommandUiFacadeController?.getErrorMessage(error, "Failed to send terminal input.") || "Failed to send terminal input.";
-    const payload = {
-      sessionId: String(sessionId || "").trim(),
-      source: String(options?.source || "").trim() || "terminal-input",
-      suppressed: options?.suppressed === true,
-      name: typeof error?.name === "string" ? error.name : "",
-      message
-    };
-    traceDebugController.record("terminal.input.error", payload);
-    debugLog("terminal.input.error", payload);
-  },
   setError: (message) => appCommandUiFacadeController?.setError(message),
   sendInput: (sessionId, data, requestOptions) => api.sendInput(sessionId, data, requestOptions)
-});
+}));
 
 sessionCardMetaController = createSessionCardMetaController({
   normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags,
