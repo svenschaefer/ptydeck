@@ -478,6 +478,85 @@ test("store correlates submitted commands with output, interpretation, artifacts
   assert.ok(session.commandCorrelations[0].completedAt >= session.commandCorrelations[0].firstOutputAt);
 });
 
+test("store bounds command correlation history and ignores no-op interpretation actions while matching the latest pending record", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running" }]);
+
+  for (let index = 0; index < 10; index += 1) {
+    store.recordSessionCommandSubmission("s1", {
+      label: `/cmd-${index}`,
+      text: `echo ${index}`
+    });
+  }
+
+  let session = store.getState().sessions[0];
+  assert.equal(session.commandCorrelations.length, 8);
+  assert.deepEqual(
+    session.commandCorrelations.map((record) => record.id),
+    ["cmd-3", "cmd-4", "cmd-5", "cmd-6", "cmd-7", "cmd-8", "cmd-9", "cmd-10"]
+  );
+
+  store.applySessionInterpretationActions("s1", [
+    null,
+    { type: "upsertSessionArtifact", artifact: null },
+    { type: "removeSessionArtifact", artifactId: "   " },
+    { type: "pushSessionNotification", notification: { message: "   " } },
+    { type: "unknown-action" }
+  ]);
+
+  session = store.getState().sessions[0];
+  const latestCorrelation = session.commandCorrelations.at(-1);
+  assert.equal(session.commandCorrelations.length, 8);
+  assert.equal(latestCorrelation?.id, "cmd-10");
+  assert.equal(latestCorrelation?.label, "/cmd-9");
+  assert.equal(latestCorrelation?.text, "echo 9");
+  assert.deepEqual(latestCorrelation?.artifacts, []);
+  assert.equal(latestCorrelation?.notificationCount, 0);
+  assert.equal(typeof latestCorrelation?.submittedAt, "number");
+  assert.equal(typeof latestCorrelation?.matchedAt, "number");
+  assert.equal(typeof latestCorrelation?.firstOutputAt, "number");
+  assert.ok(latestCorrelation?.matchedAt >= latestCorrelation?.submittedAt);
+  assert.ok(latestCorrelation?.firstOutputAt >= latestCorrelation?.matchedAt);
+});
+
+test("store trims and replaces correlation artifacts while counting only valid correlation notifications", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running" }]);
+  store.recordSessionCommandSubmission("s1", {
+    label: "/deploy",
+    text: "deploy"
+  });
+
+  store.applySessionInterpretationActions("s1", [
+    { type: "upsertSessionArtifact", artifact: { id: "a", kind: "summary", title: "Artifact A" } },
+    { type: "upsertSessionArtifact", artifact: { id: "b", kind: "summary", title: "Artifact B" } },
+    { type: "upsertSessionArtifact", artifact: { id: "c", kind: "summary", title: "Artifact C" } },
+    { type: "upsertSessionArtifact", artifact: { id: "d", kind: "summary", title: "Artifact D" } },
+    { type: "pushSessionNotification", notification: { message: "   " } }
+  ]);
+
+  let correlation = store.getState().sessions[0].commandCorrelations[0];
+  assert.deepEqual(
+    correlation.artifacts.map((artifact) => artifact.id),
+    ["b", "c", "d"]
+  );
+  assert.equal(correlation.notificationCount, 0);
+
+  store.applySessionInterpretationActions("s1", [
+    { type: "upsertSessionArtifact", artifact: { id: "c", kind: "summary", title: "Artifact C updated" } },
+    { type: "removeSessionArtifact", artifactId: "d" },
+    { type: "pushSessionNotification", notification: { id: "n-1", message: "Correlation advanced." } }
+  ]);
+
+  correlation = store.getState().sessions[0].commandCorrelations[0];
+  assert.deepEqual(correlation.artifacts, [
+    { id: "b", kind: "summary", title: "Artifact B" },
+    { id: "c", kind: "summary", title: "Artifact C updated" }
+  ]);
+  assert.equal(correlation.notificationCount, 1);
+  assert.equal(correlation.lastNotificationMessage, "Correlation advanced.");
+});
+
 test("store wrapper APIs fail closed for invalid deck, command, and submission operations", () => {
   const store = createStore();
   store.setDecks([{ id: "default", name: "Default" }]);

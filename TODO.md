@@ -14,13 +14,12 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-282` Owner `FE`: isolate the next SSH/profile/workspace operator seam from `frontend/src/public/connection-profile-runtime-controller.js` and close the remaining branch gaps with direct regressions.
-- `QLT-283` Owner `FE`: harden retained runtime-state and terminal-interaction coverage across `frontend/src/public/store.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js`.
+None.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role is active for `QLT-282` and `QLT-283`.
+- `FE` ownership role is currently inactive.
 - `BE` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.

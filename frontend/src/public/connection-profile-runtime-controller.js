@@ -15,7 +15,6 @@ import {
   formatTags,
   getDeckOptionsForDraft,
   getDraftLaunchFromInputs,
-  getDraftModeMessage,
   getThemePresetSelectOptions,
   normalizeConnectionProfileLaunch,
   normalizeConnectionProfileCollection,
@@ -32,14 +31,15 @@ import {
   themeProfilesEqual
 } from "./connection-profile-draft-state.js";
 import {
-  buildSshTrustGuidance,
-  buildSshTrustStatus,
   createConnectionProfileSshLifecycle,
   formatSshTarget,
   getSshTrustTargetKey,
   isSameSshTrustTarget,
   normalizeSshTrustTargetInput
 } from "./connection-profile-ssh-lifecycle.js";
+import {
+  buildConnectionProfileDraftViewState
+} from "./connection-profile-runtime-view-state.js";
 
 function clearChildren(element) {
   if (!element || typeof element.removeChild !== "function") {
@@ -295,29 +295,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
     pendingDeleteProfileId = "";
   }
 
-  function getSshAuthHint(launch) {
-    if (normalizeLower(launch?.kind) !== "ssh") {
-      return "";
-    }
-    const method = normalizeLower(launch?.remoteAuth?.method);
-    if (method === "password") {
-      return "Password auth stores only the method. The password is requested in a masked launch dialog each time you start this SSH connection.";
-    }
-    if (method === "keyboardinteractive") {
-      return "Keyboard-interactive auth stores only the method. The challenge secret is requested in a masked launch dialog each time you start this SSH connection.";
-    }
-    return "Private-key auth stores only the optional key path. No SSH secret is stored in the saved profile or one-shot launch payload.";
-  }
-
-  function getSshSecretHint(launch) {
-    if (normalizeLower(launch?.kind) !== "ssh") {
-      return "";
-    }
-    return authMethodRequiresSecret(launch?.remoteAuth)
-      ? "Launching this SSH connection will request a masked runtime secret right before start."
-      : "Launching this SSH connection will use key-based auth without prompting for a runtime secret.";
-  }
-
   function describeSshLaunchContext(profile) {
     const launch = profile?.launch;
     const target = formatSshTarget(launch?.remoteConnection?.host, launch?.remoteConnection?.port, launch?.remoteConnection?.username);
@@ -430,171 +407,120 @@ export function createConnectionProfileRuntimeController(options = {}) {
       defaultDeckId,
       defaultThemeProfile
     });
-    const isSsh = normalizeLower(currentLaunch.kind) === "ssh";
-    const authMethod = normalizeLower(currentLaunch?.remoteAuth?.method) || "privatekey";
-    if (summaryEl) {
-      summaryEl.textContent = selectedProfile
-        ? formatConnectionProfileSummary(selectedProfile)
-        : "No saved connection profile selected. You can still save and launch the draft below.";
-    }
-    if (sshFieldsEl) {
-      sshFieldsEl.hidden = !isSsh;
-    }
-    if (draftRemotePrivateKeyFieldEl) {
-      draftRemotePrivateKeyFieldEl.hidden = !isSsh || authMethod !== "privatekey";
-    }
-    if (authHintEl) {
-      authHintEl.textContent = getSshAuthHint(currentLaunch);
-    }
-    if (secretHintEl) {
-      secretHintEl.textContent = getSshSecretHint(currentLaunch);
-    }
-    if (runtimeSecretFieldEl) {
-      runtimeSecretFieldEl.hidden = true;
-    }
-    if (runtimeSecretInputEl) {
-      runtimeSecretInputEl.hidden = true;
-      runtimeSecretInputEl.disabled = true;
-      runtimeSecretInputEl.value = "";
-    }
-    if (draftLaunchTextareaEl) {
-      draftLaunchTextareaEl.readOnly = true;
-      draftLaunchTextareaEl.value = JSON.stringify(currentLaunch, null, 2);
-    }
-    setDraftStatus(getDraftModeMessage(draftState, { getProfile }));
-    if (deleteBtn) {
-      deleteBtn.textContent = pendingDeleteProfileId && pendingDeleteProfileId === selectedProfile?.id ? "Confirm Delete Saved" : "Delete Saved";
-    }
-    if (deleteConfirmEl) {
-      deleteConfirmEl.hidden = !(selectedProfile && pendingDeleteProfileId === selectedProfile.id);
-    }
-    if (deleteConfirmMessageEl) {
-      deleteConfirmMessageEl.textContent =
-        selectedProfile && pendingDeleteProfileId === selectedProfile.id
-          ? `Delete saved connection profile [${selectedProfile.id}] ${selectedProfile.name}? This removes only the saved profile, not any already running sessions.`
-          : "";
-    }
-
     const target = getCurrentSshTrustTarget();
     const matchingTrustEntries = getTrustEntriesForCurrentTarget();
     const probeCandidates = getSshProbeCandidatesForCurrentTarget();
-    const trustOptions = matchingTrustEntries.length
-      ? matchingTrustEntries.map((entry) => ({
-          value: entry.id,
-          label: `${entry.keyType} · ${entry.fingerprintSha256}`,
-          documentRef
-        }))
-      : [
-          {
-            value: "",
-            label: isSsh ? "No trusted keys for this SSH target" : "Switch to SSH to manage trust entries",
-            disabled: true,
-            documentRef
-          }
-        ];
-    const hasSelectedTrustEntry = matchingTrustEntries.some((entry) => entry.id === selectedSshTrustEntryId);
-    if (!hasSelectedTrustEntry) {
-      selectedSshTrustEntryId = matchingTrustEntries[0]?.id || "";
+    const viewState = buildConnectionProfileDraftViewState({
+      draftState,
+      getProfile,
+      selectedProfile,
+      currentLaunch,
+      pendingDeleteProfileId,
+      target,
+      matchingTrustEntries,
+      probeCandidates,
+      selectedSshTrustEntryId,
+      selectedSshProbeCandidateId,
+      probingSshHostKeys,
+      loadingSshTrustEntries,
+      documentRef,
+      api
+    });
+    selectedSshTrustEntryId = viewState.selectedSshTrustEntryId;
+    selectedSshProbeCandidateId = viewState.selectedSshProbeCandidateId;
+    if (summaryEl) {
+      summaryEl.textContent = viewState.summaryText;
     }
-    const probeOptions = probeCandidates.length
-      ? probeCandidates.map((entry) => ({
-          value: entry.id,
-          label: `${entry.keyType} · ${entry.fingerprintSha256}`,
-          documentRef
-        }))
-      : [
-          {
-            value: "",
-            label: isSsh ? "Fetch host keys to review one before trusting it" : "Switch to SSH to fetch host keys",
-            disabled: true,
-            documentRef
-          }
-        ];
-    const hasSelectedProbeCandidate = probeCandidates.some((entry) => entry.id === selectedSshProbeCandidateId);
-    if (!hasSelectedProbeCandidate) {
-      selectedSshProbeCandidateId = probeCandidates[0]?.id || "";
+    if (sshFieldsEl) {
+      sshFieldsEl.hidden = viewState.sshFieldsHidden;
     }
-    setSelectOptions(sshProbeSelectEl, probeOptions, selectedSshProbeCandidateId || probeOptions[0]?.value || "");
-    setSelectOptions(sshTrustSelectEl, trustOptions, selectedSshTrustEntryId || trustOptions[0]?.value || "");
-    const selectedProbeCandidate = probeCandidates.find((entry) => entry.id === selectedSshProbeCandidateId) || null;
-    const selectedTrustEntry = matchingTrustEntries.find((entry) => entry.id === selectedSshTrustEntryId) || null;
-    const selectedConflictEntry = target && selectedProbeCandidate ? findSshTrustConflictEntry(target, selectedProbeCandidate) : null;
-    const selectedPreview = selectedProbeCandidate || selectedTrustEntry;
+    if (draftRemotePrivateKeyFieldEl) {
+      draftRemotePrivateKeyFieldEl.hidden = viewState.privateKeyFieldHidden;
+    }
+    if (authHintEl) {
+      authHintEl.textContent = viewState.authHintText;
+    }
+    if (secretHintEl) {
+      secretHintEl.textContent = viewState.secretHintText;
+    }
+    if (runtimeSecretFieldEl) {
+      runtimeSecretFieldEl.hidden = viewState.runtimeSecretFieldHidden;
+    }
+    if (runtimeSecretInputEl) {
+      runtimeSecretInputEl.hidden = viewState.runtimeSecretInputHidden;
+      runtimeSecretInputEl.disabled = viewState.runtimeSecretInputDisabled;
+      runtimeSecretInputEl.value = viewState.runtimeSecretInputValue;
+    }
+    if (draftLaunchTextareaEl) {
+      draftLaunchTextareaEl.readOnly = true;
+      draftLaunchTextareaEl.value = viewState.draftLaunchJson;
+    }
+    setDraftStatus(viewState.draftStatusText);
+    if (deleteBtn) {
+      deleteBtn.textContent = viewState.deleteButtonText;
+    }
+    if (deleteConfirmEl) {
+      deleteConfirmEl.hidden = viewState.deleteConfirmHidden;
+    }
+    if (deleteConfirmMessageEl) {
+      deleteConfirmMessageEl.textContent = viewState.deleteConfirmMessageText;
+    }
+    setSelectOptions(sshProbeSelectEl, viewState.probeOptions, selectedSshProbeCandidateId || viewState.probeOptions[0]?.value || "");
+    setSelectOptions(sshTrustSelectEl, viewState.trustOptions, selectedSshTrustEntryId || viewState.trustOptions[0]?.value || "");
     if (sshTrustKeyTypeInputEl) {
-      sshTrustKeyTypeInputEl.value = selectedPreview?.keyType || "";
+      sshTrustKeyTypeInputEl.value = viewState.trustKeyTypeValue;
       sshTrustKeyTypeInputEl.readOnly = true;
     }
     if (sshTrustFingerprintInputEl) {
-      sshTrustFingerprintInputEl.value = selectedPreview?.fingerprintSha256 || "";
+      sshTrustFingerprintInputEl.value = viewState.trustFingerprintValue;
       sshTrustFingerprintInputEl.readOnly = true;
     }
     if (sshTrustPublicKeyTextareaEl) {
-      sshTrustPublicKeyTextareaEl.value = selectedPreview?.publicKey || "";
+      sshTrustPublicKeyTextareaEl.value = viewState.trustPublicKeyValue;
       sshTrustPublicKeyTextareaEl.readOnly = true;
     }
     if (sshTrustGuidanceEl) {
-      sshTrustGuidanceEl.textContent = buildSshTrustGuidance({
-        isSsh,
-        target,
-        matchingTrustEntries,
-        probeCandidates,
-        conflictEntry: selectedConflictEntry
-      });
+      sshTrustGuidanceEl.textContent = viewState.trustGuidanceText;
     }
     if (sshTrustStatusEl) {
-      sshTrustStatusEl.textContent = buildSshTrustStatus({
-        isSsh,
-        target,
-        matchingTrustEntries,
-        probeCandidates,
-        conflictEntry: selectedConflictEntry,
-        probing: probingSshHostKeys
-      });
+      sshTrustStatusEl.textContent = viewState.trustStatusText;
     }
     if (sshTrustCompareEl) {
-      sshTrustCompareEl.hidden = !selectedConflictEntry;
+      sshTrustCompareEl.hidden = viewState.trustCompareHidden;
     }
     if (sshTrustCompareStatusEl) {
-      sshTrustCompareStatusEl.textContent = selectedConflictEntry && selectedProbeCandidate
-        ? `${selectedConflictEntry.fingerprintSha256} -> ${selectedProbeCandidate.fingerprintSha256}`
-        : "";
+      sshTrustCompareStatusEl.textContent = viewState.trustCompareStatusText;
     }
     if (sshTrustCurrentKeyTypeInputEl) {
-      sshTrustCurrentKeyTypeInputEl.value = selectedConflictEntry?.keyType || "";
+      sshTrustCurrentKeyTypeInputEl.value = viewState.trustCurrentKeyTypeValue;
       sshTrustCurrentKeyTypeInputEl.readOnly = true;
     }
     if (sshTrustCurrentFingerprintInputEl) {
-      sshTrustCurrentFingerprintInputEl.value = selectedConflictEntry?.fingerprintSha256 || "";
+      sshTrustCurrentFingerprintInputEl.value = viewState.trustCurrentFingerprintValue;
       sshTrustCurrentFingerprintInputEl.readOnly = true;
     }
     if (sshTrustCandidateKeyTypeInputEl) {
-      sshTrustCandidateKeyTypeInputEl.value = selectedConflictEntry ? selectedProbeCandidate?.keyType || "" : "";
+      sshTrustCandidateKeyTypeInputEl.value = viewState.trustCandidateKeyTypeValue;
       sshTrustCandidateKeyTypeInputEl.readOnly = true;
     }
     if (sshTrustCandidateFingerprintInputEl) {
-      sshTrustCandidateFingerprintInputEl.value = selectedConflictEntry ? selectedProbeCandidate?.fingerprintSha256 || "" : "";
+      sshTrustCandidateFingerprintInputEl.value = viewState.trustCandidateFingerprintValue;
       sshTrustCandidateFingerprintInputEl.readOnly = true;
     }
     if (sshTrustProbeBtn) {
-      sshTrustProbeBtn.disabled = typeof api.probeSshHostKeys !== "function" || !isSsh || !target || probingSshHostKeys;
+      sshTrustProbeBtn.disabled = viewState.trustProbeDisabled;
     }
     if (sshTrustRefreshBtn) {
-      sshTrustRefreshBtn.disabled = typeof api.listSshTrustEntries !== "function" || !isSsh || loadingSshTrustEntries;
+      sshTrustRefreshBtn.disabled = viewState.trustRefreshDisabled;
     }
     if (sshTrustSaveBtn) {
-      sshTrustSaveBtn.disabled = typeof api.createSshTrustEntry !== "function" || !isSsh || !selectedProbeCandidate || Boolean(selectedConflictEntry);
+      sshTrustSaveBtn.disabled = viewState.trustSaveDisabled;
     }
     if (sshTrustDeleteBtn) {
-      sshTrustDeleteBtn.disabled = typeof api.deleteSshTrustEntry !== "function" || !selectedSshTrustEntryId;
+      sshTrustDeleteBtn.disabled = viewState.trustDeleteDisabled;
     }
     if (sshTrustReplaceBtn) {
-      sshTrustReplaceBtn.disabled =
-        typeof api.createSshTrustEntry !== "function" ||
-        typeof api.deleteSshTrustEntry !== "function" ||
-        !isSsh ||
-        !target ||
-        !selectedProbeCandidate ||
-        !selectedConflictEntry;
+      sshTrustReplaceBtn.disabled = viewState.trustReplaceDisabled;
     }
   }
 

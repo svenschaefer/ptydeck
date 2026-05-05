@@ -920,6 +920,54 @@ test("session-terminal-runtime controller routes clipboard paste events through 
   assert.equal(entry.terminal.focusCalls, 1);
 });
 
+test("session-terminal-runtime controller reads paste payloads from dataTransfer and leaves non-shortcut custom keys alone", () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const refs = createTerminalCardRefs("paste-datatransfer");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  assert.equal(entry.terminal.customKeyEventHandler?.(createKeyEvent("x")), true);
+
+  const pasteEvent = {
+    type: "paste",
+    dataTransfer: {
+      getData(format) {
+        return format === "text" ? "echo via dataTransfer" : "";
+      }
+    },
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    }
+  };
+  refs.mount.helperTextarea.dispatchEvent(pasteEvent);
+
+  assert.equal(pasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, [["s1", "echo via dataTransfer"]]);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
 test("session-terminal-runtime controller falls back to reading clipboard text when a paste event has no inline text payload", async () => {
   const pasted = [];
   const controller = createSessionTerminalRuntimeController({
@@ -1110,6 +1158,49 @@ test("session-terminal-runtime controller bridges scrollbar gutter drag to the x
   windowRef.dispatchEvent(moveAfterRelease);
 
   assert.equal(refs.mount.viewport.scrollTop, scrollAfterMove);
+});
+
+test("session-terminal-runtime controller falls back to document-level drag listeners when window listeners are unavailable", () => {
+  const documentRef = new FakeEventTarget("document");
+  const windowRef = {
+    Terminal: FakeTerminal,
+    ResizeObserver: FakeResizeObserver,
+    document: documentRef,
+    setTimeout(fn) {
+      return fn;
+    }
+  };
+  const controller = createSessionTerminalRuntimeController({ windowRef });
+  const refs = createTerminalCardRefs("document-drag-fallback");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  const downEvent = createMouseEvent("mousedown", 0);
+  downEvent.clientX = 645;
+  downEvent.clientY = 112;
+  refs.mount.dispatchEvent(downEvent);
+
+  assert.equal(downEvent.defaultPrevented, true);
+  assert.equal(entry.terminal.focusCalls, 1);
+  assert.equal(documentRef.listeners.get("mousemove")?.length || 0, 1);
+  assert.equal(documentRef.listeners.get("mouseup")?.length || 0, 1);
+
+  const moveEvent = createMouseEvent("mousemove", 0);
+  moveEvent.clientX = 645;
+  moveEvent.clientY = 220;
+  documentRef.dispatchEvent(moveEvent);
+  assert.ok(refs.mount.viewport.scrollTop > 0);
+
+  documentRef.dispatchEvent(createMouseEvent("mouseup", 0));
+  assert.equal(documentRef.listeners.get("mousemove")?.length || 0, 0);
+  assert.equal(documentRef.listeners.get("mouseup")?.length || 0, 0);
 });
 
 test("session-terminal-runtime controller pastes clipboard text on explicit Ctrl-V shortcuts via native paste events", async () => {
@@ -1727,6 +1818,63 @@ test("session-terminal-runtime controller sends terminal cancel after Ctrl-C pro
 
   assert.equal(ctrlCEvent.defaultPrevented, true);
   assert.deepEqual(clipboardWrites, []);
+  assert.deepEqual(terminalWrites, [["s1", "\u0003"]]);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller resets the Ctrl-C prompt guard after an intent request rejects", async () => {
+  const promptOutcomes = [new Error("Prompt failed."), "cancel"];
+  const promptCalls = [];
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    canWriteClipboardText: () => true,
+    requestTerminalCtrlCAction: async ({ session, selection }) => {
+      promptCalls.push([session.id, selection]);
+      const next = promptOutcomes.shift();
+      if (next instanceof Error) {
+        throw next;
+      }
+      return next;
+    }
+  });
+  const refs = createTerminalCardRefs("ctrl-c-reject-reset");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "selected text";
+  const firstCtrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(firstCtrlCEvent);
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  const secondCtrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(secondCtrlCEvent);
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(firstCtrlCEvent.defaultPrevented, true);
+  assert.equal(secondCtrlCEvent.defaultPrevented, true);
+  assert.deepEqual(promptCalls, [
+    ["s1", "selected text"],
+    ["s1", "selected text"]
+  ]);
   assert.deepEqual(terminalWrites, [["s1", "\u0003"]]);
   assert.equal(entry.terminal.focusCalls, 1);
 });
