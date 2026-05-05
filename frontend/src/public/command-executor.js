@@ -1,13 +1,15 @@
 import { createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
 import {
+  formatConnectionProfileReport,
   formatConnectionProfileSummary,
   normalizeConnectionProfileLaunch
-} from "./connection-profile-runtime-controller.js";
+} from "./connection-profile-draft-state.js";
 import { formatWorkspacePresetDetail } from "./workspace-preset-runtime-controller.js";
 import { createCommandExecutorCustomHandlers } from "./command-executor-custom-handlers.js";
 import { createCommandExecutorCustomAdminHandlers } from "./command-executor-custom-admin-handlers.js";
 import { createCommandExecutorDomainHandlers } from "./command-executor-domain-handlers.js";
 import { createCommandExecutorOperatorHandlers } from "./command-executor-operator-handlers.js";
+import { createCommandExecutorReportingHandlers } from "./command-executor-reporting-handlers.js";
 import { createCommandExecutorSettingsHandlers } from "./command-executor-settings-handlers.js";
 import {
   createCommandExecutorSessionHandlers,
@@ -212,24 +214,6 @@ export function createCommandExecutor(options = {}) {
     });
   }
 
-  function formatConnectionProfileReport(profile) {
-    const launch = profile?.launch && typeof profile.launch === "object" ? profile.launch : {};
-    return [
-      `[${profile.id}] ${profile.name}`,
-      `kind=${JSON.stringify(launch.kind || "local")}`,
-      `deckId=${JSON.stringify(launch.deckId || defaultDeckId)}`,
-      `shell=${JSON.stringify(launch.shell || "")}`,
-      `startCwd=${JSON.stringify(launch.startCwd || "")}`,
-      `startCommand=${JSON.stringify(launch.startCommand || "")}`,
-      `env=${JSON.stringify(launch.env || {})}`,
-      `tags=${JSON.stringify(Array.isArray(launch.tags) ? launch.tags : [])}`,
-      `remoteConnection=${JSON.stringify(launch.remoteConnection || null)}`,
-      `remoteAuth=${JSON.stringify(launch.remoteAuth || null)}`,
-      `activeThemeProfile=${JSON.stringify(launch.activeThemeProfile || {})}`,
-      `inactiveThemeProfile=${JSON.stringify(launch.inactiveThemeProfile || {})}`
-    ].join("\n");
-  }
-
   function normalizeKeyword(value) {
     return String(value || "").trim().toLowerCase();
   }
@@ -349,20 +333,6 @@ export function createCommandExecutor(options = {}) {
       selectorLabel,
       resolveTargetSelectors
     );
-  }
-
-  function buildReplayExcerptSummary(payload) {
-    const selector = String(payload?.selector || "excerpt").trim() || "excerpt";
-    const resolvedCount = Number.isInteger(payload?.resolvedCount) ? payload.resolvedCount : 0;
-    const availableCount = Number.isInteger(payload?.availableCount) ? payload.availableCount : resolvedCount;
-    const chars = Number.isInteger(payload?.chars) ? payload.chars : String(payload?.data || "").length;
-    const lines = Number.isInteger(payload?.lines) ? payload.lines : String(payload?.data || "").split("\n").filter(Boolean).length;
-    const partialSuffix = payload?.selectorSatisfied === true ? "" : ", partial";
-    return `${selector} -> ${resolvedCount}/${availableCount} units, ${chars} chars, ${lines} lines${partialSuffix}`;
-  }
-
-  function buildReplayExcerptEmptyFeedback(session, selector) {
-    return `No replay excerpt matched ${selector} on [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
   }
 
   function resolveCustomCommandTargets(selectorText, sessions, activeSessionId, missingActiveMessage) {
@@ -551,6 +521,23 @@ export function createCommandExecutor(options = {}) {
     getTerminalSettings
   });
 
+  const reportingHandlers = createCommandExecutorReportingHandlers({
+    formatUsage,
+    resolveActiveOrDirectTargetSession,
+    resolveSingleSessionForCommand,
+    openSessionReplayViewer,
+    exportSessionReplayDownload,
+    exportSessionReplayCopy,
+    loadSessionReplayExcerpt,
+    copySessionReplayExcerpt,
+    previewSessionReplayExcerpt,
+    submitTerminalPaste,
+    uploadSessionFile,
+    downloadSessionFile,
+    formatSessionToken,
+    formatSessionDisplayName
+  });
+
   async function execute(interpreted) {
     const resolvedSlashCommand = resolveSlashCommand(interpreted);
     const commandRaw = resolvedSlashCommand.commandRaw;
@@ -585,126 +572,15 @@ export function createCommandExecutor(options = {}) {
       return sessionCommandFeedback;
     }
 
-    if (command === "replay") {
-      const subcommand = String(args[0] || "").trim().toLowerCase();
-      if (subcommand === "view" || subcommand === "export" || (subcommand === "copy" && args.length === 1)) {
-        const resolvedTarget = resolveActiveOrDirectTargetSession(
-          interpreted,
-          sessions,
-          activeSessionId,
-          "No active session for /replay.",
-          "Replay selector"
-        );
-        if (resolvedTarget.error) {
-          return resolvedTarget.error;
-        }
-        if (subcommand === "view") {
-          const outcome = await openSessionReplayViewer(resolvedTarget.session);
-          return outcome?.feedback || "";
-        }
-        const outcome =
-          subcommand === "copy"
-            ? await exportSessionReplayCopy(resolvedTarget.session)
-            : await exportSessionReplayDownload(resolvedTarget.session);
-        return outcome?.feedback || "";
-      }
-
-      if (subcommand === "preview" || subcommand === "copy" || subcommand === "paste") {
-        if (subcommand === "preview" && args.length !== 3) {
-          return formatUsage("replay", "preview");
-        }
-        if (subcommand === "copy" && args.length !== 3) {
-          return formatUsage("replay", "copy");
-        }
-        if (subcommand === "paste" && args.length !== 4) {
-          return formatUsage("replay", "paste");
-        }
-
-        const sourceResolution = resolveSingleSessionForCommand(
-          args[1],
-          sessions,
-          activeSessionId,
-          "Replay source selector must resolve to exactly one session.",
-          "Replay source selector"
-        );
-        if (sourceResolution.error) {
-          return sourceResolution.error;
-        }
-        const sliceSelector = String(args[subcommand === "paste" ? 3 : 2] || "").trim();
-        if (!sliceSelector) {
-          return formatUsage("replay", subcommand);
-        }
-        const excerptPayload = await loadSessionReplayExcerpt(sourceResolution.session, sliceSelector);
-        if (!excerptPayload || typeof excerptPayload !== "object") {
-          return "Failed to load replay excerpt.";
-        }
-        if (!excerptPayload.data) {
-          return buildReplayExcerptEmptyFeedback(sourceResolution.session, sliceSelector);
-        }
-        if (subcommand === "preview") {
-          return (
-            previewSessionReplayExcerpt(sourceResolution.session, excerptPayload) ||
-            `Preview from [${formatSessionToken(sourceResolution.session.id)}] ${formatSessionDisplayName(sourceResolution.session)} (${buildReplayExcerptSummary(excerptPayload)}).\n\n${excerptPayload.data}`
-          );
-        }
-        if (subcommand === "copy") {
-          const outcome = await copySessionReplayExcerpt(sourceResolution.session, sliceSelector, {
-            payload: excerptPayload
-          });
-          return (
-            outcome?.feedback ||
-            `Copied replay excerpt from [${formatSessionToken(sourceResolution.session.id)}] ${formatSessionDisplayName(sourceResolution.session)} (${buildReplayExcerptSummary(excerptPayload)}).`
-          );
-        }
-        const targetResolution = resolveSingleSessionForCommand(
-          args[2],
-          sessions,
-          activeSessionId,
-          "Replay target selector must resolve to exactly one session.",
-          "Replay target selector"
-        );
-        if (targetResolution.error) {
-          return targetResolution.error;
-        }
-        const pasteResult = await submitTerminalPaste(targetResolution.session.id, excerptPayload.data, {
-          source: "replay-paste",
-          activateTargetBeforeSend: true
-        });
-        if (pasteResult?.status === "sent") {
-          return `Pasted replay excerpt ${buildReplayExcerptSummary(excerptPayload)} from [${formatSessionToken(sourceResolution.session.id)}] ${formatSessionDisplayName(sourceResolution.session)} to [${formatSessionToken(targetResolution.session.id)}] ${formatSessionDisplayName(targetResolution.session)}.`;
-        }
-        return pasteResult?.feedback || "Failed to paste replay excerpt.";
-      }
-
-      return formatUsage("replay");
-    }
-
-    if (command === "transfer") {
-      const subcommand = String(args[0] || "").trim().toLowerCase();
-      if (subcommand !== "upload" && subcommand !== "download") {
-        return formatUsage("transfer");
-      }
-      const resolvedTarget = resolveActiveOrDirectTargetSession(
-        interpreted,
-        sessions,
-        activeSessionId,
-        "No active session for /transfer.",
-        "Transfer selector"
-      );
-      if (resolvedTarget.error) {
-        return resolvedTarget.error;
-      }
-      if (subcommand === "upload") {
-        const remotePath = args.slice(1).join(" ").trim();
-        const outcome = await uploadSessionFile(resolvedTarget.session, { remotePath });
-        return outcome?.feedback || "";
-      }
-      const remotePath = args.slice(1).join(" ").trim();
-      if (!remotePath) {
-        return formatUsage("transfer", "download");
-      }
-      const outcome = await downloadSessionFile(resolvedTarget.session, { remotePath });
-      return outcome?.feedback || "";
+    const reportingFeedback = await reportingHandlers.executeStructuredCommand({
+      command,
+      args,
+      interpreted,
+      sessions,
+      activeSessionId
+    });
+    if (reportingFeedback !== null) {
+      return reportingFeedback;
     }
 
     const structuredDomainFeedback = await domainHandlers.executeStructuredCommand({
