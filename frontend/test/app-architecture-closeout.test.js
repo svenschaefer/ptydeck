@@ -10,6 +10,9 @@ const appRuntimeCompositionPath = fileURLToPath(
 const appRuntimeBootstrapAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-bootstrap-assembly.js", import.meta.url)
 );
+const appRuntimeInitializationAccessCompositionPath = fileURLToPath(
+  new URL("../src/public/app-runtime-initialization-access-composition.js", import.meta.url)
+);
 const appRuntimeOperatorSupportAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-operator-support-assembly.js", import.meta.url)
 );
@@ -68,13 +71,11 @@ test("runtime composition controller owns the delegated runtime assembly contrac
   const source = await readFile(appRuntimeCompositionPath, "utf8");
 
   const requiredDelegationMarkers = [
-    "createAppCommandUiFacadeController",
     "createAppLayoutDeckFacadeController",
+    "createAppRuntimeInitializationAccessComposition",
     "createAppRuntimeOperatorSupportAssembly",
     "createAppRuntimeRecoveryComposition",
-    "createAppRuntimeSessionAccessAssembly",
     "createAppRuntimeStartupComposition",
-    "createAppRuntimeStateController",
     "createAppSessionRuntimeFacadeController",
     "createDeckRuntimeController",
     "createSessionRuntimeController",
@@ -94,6 +95,25 @@ test("runtime composition controller owns the delegated runtime assembly contrac
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+});
+
+test("runtime initialization/access composition owns the delegated ui-state and session-access contract", async () => {
+  const source = await readFile(appRuntimeInitializationAccessCompositionPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createAppCommandUiFacadeController",
+    "createAppRuntimeSessionAccessAssembly",
+    "createAppRuntimeStateController",
+    "appRuntimeStateController = createAppRuntimeStateController({",
+    "appCommandUiFacadeController = createAppCommandUiFacadeController({",
+    "const sessionAccessAssembly = createAppRuntimeSessionAccessAssembly({",
+    "const getAppRuntimeStateController =",
+    "const getAppCommandUiFacadeController ="
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime initialization/access marker ${marker}`);
   }
 });
 

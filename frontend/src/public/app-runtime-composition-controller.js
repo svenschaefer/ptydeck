@@ -1,12 +1,10 @@
-import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
+import { createAppRuntimeInitializationAccessComposition } from "./app-runtime-initialization-access-composition.js";
 import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-support-assembly.js";
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
-import { createAppRuntimeSessionAccessAssembly } from "./app-runtime-session-access-assembly.js";
 import { createAppRuntimeStartupComposition } from "./app-runtime-startup-composition.js";
-import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createConnectionProfileRuntimeController } from "./connection-profile-runtime-controller.js";
@@ -515,21 +513,63 @@ const uiState = {
   startupGateCanSkip: false
 };
 
-const sessionAccessAssembly = createAppRuntimeSessionAccessAssembly({
+const terminalSearchState = {
+  query: "",
+  sessionId: "",
+  selectedSessionId: "",
+  matches: [],
+  activeIndex: -1,
+  revision: -1,
+  wrapped: false,
+  direction: "next",
+  missingActiveSession: false
+};
+const nowMs =
+  typeof window !== "undefined" &&
+  window.performance &&
+  typeof window.performance.now === "function"
+    ? () => window.performance.now()
+    : () => Date.now();
+const startupPerf = {
+  appStartAtMs: nowMs(),
+  bootstrapRequestCount: 0,
+  bootstrapReadyAtMs: null,
+  firstNonEmptyRenderAtMs: null,
+  firstTerminalMountedAtMs: null,
+  startupReported: false
+};
+if (typeof window !== "undefined") {
+  window.__PTYDECK_PERF__ = startupPerf;
+}
+
+const appRuntimeInitializationAccessComposition = createAppRuntimeInitializationAccessComposition({
   windowRef: window,
   documentRef: document,
   config,
   uiState,
-  api,
-  store,
+  startupPerf,
+  nowMs,
+  wsBootstrapFallbackMs: WS_BOOTSTRAP_FALLBACK_MS,
   debugLog,
-  requestRender: () => appCommandUiFacadeController?.render?.(),
-  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
-  clearCommandFeedbackAction: (options) => appRuntimeStateController?.clearCommandFeedbackAction?.(options),
-  setCommandFeedbackAction: (nextState) => appRuntimeStateController?.setCommandFeedbackAction?.(nextState),
-  clearError: () => appRuntimeStateController?.clearError?.(),
-  setError: (message) => appCommandUiFacadeController?.setError?.(message),
-  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  terminalSearchState,
+  store,
+  getAppRuntimeStateController: () => appRuntimeStateController,
+  getAppCommandUiFacadeController: () => appCommandUiFacadeController,
+  getAuthBootstrapRuntimeController: () => authBootstrapRuntimeController,
+  getTerminalSearchController: () => terminalSearchController,
+  getCommandComposerAutocompleteController: () => commandComposerAutocompleteController,
+  getCommandComposerRuntimeController: () => commandComposerRuntimeController,
+  getCommandTargetRuntimeController: () => commandTargetRuntimeController,
+  getSessionGridController: () => sessionGridController,
+  getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
+  getControlPaneRuntimeController: () => controlPaneRuntimeController,
+  getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
+  getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
+  getSendHistoryRuntimeController: () => sendHistoryRuntimeController,
+  getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
+  getPasteObservationRuntimeController: () => pasteObservationRuntimeController,
+  getCommandExecutor: () => commandExecutor,
+  api,
   getSessions: () => {
     const state = store?.getState?.() || {};
     return Array.isArray(state.sessions) ? state.sessions : [];
@@ -541,7 +581,8 @@ const sessionAccessAssembly = createAppRuntimeSessionAccessAssembly({
     trustedLocalHandoffRuntimeController?.takeControlScope?.(scope, runtimeOptions),
   renameTrustedLocalClientIdentity: (label) => trustedLocalClientRuntimeController.renameClientIdentity(label),
   retryBlockedAction: (retryAction) => commandComposerRuntimeController?.retryBlockedAction?.(retryAction),
-  applyResizeForSession: (sessionId, options) => sessionTerminalResizeController?.applyResizeForSession?.(sessionId, options),
+  applyResizeForSession: (sessionId, runtimeOptions) =>
+    sessionTerminalResizeController?.applyResizeForSession?.(sessionId, runtimeOptions),
   showControlPane: () => controlPaneRuntimeController?.show?.(),
   listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
   resolveDeckForSession: (session) => {
@@ -569,22 +610,25 @@ const sessionAccessAssembly = createAppRuntimeSessionAccessAssembly({
     sessionUiFacadeController?.getBlockedSessionActionMessage?.(sessions, actionLabel) || "",
   defaultDeckId: DEFAULT_DECK_ID
 });
-sessionControlRuntimeController = sessionAccessAssembly.sessionControlRuntimeController;
-sessionQuickSendRuntimeController = sessionAccessAssembly.sessionQuickSendRuntimeController;
-const setAccessState = sessionAccessAssembly.setAccessState;
-const isReadOnlyMode = sessionAccessAssembly.isReadOnlyMode;
-const getReadOnlyModeMessage = sessionAccessAssembly.getReadOnlyModeMessage;
-const canWriteToSession = sessionAccessAssembly.canWriteToSession;
-const getSessionWriteBlockMessage = sessionAccessAssembly.getSessionWriteBlockMessage;
-const canTakeSessionControl = sessionAccessAssembly.canTakeSessionControl;
-const setRuntimeClientId = sessionAccessAssembly.setRuntimeClientId;
-const getRuntimeClientId = sessionAccessAssembly.getRuntimeClientId;
-const renameTrustedLocalDevice = sessionAccessAssembly.renameTrustedLocalDevice;
-const showBlockedWriteReclaimUi = sessionAccessAssembly.showBlockedWriteReclaimUi;
-const renderSessionControl = sessionAccessAssembly.renderSessionControl;
-const maybeRedirectToCanonicalOrigin = sessionAccessAssembly.maybeRedirectToCanonicalOrigin;
-const maybeAutoRepairOriginHandoffControl = sessionAccessAssembly.maybeAutoRepairOriginHandoffControl;
-const handleCommandFeedbackAction = sessionAccessAssembly.handleCommandFeedbackAction;
+appRuntimeStateController = appRuntimeInitializationAccessComposition.appRuntimeStateController;
+appCommandUiFacadeController = appRuntimeInitializationAccessComposition.appCommandUiFacadeController;
+sessionControlRuntimeController = appRuntimeInitializationAccessComposition.sessionControlRuntimeController;
+sessionQuickSendRuntimeController = appRuntimeInitializationAccessComposition.sessionQuickSendRuntimeController;
+const setAccessState = appRuntimeInitializationAccessComposition.setAccessState;
+const isReadOnlyMode = appRuntimeInitializationAccessComposition.isReadOnlyMode;
+const getReadOnlyModeMessage = appRuntimeInitializationAccessComposition.getReadOnlyModeMessage;
+const canWriteToSession = appRuntimeInitializationAccessComposition.canWriteToSession;
+const getSessionWriteBlockMessage = appRuntimeInitializationAccessComposition.getSessionWriteBlockMessage;
+const canTakeSessionControl = appRuntimeInitializationAccessComposition.canTakeSessionControl;
+const setRuntimeClientId = appRuntimeInitializationAccessComposition.setRuntimeClientId;
+const getRuntimeClientId = appRuntimeInitializationAccessComposition.getRuntimeClientId;
+const renameTrustedLocalDevice = appRuntimeInitializationAccessComposition.renameTrustedLocalDevice;
+const showBlockedWriteReclaimUi = appRuntimeInitializationAccessComposition.showBlockedWriteReclaimUi;
+const renderSessionControl = appRuntimeInitializationAccessComposition.renderSessionControl;
+const maybeRedirectToCanonicalOrigin = appRuntimeInitializationAccessComposition.maybeRedirectToCanonicalOrigin;
+const maybeAutoRepairOriginHandoffControl =
+  appRuntimeInitializationAccessComposition.maybeAutoRepairOriginHandoffControl;
+const handleCommandFeedbackAction = appRuntimeInitializationAccessComposition.handleCommandFeedbackAction;
 
 function installTestHooks() {
   if (!testHooks || typeof testHooks !== "object") {
@@ -657,69 +701,6 @@ function installTestHooks() {
 }
 
 installTestHooks();
-const terminalSearchState = {
-  query: "",
-  sessionId: "",
-  selectedSessionId: "",
-  matches: [],
-  activeIndex: -1,
-  revision: -1,
-  wrapped: false,
-  direction: "next",
-  missingActiveSession: false
-};
-const nowMs =
-  typeof window !== "undefined" &&
-  window.performance &&
-  typeof window.performance.now === "function"
-    ? () => window.performance.now()
-    : () => Date.now();
-const startupPerf = {
-  appStartAtMs: nowMs(),
-  bootstrapRequestCount: 0,
-  bootstrapReadyAtMs: null,
-  firstNonEmptyRenderAtMs: null,
-  firstTerminalMountedAtMs: null,
-  startupReported: false
-};
-if (typeof window !== "undefined") {
-  window.__PTYDECK_PERF__ = startupPerf;
-}
-
-appRuntimeStateController = createAppRuntimeStateController({
-  windowRef: window,
-  uiState,
-  startupPerf,
-  nowMs,
-  wsBootstrapFallbackMs: WS_BOOTSTRAP_FALLBACK_MS,
-  debugLog,
-  requestRender: () => appCommandUiFacadeController?.render(),
-  hasBootstrapInFlight: () => authBootstrapRuntimeController?.hasBootstrapInFlight?.() === true,
-  runBootstrapFallback: () => authBootstrapRuntimeController?.bootstrapRuntimeFallback?.(),
-  runBootstrapDevAuthToken: (options) => authBootstrapRuntimeController?.bootstrapDevAuthToken?.(options) || false
-});
-
-appCommandUiFacadeController = createAppCommandUiFacadeController({
-  store,
-  uiState,
-  startupPerf,
-  nowMs,
-  terminalSearchState,
-  getAppRuntimeStateController: () => appRuntimeStateController,
-  getTerminalSearchController: () => terminalSearchController,
-  getCommandComposerAutocompleteController: () => commandComposerAutocompleteController,
-  getCommandComposerRuntimeController: () => commandComposerRuntimeController,
-  getCommandTargetRuntimeController: () => commandTargetRuntimeController,
-  getSessionGridController: () => sessionGridController,
-  getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
-  getControlPaneRuntimeController: () => controlPaneRuntimeController,
-  getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
-  getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
-  getSendHistoryRuntimeController: () => sendHistoryRuntimeController,
-  getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
-  getPasteObservationRuntimeController: () => pasteObservationRuntimeController,
-  getCommandExecutor: () => commandExecutor
-});
 
 layoutRuntimeController = createLayoutRuntimeController({
   windowRef: window,
