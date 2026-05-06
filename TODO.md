@@ -14,12 +14,18 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- None.
+- `QLT-308` Owner `FE`: Stabilize the currently failing frontend integration regressions in `frontend/test/app.test.js` (`app handles critical error paths, DOM lifecycle, and connection state rendering`; `app search tracks active terminal matches across buffer growth and deck switching`) and restore a green `npm --prefix frontend run test` / `npm --prefix frontend run test:coverage` baseline.
+- `QLT-309` Owner `BE`: Extract the next retained startup/ready/catalog/session-authority helper seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
+- `QLT-310` Owner `BE`: Harden retained catalog/state normalization coverage in `backend/src/runtime-library-normalization.js` and adjacent library-authority branches that still dominate backend uncovered lines.
+- `QLT-311` Owner `BE`: Harden launch/reconnect and quick-send persistence branches across `backend/src/session-manager.js`, `backend/src/session-manager-launch-runtime.js`, and `backend/src/session-quick-send-usage.js`.
+- `QLT-312` Owner `FE`: Extract the next initialization/error/reclaim helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions after the frontend integration baseline is green again.
+- `QLT-313` Owner `FE`: Isolate the next SSH/profile guarded-action seam from `frontend/src/public/connection-profile-runtime-controller.js` and close the remaining selection, trust, and draft-presentation branch gaps.
+- `QLT-314` Owner `FE`: Harden retained operator/workspace interaction coverage across `frontend/src/public/command-palette-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and the thin `frontend/src/public/workspace-preset-runtime-controller.js` shell.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role is currently inactive.
+- `FE` ownership role (active): owns `QLT-308`, `QLT-312`, `QLT-313`, and `QLT-314`.
+- `BE` ownership role (active): owns `QLT-309`, `QLT-310`, and `QLT-311`.
 - `QA` ownership role is currently inactive.
-- `BE` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.
