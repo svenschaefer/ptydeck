@@ -26,6 +26,7 @@ import { createRuntimeSessionControlDispatch } from "./runtime-session-control-d
 import { createRuntimeSessionState } from "./runtime-session-state.js";
 import { createRuntimeSshTrust } from "./runtime-ssh-trust.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
+import { createRuntimeStartupRestore } from "./runtime-startup-restore.js";
 import { createRuntimeWsConnectionHandler } from "./runtime-ws-connection.js";
 import { createRuntimeWsUpgradeHandler } from "./runtime-ws-upgrade.js";
 import { createRuntimeWsTicketRegistry, normalizeWsDisconnectReason } from "./runtime-ws-tickets.js";
@@ -2802,6 +2803,75 @@ function tryCreateRestoredSession({
     }
   }, 30000);
 
+  const runtimeStartupRestore = createRuntimeStartupRestore({
+    persistence,
+    sessionReplayPersistMaxChars,
+    startupWarmup,
+    decks,
+    connectionProfiles,
+    layoutProfiles,
+    workspacePresets,
+    sshTrustEntries,
+    shareLinks,
+    telegramTopicBindings,
+    sessionDeckAssignments,
+    sessionQuickIdAssignments,
+    sessionControlStates,
+    unrestoredSessions,
+    customCommands,
+    manager,
+    messagingRuntime,
+    normalizeDeckEntity,
+    normalizeLayoutProfileEntity,
+    normalizeConnectionProfileEntity,
+    slugifyConnectionProfileId,
+    normalizeSshTrustEntryEntity,
+    findSshTrustConflict,
+    normalizePersistedShareLinkEntity,
+    normalizeMessagingTopicBindings,
+    syncSshKnownHostsFile,
+    ensureDefaultDeck,
+    logDebug,
+    createLocalOperatorPrincipal,
+    setSessionControlState,
+    normalizeSessionKind,
+    normalizeSessionStartupConfig,
+    normalizeSessionRemoteConnection,
+    normalizeSessionRemoteAuth,
+    normalizeSessionThemeSlots,
+    normalizeSessionNote,
+    normalizeSessionMouseForwardingMode,
+    normalizeSessionInputSafetyProfile,
+    normalizeSessionTags,
+    normalizeQuickSendUsageEntries,
+    assignSessionQuickIdToken,
+    deriveTerminalAppIdentityFromSessionHints,
+    remoteAuthRequiresSecret,
+    tryCreateRestoredSession,
+    listSessionIdsForAuth,
+    reconcileSessionControllerForSession,
+    buildCustomCommandEntry,
+    buildCustomCommandKey,
+    compareCustomCommandEntries,
+    ensureSessionExistsOrThrow,
+    normalizeWorkspacePresetEntity,
+    cleanupLayoutProfiles,
+    cleanupConnectionProfiles,
+    cleanupWorkspacePresets,
+    hasKnownSession,
+    resolveSessionDeckId,
+    metrics,
+    customCommandNamePattern: CUSTOM_COMMAND_NAME_PATTERN,
+    customCommandReservedNames: CUSTOM_COMMAND_RESERVED_NAMES,
+    customCommandMaxNameLength,
+    customCommandMaxContentLength,
+    customCommandMaxCount,
+    defaultDeckId: DEFAULT_DECK_ID,
+    defaultSshClient: DEFAULT_SSH_CLIENT,
+    sessionKindSsh: SESSION_KIND_SSH,
+    defaultShell: config.shell
+  });
+
   async function start() {
     isStopped = false;
     isStopping = false;
@@ -2812,347 +2882,8 @@ function tryCreateRestoredSession({
     startupWarmupReadyPromise = new Promise((resolve) => {
       startupWarmupResolve = resolve;
     });
-
-    const persistedState = await persistence.loadState();
-    persistedReplayOutputs = new Map(
-      Array.isArray(persistedState.sessionOutputs)
-        ? persistedState.sessionOutputs
-            .filter(
-              (entry) =>
-                entry &&
-                typeof entry.sessionId === "string" &&
-                typeof entry.data === "string" &&
-                (entry.truncated === undefined || typeof entry.truncated === "boolean")
-            )
-            .map((entry) => [
-              entry.sessionId,
-              {
-                data: entry.data,
-                retainedChars: entry.data.length,
-                retentionLimitChars: sessionReplayPersistMaxChars,
-                truncated: entry.truncated === true
-              }
-            ])
-        : []
-    );
-    startupWarmup.setEnabled(Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0);
-    decks.clear();
-    connectionProfiles.clear();
-    layoutProfiles.clear();
-    workspacePresets.clear();
-    sshTrustEntries.clear();
-    shareLinks.clear();
-    telegramTopicBindings.clear();
-    sessionDeckAssignments.clear();
-    sessionQuickIdAssignments.clear();
-    for (const persistedDeck of persistedState.decks) {
-      const normalizedDeck = normalizeDeckEntity(persistedDeck);
-      if (!normalizedDeck) {
-        continue;
-      }
-      decks.set(normalizedDeck.id, normalizedDeck);
-    }
-    const persistedSessionDeckAssignments = new Map();
-    for (const session of Array.isArray(persistedState.sessions) ? persistedState.sessions : []) {
-      if (!session || typeof session.id !== "string" || !session.id) {
-        continue;
-      }
-      const persistedDeckId =
-        typeof session.deckId === "string" && session.deckId && decks.has(session.deckId)
-          ? session.deckId
-          : DEFAULT_DECK_ID;
-      persistedSessionDeckAssignments.set(session.id, persistedDeckId);
-    }
-    for (const persistedLayoutProfile of Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles : []) {
-      const normalizedProfile = normalizeLayoutProfileEntity(persistedLayoutProfile, {
-        strict: false,
-        hasKnownSession: (sessionId) => persistedSessionDeckAssignments.has(sessionId) || hasKnownSession(sessionId),
-        resolveSessionDeckId: (sessionId) =>
-          persistedSessionDeckAssignments.get(sessionId) ||
-          resolveSessionDeckId(sessionId)
-      });
-      if (!normalizedProfile) {
-        continue;
-      }
-      layoutProfiles.set(normalizedProfile.id, normalizedProfile);
-    }
-    for (const persistedConnectionProfile of Array.isArray(persistedState.connectionProfiles) ? persistedState.connectionProfiles : []) {
-      const normalizedProfile = normalizeConnectionProfileEntity(persistedConnectionProfile, {
-        strict: false,
-        defaultShell: config.shell,
-        hasKnownDeck: (deckId) => decks.has(deckId)
-      });
-      if (!normalizedProfile) {
-        continue;
-      }
-      if (!normalizedProfile.id) {
-        normalizedProfile.id = slugifyConnectionProfileId(normalizedProfile.name);
-      }
-      connectionProfiles.set(normalizedProfile.id, normalizedProfile);
-    }
-    for (const persistedSshTrustEntry of Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries : []) {
-      const normalizedEntry = normalizeSshTrustEntryEntity(persistedSshTrustEntry, { strict: false });
-      if (!normalizedEntry) {
-        continue;
-      }
-      const conflict = findSshTrustConflict(normalizedEntry);
-      if (conflict?.type === "conflict") {
-        logDebug("runtime.restore.ssh_trust_entry_skip", {
-          entryId: normalizedEntry.id,
-          host: normalizedEntry.host,
-          port: normalizedEntry.port,
-          keyType: normalizedEntry.keyType,
-          reason: "conflicting-existing-entry"
-        });
-        continue;
-      }
-      if (conflict?.type === "exact") {
-        continue;
-      }
-      sshTrustEntries.set(normalizedEntry.id, normalizedEntry);
-    }
-    for (const persistedShareLink of Array.isArray(persistedState.shareLinks) ? persistedState.shareLinks : []) {
-      const normalizedShareLink = normalizePersistedShareLinkEntity(persistedShareLink, { strict: false });
-      if (!normalizedShareLink) {
-        continue;
-      }
-      shareLinks.set(normalizedShareLink.id, normalizedShareLink);
-    }
-    for (const binding of normalizeMessagingTopicBindings(persistedState.messagingTelegramTopicBindings)) {
-      telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
-    }
-    messagingRuntime.replaceTelegramTopicBindings(Array.from(telegramTopicBindings.values()));
-    await syncSshKnownHostsFile();
-    ensureDefaultDeck();
-    logDebug("runtime.restore.start", {
-      persistedSessionCount: persistedState.sessions.length,
-      persistedCustomCommandCount: persistedState.customCommands.length,
-      persistedDeckCount: persistedState.decks.length,
-      persistedConnectionProfileCount: Array.isArray(persistedState.connectionProfiles) ? persistedState.connectionProfiles.length : 0,
-      persistedLayoutProfileCount: Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles.length : 0,
-      persistedWorkspacePresetCount: Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets.length : 0,
-      persistedSshTrustEntryCount: Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries.length : 0,
-      persistedShareLinkCount: Array.isArray(persistedState.shareLinks) ? persistedState.shareLinks.length : 0
-    });
-    for (const session of persistedState.sessions) {
-      try {
-        const persistedDeckId =
-          typeof session.deckId === "string" && session.deckId && decks.has(session.deckId)
-            ? session.deckId
-            : DEFAULT_DECK_ID;
-        sessionDeckAssignments.set(session.id, persistedDeckId);
-        setSessionControlState(session.id, session.controlState, createLocalOperatorPrincipal());
-        const kind = normalizeSessionKind(session.kind, { strict: false });
-        const startupConfig = normalizeSessionStartupConfig(
-          {
-            startCwd: session.startCwd !== undefined ? session.startCwd : session.cwd,
-            startCommand: session.startCommand,
-            env: session.env,
-            fallbackCwd: kind === SESSION_KIND_SSH ? "~" : session.cwd
-          },
-          { strict: false }
-        );
-        const remoteConnection = normalizeSessionRemoteConnection(session.remoteConnection, kind, { strict: false });
-        const remoteAuth = normalizeSessionRemoteAuth(session.remoteAuth, kind, { strict: false });
-        const themeSlots = normalizeSessionThemeSlots(
-          {
-            themeProfile: session.themeProfile,
-            activeThemeProfile: session.activeThemeProfile,
-            inactiveThemeProfile: session.inactiveThemeProfile
-          },
-          { strict: false }
-        );
-        const note = normalizeSessionNote(session.note, { strict: false });
-        const mouseForwardingMode = normalizeSessionMouseForwardingMode(session.mouseForwardingMode, { strict: false });
-        const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile, { strict: false });
-        const tags = normalizeSessionTags(session.tags, { strict: false });
-        const quickSendUsage = normalizeQuickSendUsageEntries(session.quickSendUsage);
-        const quickIdToken = assignSessionQuickIdToken(session.id, session.quickIdToken);
-        const requestedShell =
-          typeof session.shell === "string" && session.shell.trim()
-            ? session.shell
-            : kind === SESSION_KIND_SSH
-              ? DEFAULT_SSH_CLIENT
-              : config.shell;
-        const restoredCreatedAt = Number.isInteger(session.createdAt) ? session.createdAt : Date.now();
-        const restoredUpdatedAt = Number.isInteger(session.updatedAt) ? session.updatedAt : restoredCreatedAt;
-        const normalizedUnrestoredSession = {
-          id: typeof session.id === "string" && session.id ? session.id : "",
-          kind,
-          ...(remoteConnection ? { remoteConnection } : {}),
-          ...(remoteAuth ? { remoteAuth } : {}),
-          cwd:
-            typeof session.cwd === "string" && session.cwd.trim()
-              ? session.cwd
-              : startupConfig.startCwd,
-          shell: requestedShell,
-          ...(typeof session.name === "string" ? { name: session.name } : {}),
-          startCwd: startupConfig.startCwd,
-          startCommand: startupConfig.startCommand,
-          env: startupConfig.env,
-          ...(note ? { note } : {}),
-          mouseForwardingMode,
-          quickIdToken,
-          inputSafetyProfile,
-          tags,
-          quickSendUsage,
-          themeProfile: themeSlots.themeProfile,
-          activeThemeProfile: themeSlots.activeThemeProfile,
-          inactiveThemeProfile: themeSlots.inactiveThemeProfile,
-          appIdentity: deriveTerminalAppIdentityFromSessionHints(
-            {
-              kind,
-              shell: requestedShell,
-              ...(typeof session.name === "string" ? { name: session.name } : {}),
-              startCommand: startupConfig.startCommand
-            },
-            { updatedAt: restoredUpdatedAt }
-          ),
-          deckId: persistedDeckId,
-          createdAt: restoredCreatedAt,
-          updatedAt: restoredUpdatedAt
-        };
-        const requestedCwd = startupConfig.startCwd;
-        const fallbackCwd = kind === SESSION_KIND_SSH ? "~" : homedir();
-        const fallbackShell = kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : config.shell;
-        if (remoteAuthRequiresSecret(remoteAuth)) {
-          unrestoredSessions.set(normalizedUnrestoredSession.id, normalizedUnrestoredSession);
-          logDebug("restore.session.skip", {
-            sessionId: normalizedUnrestoredSession.id,
-            reason: "missing-remote-secret",
-            kind,
-            authMethod: remoteAuth?.method || null
-          });
-          continue;
-        }
-        const restoreAttempts = [
-          { shell: requestedShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "saved-shell+saved-cwd" },
-          { shell: fallbackShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "fallback-shell+saved-cwd" },
-          { shell: requestedShell, cwd: fallbackCwd, startCwd: fallbackCwd, reason: "saved-shell+home-cwd" },
-          { shell: fallbackShell, cwd: fallbackCwd, startCwd: fallbackCwd, reason: "fallback-shell+home-cwd" }
-        ];
-
-        let restored = false;
-        for (const attempt of restoreAttempts) {
-          try {
-            tryCreateRestoredSession({
-              session,
-              kind,
-              remoteConnection,
-              remoteAuth,
-              shell: attempt.shell,
-              cwd: attempt.cwd,
-              startCwd: attempt.startCwd,
-              startCommand: startupConfig.startCommand,
-              replayOutput: persistedReplayOutputs.get(session.id)?.data || "",
-              remoteSecret: undefined,
-              replayOutputTruncated: persistedReplayOutputs.get(session.id)?.truncated === true,
-              env: startupConfig.env,
-              quickIdToken,
-              note,
-              mouseForwardingMode,
-              inputSafetyProfile,
-              tags,
-              quickSendUsage,
-              themeProfile: themeSlots.themeProfile,
-              activeThemeProfile: themeSlots.activeThemeProfile,
-              inactiveThemeProfile: themeSlots.inactiveThemeProfile
-            });
-            restored = true;
-            if (attempt.reason !== "saved-shell+saved-cwd") {
-              logDebug("runtime.restore.session_fallback_applied", {
-                sessionId: session.id,
-                reason: attempt.reason,
-                requestedShell,
-                requestedStartCwd: requestedCwd,
-                appliedShell: attempt.shell,
-                appliedStartCwd: attempt.startCwd
-              });
-            }
-            break;
-          } catch (err) {
-            logDebug("runtime.restore.session_attempt_failed", {
-              sessionId: session.id,
-              reason: attempt.reason,
-              shell: attempt.shell,
-              startCwd: attempt.startCwd,
-              error: err?.message || String(err)
-            });
-          }
-        }
-
-        if (!restored) {
-          unrestoredSessions.set(normalizedUnrestoredSession.id, normalizedUnrestoredSession);
-          metrics.sessionsUnrestoredTotal += 1;
-          logDebug("runtime.restore.session_marked_unrestored", {
-            sessionId: normalizedUnrestoredSession.id
-          });
-          throw new Error("all restore attempts failed");
-        }
-        unrestoredSessions.delete(normalizedUnrestoredSession.id);
-      } catch (err) {
-        console.error("failed to restore session", session.id, err);
-      }
-    }
-    for (const sessionId of listSessionIdsForAuth(null)) {
-      reconcileSessionControllerForSession(sessionId);
-    }
-    const restoreCandidates = [];
-    for (const customCommand of persistedState.customCommands) {
-      const candidate = buildCustomCommandEntry(customCommand?.name, customCommand, {
-        strict: false,
-        fieldPathPrefix: "customCommands[]"
-      });
-      if (!candidate) {
-        continue;
-      }
-      if (
-        candidate.name.length > customCommandMaxNameLength ||
-        !CUSTOM_COMMAND_NAME_PATTERN.test(candidate.name) ||
-        CUSTOM_COMMAND_RESERVED_NAMES.has(candidate.name) ||
-        candidate.content.length > customCommandMaxContentLength
-      ) {
-        continue;
-      }
-      restoreCandidates.push(candidate);
-    }
-    restoreCandidates.sort(compareCustomCommandEntries);
-    for (const candidate of restoreCandidates) {
-      if (candidate.scope === "session") {
-        try {
-          ensureSessionExistsOrThrow(candidate.sessionId);
-        } catch {
-          continue;
-        }
-      }
-      const key = buildCustomCommandKey(candidate.name, candidate.scope, candidate.sessionId);
-      if (customCommands.has(key)) {
-        customCommands.set(key, candidate);
-        continue;
-      }
-      if (customCommands.size >= customCommandMaxCount) {
-        continue;
-      }
-      customCommands.set(key, candidate);
-    }
-    for (const persistedWorkspacePreset of Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets : []) {
-      const normalizedPreset = normalizeWorkspacePresetEntity(persistedWorkspacePreset, { strict: false });
-      if (!normalizedPreset) {
-        continue;
-      }
-      workspacePresets.set(normalizedPreset.id, normalizedPreset);
-    }
-    cleanupLayoutProfiles();
-    cleanupConnectionProfiles();
-    cleanupWorkspacePresets();
-    logDebug("runtime.restore.done", {
-      restoredSessionCount: manager.list().length,
-      unrestoredSessionCount: unrestoredSessions.size,
-      restoredCustomCommandCount: customCommands.size,
-      restoredDeckCount: decks.size,
-      restoredConnectionProfileCount: connectionProfiles.size,
-      restoredWorkspacePresetCount: workspacePresets.size
-    });
+    const restoredState = await runtimeStartupRestore.restorePersistedRuntimeState();
+    persistedReplayOutputs = restoredState.persistedReplayOutputs;
 
     await new Promise((resolve) => {
       server.listen(config.port, resolve);

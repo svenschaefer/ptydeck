@@ -188,6 +188,71 @@ test("session-manager launch runtime updates ssh remote availability state deter
   assert.equal(sessionUpdates.length, 2);
 });
 
+test("session-manager launch runtime keeps reconnect guard branches fail-closed", () => {
+  const { runtime, sessions, sessionUpdates, timers } = createLaunchRuntimeHarness();
+
+  runtime.markRemoteSessionConnected({ meta: { kind: "local" } }, 1700000000100);
+  runtime.markRemoteSessionUnavailable({ meta: { kind: "local" } }, "offline", 1700000000100);
+  assert.equal(runtime.scheduleRemoteReconnect({ meta: { kind: "local" } }, {}), false);
+
+  runtime.attemptRemoteReconnect("missing", "ssh-transport-exit");
+
+  sessions.set("local", {
+    id: "local",
+    ptyProcess: null,
+    expectedExitReason: "",
+    meta: {
+      id: "local",
+      kind: "local",
+      remoteRuntime: null
+    }
+  });
+  runtime.attemptRemoteReconnect("local", "ssh-transport-exit");
+
+  sessions.set("expected", {
+    id: "expected",
+    ptyProcess: null,
+    expectedExitReason: "deleted",
+    meta: {
+      id: "expected",
+      kind: "ssh",
+      shell: "ssh",
+      remoteRuntime: {
+        connectivityState: "degraded",
+        reconnectPolicy: {
+          maxAttempts: 3,
+          delayMs: 25
+        },
+        reconnectAttempts: 1
+      }
+    }
+  });
+  runtime.attemptRemoteReconnect("expected", "ssh-transport-exit");
+
+  sessions.set("busy", {
+    id: "busy",
+    ptyProcess: createFakePty(),
+    expectedExitReason: "",
+    meta: {
+      id: "busy",
+      kind: "ssh",
+      shell: "ssh",
+      remoteRuntime: {
+        connectivityState: "degraded",
+        reconnectPolicy: {
+          maxAttempts: 3,
+          delayMs: 25
+        },
+        reconnectAttempts: 1
+      }
+    }
+  });
+  runtime.attemptRemoteReconnect("busy", "ssh-transport-exit");
+
+  assert.equal(sessionUpdates.length, 0);
+  assert.equal(timers.length, 0);
+});
+
 test("session-manager launch runtime attempts ssh reconnects and marks them connected after the stabilize window", () => {
   const { runtime, sessions, attached, createdPtys, sessionUpdates, timers } = createLaunchRuntimeHarness();
   const session = {
@@ -252,6 +317,60 @@ test("session-manager launch runtime attempts ssh reconnects and marks them conn
   assert.equal(attached[0].launchSpec.command, "ssh");
   assert.equal(createdPtys[0].spawnOptions.env.TERM, "xterm-256color");
   assert.equal(createdPtys[0].spawnOptions.args.includes("HostKeyAlgorithms=ssh-rsa"), true);
+});
+
+test("session-manager launch runtime ignores stale stabilize timers after reconnect attach", () => {
+  const { runtime, sessions, timers, sessionUpdates } = createLaunchRuntimeHarness();
+  const session = {
+    id: "session-stale",
+    ptyProcess: null,
+    remoteSecret: "",
+    expectedExitReason: "",
+    meta: {
+      id: "session-stale",
+      kind: "ssh",
+      shell: "ssh",
+      cwd: "~/old",
+      startCwd: "~/workspace",
+      startCommand: "",
+      env: {},
+      remoteConnection: {
+        host: "example.internal",
+        port: 22,
+        username: "ops"
+      },
+      remoteAuth: {
+        method: "privateKey",
+        privateKeyPath: "/keys/id_rsa"
+      },
+      remoteRuntime: {
+        connectivityState: "degraded",
+        reconnectPolicy: {
+          maxAttempts: 3,
+          delayMs: 25
+        },
+        reconnectAttempts: 0,
+        disconnectedAt: 1700000000000,
+        nextReconnectAt: 1700000000025,
+        lastReconnectAt: null,
+        lastDisconnectReason: "ssh-transport-exit",
+        lastExitCode: 255,
+        lastExitSignal: ""
+      },
+      updatedAt: 1700000000000
+    }
+  };
+  sessions.set(session.id, session);
+
+  runtime.attemptRemoteReconnect(session.id, "ssh-transport-exit");
+
+  assert.equal(timers.length, 1);
+  const originalUpdates = sessionUpdates.length;
+  session.ptyProcess = createFakePty({ pid: 4999 });
+  timers[0].fn();
+
+  assert.equal(session.meta.remoteRuntime.connectivityState, "degraded");
+  assert.equal(sessionUpdates.length, originalUpdates);
 });
 
 test("session-manager launch runtime keeps failed reconnect attempts bounded and fail-closed", () => {

@@ -484,6 +484,47 @@ test("runtime library normalization validates layout split-layout and control-pa
   assert.equal(normalization.normalizeLayoutProfileEntity({ id: "not valid" }), null);
 });
 
+test("runtime library normalization keeps lenient split-layout fallback branches deterministic", () => {
+  const normalization = createHarness();
+
+  const lenientLayout = normalization.normalizeLayoutProfileLayout(
+    {
+      deckSplitLayouts: {
+        "Invalid Deck": {
+          root: { type: "pane", paneId: "ignored" }
+        },
+        default: {
+          root: {
+            type: "row",
+            children: [
+              { type: "pane", paneId: null },
+              { type: "pane", paneId: "Main" }
+            ],
+            weights: "invalid"
+          },
+          paneSessions: {
+            main: ["session-1", "session-2", "session-1", 17],
+            side: ["session-3"],
+            "Invalid Pane": ["session-1"]
+          }
+        }
+      }
+    },
+    {
+      strict: false,
+      hasKnownSession: (sessionId) => ["session-1", "session-2", "session-3"].includes(sessionId),
+      resolveSessionDeckId: (sessionId) => (sessionId === "session-2" ? "ops" : "default")
+    }
+  );
+
+  assert.deepEqual(lenientLayout.deckSplitLayouts, {
+    default: {
+      root: { type: "pane", paneId: "main" },
+      paneSessions: { main: ["session-1"] }
+    }
+  });
+});
+
 test("runtime library normalization shapes workspace presets against known decks, sessions, and layouts", () => {
   const normalization = createHarness();
 
@@ -641,6 +682,45 @@ test("runtime library normalization validates workspace preset fallbacks and bra
   );
 
   assert.equal(normalization.normalizeWorkspacePresetEntity({ id: "not valid" }), null);
+});
+
+test("runtime library normalization keeps lenient workspace fallback branches deterministic without a default deck", () => {
+  const normalization = createHarness({
+    decks: new Map([["ops", { id: "ops", name: "Ops" }]]),
+    layoutProfiles: new Map(),
+    knownSessions: new Map([["session-2", "ops"]])
+  });
+
+  const workspace = normalization.normalizeWorkspacePresetWorkspace(
+    {
+      activeDeckId: "missing",
+      layoutProfileId: "invalid id",
+      controlPaneVisible: false,
+      deckGroups: {
+        ops: [],
+        "bad deck": {
+          groups: []
+        }
+      },
+      deckSplitLayouts: []
+    },
+    { strict: false }
+  );
+
+  assert.deepEqual(workspace, {
+    activeDeckId: "ops",
+    layoutProfileId: "",
+    controlPaneVisible: false,
+    controlPanePosition: "bottom",
+    controlPaneSize: 240,
+    deckGroups: {
+      ops: {
+        activeGroupId: "",
+        groups: []
+      }
+    },
+    deckSplitLayouts: {}
+  });
 });
 
 test("runtime library normalization creates and restores share-link entities deterministically", () => {

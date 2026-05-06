@@ -467,3 +467,152 @@ test("runtime library authority keeps layout and workspace preset cleanup in syn
   assert.equal(deletedPreset.id, createdPreset.id);
   assert.deepEqual(authority.listWorkspacePresets(), []);
 });
+
+test("runtime library authority covers host fallback, tie ordering, and guarded missing/conflict catalog branches", () => {
+  const { authority } = createHarness();
+
+  const shareA = authority.createShareLink(
+    {
+      targetType: "deck",
+      targetId: "ops",
+      expiresInSeconds: 1
+    },
+    {},
+    { headers: {} },
+    {
+      protocol: "http",
+      host: "api.ptydeck.local.secos.rocks"
+    }
+  );
+  const shareB = authority.createShareLink(
+    {
+      targetType: "deck",
+      targetId: "ops",
+      expiresInSeconds: 600
+    },
+    {},
+    { headers: {} },
+    {
+      protocol: "http",
+      host: "api.ptydeck.local.secos.rocks"
+    }
+  );
+
+  assert.equal(shareA.joinUrl, "http://ptydeck.local.secos.rocks/?share_token=share-token-share-000000000000000000000001");
+  assert.equal(shareA.active, true);
+  assert.equal(shareB.joinUrl, "http://ptydeck.local.secos.rocks/?share_token=share-token-share-000000000000000000000002");
+  assert.deepEqual(
+    authority.listShareLinks().map((entry) => entry.id),
+    ["share-000000000000000000000001", "share-000000000000000000000002"]
+  );
+
+  const createdConnection = authority.createConnectionProfile({
+    id: "ops-ssh",
+    name: "Ops SSH",
+    launch: { kind: "ssh", deckId: "ops" }
+  });
+  const createdLayout = authority.createLayoutProfile({
+    id: "focus-layout",
+    name: "Focus Layout"
+  });
+  const presetA = authority.createWorkspacePreset({
+    id: "alpha-b",
+    name: "Alpha",
+    workspace: {
+      activeDeckId: "default"
+    }
+  });
+  const presetB = authority.createWorkspacePreset({
+    id: "alpha-a",
+    name: "Alpha",
+    workspace: {
+      activeDeckId: "default"
+    }
+  });
+
+  assert.equal(createdConnection.id, "ops-ssh");
+  assert.equal(createdLayout.id, "focus-layout");
+  assert.deepEqual(
+    authority.listPersistedConnectionProfiles().map((entry) => entry.id),
+    ["ops-ssh"]
+  );
+  assert.deepEqual(
+    authority.listPersistedLayoutProfiles().map((entry) => entry.id),
+    ["focus-layout"]
+  );
+  assert.deepEqual(
+    authority.listPersistedWorkspacePresets().map((entry) => entry.id),
+    ["alpha-b", "alpha-a"]
+  );
+  assert.deepEqual(
+    authority.listWorkspacePresets().map((entry) => entry.id),
+    ["alpha-a", "alpha-b"]
+  );
+  assert.equal(presetA.workspace.layoutProfileId, undefined);
+  assert.equal(presetB.workspace.layoutProfileId, undefined);
+
+  assert.throws(() => authority.getApiShareLinkOrThrow("missing-share"), (error) => {
+    assert.equal(error instanceof ApiError, true);
+    assert.equal(error.error, "ShareLinkNotFound");
+    return true;
+  });
+  assert.throws(() => authority.getConnectionProfileOrThrow("missing-profile"), (error) => {
+    assert.equal(error instanceof ApiError, true);
+    assert.equal(error.error, "ConnectionProfileNotFound");
+    return true;
+  });
+  assert.throws(() => authority.getLayoutProfileOrThrow("missing-layout"), (error) => {
+    assert.equal(error instanceof ApiError, true);
+    assert.equal(error.error, "LayoutProfileNotFound");
+    return true;
+  });
+  assert.throws(() => authority.getWorkspacePresetOrThrow("missing-workspace"), (error) => {
+    assert.equal(error instanceof ApiError, true);
+    assert.equal(error.error, "WorkspacePresetNotFound");
+    return true;
+  });
+
+  assert.throws(
+    () =>
+      authority.createConnectionProfile({
+        id: "ops-ssh",
+        name: "Ops SSH Duplicate",
+        launch: { kind: "ssh", deckId: "ops" }
+      }),
+    (error) => {
+      assert.equal(error instanceof ApiError, true);
+      assert.equal(error.error, "ConnectionProfileAlreadyExists");
+      return true;
+    }
+  );
+  assert.throws(
+    () =>
+      authority.createLayoutProfile({
+        id: "focus-layout",
+        name: "Focus Layout Duplicate"
+      }),
+    (error) => {
+      assert.equal(error instanceof ApiError, true);
+      assert.equal(error.error, "LayoutProfileAlreadyExists");
+      return true;
+    }
+  );
+  assert.throws(
+    () =>
+      authority.createWorkspacePreset({
+        id: "alpha-a",
+        name: "Alpha Duplicate",
+        workspace: {
+          activeDeckId: "default"
+        }
+      }),
+    (error) => {
+      assert.equal(error instanceof ApiError, true);
+      assert.equal(error.error, "WorkspacePresetAlreadyExists");
+      return true;
+    }
+  );
+
+  assert.throws(() => authority.updateLayoutProfile(createdLayout.id, {}), /At least one updatable layout profile field is required/);
+  assert.throws(() => authority.updateWorkspacePreset("alpha-a", {}), /At least one updatable workspace preset field is required/);
+});
