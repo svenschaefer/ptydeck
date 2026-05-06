@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import pty from "node-pty";
 import { EventEmitter } from "node:events";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "./errors.js";
@@ -11,12 +10,6 @@ import {
   queueNodePtyAsyncWriteMeta
 } from "./node-pty-write-retry.js";
 import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.js";
-import {
-  normalizeRemoteAuth,
-  normalizeRemoteConnection,
-  normalizeRemoteSecret,
-  remoteAuthRequiresSecret
-} from "./session-launch-spec.js";
 import {
   clearExpectedExitReason as clearSessionManagerExpectedExitReason,
   clearForegroundProcessRefreshTimer as clearSessionManagerForegroundProcessRefreshTimer,
@@ -29,54 +22,31 @@ import {
   clearStartupTerminalQueryFallback as clearSessionManagerStartupTerminalQueryFallback
 } from "./session-manager-cleanup.js";
 import {
-  buildRemoteRuntimeMeta,
   DEFAULT_REMOTE_RECONNECT_DELAY_MS,
   DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
 } from "./session-manager-remote-runtime.js";
 import { createSessionManagerLaunchRuntime } from "./session-manager-launch-runtime.js";
 import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
-import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
-import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import {
-  normalizeQuickSendUsageEntries,
   recordQuickSendUsageEntry
 } from "./session-quick-send-usage.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
-import { buildRestartSessionCreatePayload } from "./session-manager-lifecycle.js";
 import { createSessionManagerAppIdentityRuntime } from "./session-manager-app-identity-runtime.js";
+import {
+  applySessionPatch,
+  buildReplayRetentionResult,
+  buildReplayRetentionState,
+  buildRestartSessionCreatePayload,
+  buildSessionRecord,
+  normalizeReplayShellBlocks
+} from "./session-manager-lifecycle.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
-const DEFAULT_SSH_CLIENT = "ssh";
 const SESSION_KIND_LOCAL = "local";
 const SESSION_KIND_SSH = "ssh";
-const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
-const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
-const SESSION_NOTE_MAX_LENGTH = 512;
 const SESSION_MANAGER_DIRNAME = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SSH_ASKPASS_PATH = join(SESSION_MANAGER_DIRNAME, "../libexec/ssh-askpass.sh");
 const DEFAULT_SSH_KNOWN_HOSTS_PATH = join(SESSION_MANAGER_DIRNAME, "../data/ssh_known_hosts");
-const DEFAULT_SESSION_THEME_PROFILE = {
-  background: "#0a0d12",
-  foreground: "#d8dee9",
-  cursor: "#8ec07c",
-  black: "#0a0d12",
-  red: "#fb4934",
-  green: "#8ec07c",
-  yellow: "#fabd2f",
-  blue: "#83a598",
-  magenta: "#b48ead",
-  cyan: "#8fbcbb",
-  white: "#d8dee9",
-  brightBlack: "#4b5563",
-  brightRed: "#ff6b5a",
-  brightGreen: "#a5d68a",
-  brightYellow: "#ffd36a",
-  brightBlue: "#98b6cc",
-  brightMagenta: "#c8a7d8",
-  brightCyan: "#a9d9d6",
-  brightWhite: "#f5f7fa"
-};
-const SESSION_STATE_STARTING = "starting";
 const SESSION_STATE_RUNNING = "running";
 const SESSION_STATE_EXITED = "exited";
 const SESSION_ACTIVITY_STATE_ACTIVE = "active";
@@ -155,95 +125,6 @@ function createTraceEnvelope(createTraceId, seed, overrides = {}) {
   };
 }
 
-function normalizeSessionEnv(env) {
-  if (!env || typeof env !== "object" || Array.isArray(env)) {
-    return {};
-  }
-  const normalized = {};
-  for (const [key, value] of Object.entries(env)) {
-    if (typeof key !== "string" || typeof value !== "string") {
-      continue;
-    }
-    normalized[key] = value;
-  }
-  return normalized;
-}
-
-function normalizeSessionThemeProfile(themeProfile) {
-  const input = themeProfile && typeof themeProfile === "object" && !Array.isArray(themeProfile) ? themeProfile : {};
-  const normalized = {};
-  for (const [key, defaultValue] of Object.entries(DEFAULT_SESSION_THEME_PROFILE)) {
-    const candidate = typeof input[key] === "string" ? input[key] : defaultValue;
-    normalized[key] = THEME_COLOR_HEX_PATTERN.test(candidate) ? candidate : defaultValue;
-  }
-  return normalized;
-}
-
-function normalizeSessionThemeSlots({ themeProfile, activeThemeProfile, inactiveThemeProfile } = {}) {
-  const fallbackTheme = normalizeSessionThemeProfile(themeProfile);
-  const normalizedActiveThemeProfile =
-    activeThemeProfile !== undefined
-      ? normalizeSessionThemeProfile(activeThemeProfile)
-      : fallbackTheme;
-  const normalizedInactiveThemeProfile =
-    inactiveThemeProfile !== undefined
-      ? normalizeSessionThemeProfile(inactiveThemeProfile)
-      : fallbackTheme;
-  return {
-    themeProfile: normalizedActiveThemeProfile,
-    activeThemeProfile: normalizedActiveThemeProfile,
-    inactiveThemeProfile: normalizedInactiveThemeProfile
-  };
-}
-
-function normalizeSessionTags(tags) {
-  if (!Array.isArray(tags)) {
-    return [];
-  }
-  const seen = new Set();
-  const normalized = [];
-  for (const entry of tags) {
-    if (typeof entry !== "string") {
-      continue;
-    }
-    const candidate = entry.trim().toLowerCase();
-    if (!candidate || !SESSION_TAG_PATTERN.test(candidate) || seen.has(candidate)) {
-      continue;
-    }
-    seen.add(candidate);
-    normalized.push(candidate);
-  }
-  normalized.sort((a, b) => a.localeCompare(b, "en-US", { sensitivity: "base" }));
-  return normalized;
-}
-
-function normalizeSessionNote(note) {
-  if (typeof note !== "string") {
-    return undefined;
-  }
-  const normalized = note
-    .replace(/\r\n?/g, "\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .join("\n")
-    .trim();
-  if (!normalized) {
-    return undefined;
-  }
-  if (normalized.length > SESSION_NOTE_MAX_LENGTH) {
-    return normalized.slice(0, SESSION_NOTE_MAX_LENGTH);
-  }
-  return normalized;
-}
-
-function normalizeQuickIdToken(value) {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const normalized = value.trim();
-  return normalized ? normalized : undefined;
-}
-
 function normalizePromptBoundaries(promptBoundaries, chunkLength) {
   const maxLength = Number.isInteger(chunkLength) && chunkLength >= 0 ? chunkLength : 0;
   return (Array.isArray(promptBoundaries) ? promptBoundaries : [])
@@ -252,27 +133,8 @@ function normalizePromptBoundaries(promptBoundaries, chunkLength) {
     .sort((left, right) => left - right);
 }
 
-function normalizeReplayShellBlocks(shellBlocks, maxLength) {
-  const effectiveMaxLength = Number.isInteger(maxLength) && maxLength >= 0 ? maxLength : 0;
-  return (Array.isArray(shellBlocks) ? shellBlocks : [])
-    .map((entry) => {
-      const start = Number.isInteger(entry?.start) ? entry.start : -1;
-      const end = Number.isInteger(entry?.end) ? entry.end : -1;
-      if (start < 0 || end <= start || end > effectiveMaxLength) {
-        return null;
-      }
-      return { start, end };
-    })
-    .filter(Boolean)
-    .sort((left, right) => left.start - right.start);
-}
-
 function getTextLength(value) {
   return typeof value === "string" ? value.length : 0;
-}
-
-function normalizeSessionKind(kind) {
-  return String(kind || "").trim().toLowerCase() === SESSION_KIND_SSH ? SESSION_KIND_SSH : SESSION_KIND_LOCAL;
 }
 
 function countCursorPositionQueries(rawData) {
@@ -582,7 +444,7 @@ export class SessionManager {
       cwd,
       startCwd,
       startCommand,
-      env: normalizeSessionEnv(env),
+      env,
       remoteConnection,
       remoteAuth,
       remoteSecret
@@ -800,45 +662,11 @@ export class SessionManager {
   }
 
   buildReplayRetentionResult(value, maxChars = this.sessionReplayMemoryMaxChars) {
-    if (typeof value !== "string" || value.length === 0) {
-      return { value: "", truncated: false };
-    }
-    if (!Number.isInteger(maxChars) || maxChars <= 0) {
-      return { value: "", truncated: true };
-    }
-    if (value.length > maxChars) {
-      return { value: value.slice(-maxChars), truncated: true };
-    }
-    return { value, truncated: false };
+    return buildReplayRetentionResult(value, maxChars);
   }
 
   buildReplayRetentionState(value, shellBlocks = [], currentShellBlockStart = null, maxChars = this.sessionReplayMemoryMaxChars) {
-    const replayOutput = this.buildReplayRetentionResult(value, maxChars);
-    if (!replayOutput.value) {
-      return {
-        value: "",
-        truncated: replayOutput.truncated,
-        shellBlocks: [],
-        currentShellBlockStart: null
-      };
-    }
-    const trimDelta = getTextLength(value) - replayOutput.value.length;
-    const nextShellBlocks = normalizeReplayShellBlocks(shellBlocks, getTextLength(value))
-      .map((entry) => ({
-        start: entry.start - trimDelta,
-        end: entry.end - trimDelta
-      }))
-      .filter((entry) => entry.start >= 0 && entry.end > entry.start && entry.end <= replayOutput.value.length);
-    const nextCurrentShellBlockStart =
-      Number.isInteger(currentShellBlockStart) && currentShellBlockStart - trimDelta >= 0
-        ? currentShellBlockStart - trimDelta
-        : null;
-    return {
-      value: replayOutput.value,
-      truncated: replayOutput.truncated,
-      shellBlocks: nextShellBlocks,
-      currentShellBlockStart: nextCurrentShellBlockStart
-    };
+    return buildReplayRetentionState(value, shellBlocks, currentShellBlockStart, maxChars);
   }
 
   appendReplayOutput(session, cleaned, promptBoundaries = []) {
@@ -1081,133 +909,46 @@ export class SessionManager {
         `Maximum concurrent session limit (${this.sessionMaxConcurrent}) reached.`
       );
     }
-
-    const createdTimestamp = Number.isInteger(createdAt) ? createdAt : this.nowFn();
-    const updatedTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
-    const initialActivityTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
-    const normalizedKind = normalizeSessionKind(kind);
-    const normalizedStartCwd =
-      typeof startCwd === "string" && startCwd.trim()
-        ? startCwd
-        : typeof cwd === "string" && cwd.trim()
-          ? cwd
-          : normalizedKind === SESSION_KIND_SSH
-            ? "~"
-            : homedir();
-    const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
-    const normalizedEnv = normalizeSessionEnv(env);
-    const normalizedNote = normalizeSessionNote(note);
-    const normalizedMouseForwardingMode = normalizeSessionMouseForwardingMode(mouseForwardingMode, { strict: false });
-    const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
-    const normalizedTags = normalizeSessionTags(tags);
-    const normalizedQuickSendUsage = normalizeQuickSendUsageEntries(quickSendUsage);
-    const normalizedQuickIdToken = normalizeQuickIdToken(quickIdToken);
-    const normalizedRemoteConnection = normalizeRemoteConnection(remoteConnection, normalizedKind);
-    const normalizedRemoteAuth = normalizeRemoteAuth(remoteAuth, normalizedKind);
-    const normalizedRemoteSecret = normalizeRemoteSecret(remoteSecret, normalizedRemoteAuth, normalizedKind);
-    const normalizedShell =
-      typeof shell === "string" && shell.trim()
-        ? shell.trim()
-        : normalizedKind === SESSION_KIND_SSH
-          ? DEFAULT_SSH_CLIENT
-          : this.defaultShell;
-    const normalizedThemeSlots = normalizeSessionThemeSlots({
-      themeProfile,
-      activeThemeProfile,
-      inactiveThemeProfile
-    });
-    const localSpawnCwd =
-      normalizedKind === SESSION_KIND_SSH
-        ? homedir()
-        : typeof cwd === "string" && cwd.trim()
-          ? cwd
-          : normalizedStartCwd;
-    const launchBundle = this.buildLaunchBundle({
-      kind: normalizedKind,
-      shell: normalizedShell,
-      cwd: localSpawnCwd,
-      startCwd: normalizedStartCwd,
-      startCommand: normalizedStartCommand,
-      env: normalizedEnv,
-      remoteConnection: normalizedRemoteConnection,
-      remoteAuth: normalizedRemoteAuth,
-      remoteSecret: normalizedRemoteSecret
-    });
-
-    const initialReplayOutput = this.buildReplayRetentionResult(replayOutput);
-    const identityRuntime = this.appIdentityRuntime.createInitialIdentityRuntime(
+    const { session, launchBundle } = buildSessionRecord(
       {
-        kind: normalizedKind,
-        shell: normalizedShell,
-        ...(typeof name === "string" ? { name } : {}),
-        startCommand: normalizedStartCommand
-      },
-      { updatedAt: updatedTimestamp }
-    );
-    const initialAppIdentity = identityRuntime.appIdentity;
-    const session = {
-      id,
-      ptyProcess: null,
-      shellAdapter: null,
-      appIdentityState: identityRuntime.appIdentityState,
-      terminalSignalState: identityRuntime.terminalSignalState,
-      cwdTrackingBuffer: "",
-      outputBuffer: initialReplayOutput.value,
-      outputTruncated: replayOutputTruncated === true || initialReplayOutput.truncated,
-      replayShellBlocks: [],
-      currentShellBlockStart: null,
-      replayShellBlockTrackingSupported: false,
-      activityTimer: null,
-      foregroundProcessRefreshTimer: null,
-      launchPostStartInputTimer: null,
-      remoteReconnectTimer: null,
-      remoteReconnectStabilizeTimer: null,
-      expectedExitReasonTimer: null,
-      expectedExitReason: "",
-      lastActivityAt: initialActivityTimestamp,
-      pendingLaunchPostStartInput: null,
-      pendingStartupTerminalQueryFallback: null,
-      remoteSecret: normalizedRemoteSecret,
-      traceSeed: normalizeTraceSeed(trace),
-      meta: {
         id,
-        kind: normalizedKind,
-        ...(normalizedRemoteConnection ? { remoteConnection: normalizedRemoteConnection } : {}),
-        ...(normalizedRemoteAuth ? { remoteAuth: normalizedRemoteAuth } : {}),
-        cwd: launchBundle.launchSpec.metaCwd,
-        shell: launchBundle.launchSpec.command,
-        ...(typeof name === "string" ? { name } : {}),
-        ...(normalizedQuickIdToken ? { quickIdToken: normalizedQuickIdToken } : {}),
-        ...(typeof deckId === "string" && deckId.trim() ? { deckId: deckId.trim() } : {}),
-        startCwd: normalizedStartCwd,
-        startCommand: normalizedStartCommand,
-        env: normalizedEnv,
-        ...(normalizedNote ? { note: normalizedNote } : {}),
-        mouseForwardingMode: normalizedMouseForwardingMode,
-        inputSafetyProfile: normalizedInputSafetyProfile,
-        tags: normalizedTags,
-        quickSendUsage: normalizedQuickSendUsage,
-        ...(normalizedKind === SESSION_KIND_SSH
-          ? {
-              remoteRuntime: buildRemoteRuntimeMeta({
-                reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-                reconnectDelayMs: this.remoteReconnectDelayMs
-              })
-            }
-          : {}),
-        themeProfile: normalizedThemeSlots.themeProfile,
-        activeThemeProfile: normalizedThemeSlots.activeThemeProfile,
-        inactiveThemeProfile: normalizedThemeSlots.inactiveThemeProfile,
-        appIdentity: initialAppIdentity,
-        state: SESSION_STATE_STARTING,
-        activityState: SESSION_ACTIVITY_STATE_INACTIVE,
-        activityUpdatedAt: initialActivityTimestamp,
-        activityCompletedAt: null,
-        startedAt: null,
-        createdAt: createdTimestamp,
-        updatedAt: updatedTimestamp
+        quickIdToken,
+        kind,
+        remoteConnection,
+        remoteAuth,
+        remoteSecret,
+        cwd,
+        shell,
+        name,
+        startCwd,
+        startCommand,
+        env,
+        deckId,
+        replayOutput,
+        replayOutputTruncated,
+        note,
+        mouseForwardingMode,
+        inputSafetyProfile,
+        tags,
+        quickSendUsage,
+        themeProfile,
+        activeThemeProfile,
+        inactiveThemeProfile,
+        createdAt,
+        updatedAt,
+        traceSeed: normalizeTraceSeed(trace)
+      },
+      {
+        defaultShell: this.defaultShell,
+        buildLaunchBundle: (options) => this.buildLaunchBundle(options),
+        createInitialIdentityRuntime: (identityInput, options) =>
+          this.appIdentityRuntime.createInitialIdentityRuntime(identityInput, options),
+        remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+        remoteReconnectDelayMs: this.remoteReconnectDelayMs,
+        sessionReplayMemoryMaxChars: this.sessionReplayMemoryMaxChars,
+        nowFn: this.nowFn
       }
-    };
+    );
 
     this.sessions.set(id, session);
     this.attachPtyProcess(session, launchBundle);
@@ -1343,127 +1084,14 @@ export class SessionManager {
       sessionId,
       source: options.trace?.source || "rest"
     });
-    const currentKind = normalizeSessionKind(session.meta.kind);
-    const nextKind = normalizeSessionKind(patch.kind !== undefined ? patch.kind : currentKind);
-    const kindChanged = nextKind !== currentKind;
-    const nextRemoteAuth =
-      patch.remoteAuth !== undefined || patch.kind !== undefined
-        ? normalizeRemoteAuth(
-            patch.remoteAuth !== undefined ? patch.remoteAuth : kindChanged ? undefined : session.meta.remoteAuth,
-            nextKind
-          )
-        : session.meta.remoteAuth;
-    if (patch.name !== undefined) {
-      session.meta.name = patch.name;
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "quickIdToken")) {
-      const normalizedQuickIdToken = normalizeQuickIdToken(patch.quickIdToken);
-      if (normalizedQuickIdToken) {
-        session.meta.quickIdToken = normalizedQuickIdToken;
-      } else {
-        delete session.meta.quickIdToken;
-      }
-    }
-    if (patch.startCwd !== undefined) {
-      session.meta.startCwd = patch.startCwd;
-    }
-    if (patch.startCommand !== undefined) {
-      session.meta.startCommand = patch.startCommand;
-    }
-    if (patch.kind !== undefined) {
-      session.meta.kind = nextKind;
-      session.meta.shell = nextKind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : this.defaultShell;
-      if (patch.startCwd === undefined) {
-        session.meta.startCwd = nextKind === SESSION_KIND_SSH ? "~" : homedir();
-      }
-      session.meta.cwd = nextKind === SESSION_KIND_SSH ? session.meta.startCwd || "~" : session.meta.startCwd || homedir();
-      if (nextKind === SESSION_KIND_SSH) {
-        session.meta.remoteRuntime = buildRemoteRuntimeMeta({
-          reconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-          reconnectDelayMs: this.remoteReconnectDelayMs
-        });
-      } else {
-        delete session.meta.remoteRuntime;
-        this.clearRemoteReconnectTimers(session);
-        this.clearExpectedExitReason(session);
-      }
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "remoteConnection") || patch.kind !== undefined) {
-      const normalizedRemoteConnection = normalizeRemoteConnection(
-        Object.prototype.hasOwnProperty.call(patch, "remoteConnection")
-          ? patch.remoteConnection
-          : kindChanged
-            ? undefined
-            : session.meta.remoteConnection,
-        nextKind
-      );
-      if (normalizedRemoteConnection) {
-        session.meta.remoteConnection = normalizedRemoteConnection;
-      } else {
-        delete session.meta.remoteConnection;
-      }
-    }
-    if (patch.remoteAuth !== undefined || patch.kind !== undefined) {
-      if (nextRemoteAuth) {
-        session.meta.remoteAuth = nextRemoteAuth;
-      } else {
-        delete session.meta.remoteAuth;
-      }
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "remoteSecret")) {
-      session.remoteSecret = normalizeRemoteSecret(patch.remoteSecret, nextRemoteAuth, nextKind);
-    } else if (remoteAuthRequiresSecret(nextRemoteAuth) && !session.remoteSecret) {
-      throw new ApiError(
-        400,
-        "ValidationError",
-        "Field 'remoteSecret' is required when changing to password or keyboardInteractive ssh auth."
-      );
-    } else if (!remoteAuthRequiresSecret(nextRemoteAuth)) {
-      session.remoteSecret = undefined;
-    }
-    if (patch.env !== undefined) {
-      session.meta.env = normalizeSessionEnv(patch.env);
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "note")) {
-      const normalizedNote = normalizeSessionNote(patch.note);
-      if (normalizedNote) {
-        session.meta.note = normalizedNote;
-      } else {
-        delete session.meta.note;
-      }
-    }
-    if (patch.mouseForwardingMode !== undefined) {
-      session.meta.mouseForwardingMode = normalizeSessionMouseForwardingMode(patch.mouseForwardingMode, { strict: false });
-    }
-    if (patch.inputSafetyProfile !== undefined) {
-      session.meta.inputSafetyProfile = normalizeSessionInputSafetyProfile(patch.inputSafetyProfile, { strict: false });
-    }
-    if (patch.tags !== undefined) {
-      session.meta.tags = normalizeSessionTags(patch.tags);
-    }
-    if (
-      patch.themeProfile !== undefined ||
-      patch.activeThemeProfile !== undefined ||
-      patch.inactiveThemeProfile !== undefined
-    ) {
-      const nextActiveThemeInput =
-        patch.activeThemeProfile !== undefined
-          ? patch.activeThemeProfile
-          : patch.themeProfile !== undefined
-            ? patch.themeProfile
-            : session.meta.activeThemeProfile;
-      const normalizedThemeSlots = normalizeSessionThemeSlots({
-        themeProfile: nextActiveThemeInput,
-        activeThemeProfile: nextActiveThemeInput,
-        inactiveThemeProfile:
-          patch.inactiveThemeProfile !== undefined ? patch.inactiveThemeProfile : session.meta.inactiveThemeProfile
-      });
-      session.meta.themeProfile = normalizedThemeSlots.themeProfile;
-      session.meta.activeThemeProfile = normalizedThemeSlots.activeThemeProfile;
-      session.meta.inactiveThemeProfile = normalizedThemeSlots.inactiveThemeProfile;
-    }
-    const updatedAt = this.nowFn();
-    session.meta.updatedAt = updatedAt;
+    const { updatedAt } = applySessionPatch(session, patch, {
+      defaultShell: this.defaultShell,
+      remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+      remoteReconnectDelayMs: this.remoteReconnectDelayMs,
+      clearRemoteReconnectTimers: (currentSession) => this.clearRemoteReconnectTimers(currentSession),
+      clearExpectedExitReason: (currentSession) => this.clearExpectedExitReason(currentSession),
+      nowFn: this.nowFn
+    });
     const refreshedIdentity = this.refreshSessionAppIdentity(session, {
       updatedAt
     });
