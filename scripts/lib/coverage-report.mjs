@@ -265,6 +265,7 @@ export async function runWorkspaceCoverage({
   excludedTestNames = new Set(),
   includeSourcePrefixes = [],
   excludeSourcePrefixes = [],
+  nodeTestArgs = [],
   stdout = process.stdout,
   stderr = process.stderr,
   listOnly = false
@@ -280,11 +281,18 @@ export async function runWorkspaceCoverage({
     return 0;
   }
 
-  const child = spawn(process.execPath, ["--test", "--experimental-test-coverage", ...testFiles], {
+  const normalizedNodeTestArgs = Array.isArray(nodeTestArgs)
+    ? nodeTestArgs.filter((arg) => typeof arg === "string" && arg.trim().startsWith("--test-"))
+    : [];
+  const child = spawn(
+    process.execPath,
+    ["--test", ...normalizedNodeTestArgs, "--experimental-test-coverage", ...testFiles],
+    {
     cwd: rootDir,
     env: buildCoverageChildEnv(process.env),
     stdio: ["ignore", "pipe", "pipe"]
-  });
+    }
+  );
 
   let capturedStdout = "";
   let capturedStderr = "";

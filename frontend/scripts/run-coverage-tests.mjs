@@ -4,5 +4,6 @@ import { runWorkspaceCoverage } from "../../scripts/lib/coverage-report.mjs";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const listOnly = process.argv.includes("--list-tests");
-const exitCode = await runWorkspaceCoverage({ rootDir, listOnly });
+const nodeTestArgs = process.argv.filter((arg) => arg.startsWith("--test-"));
+const exitCode = await runWorkspaceCoverage({ rootDir, listOnly, nodeTestArgs });
 process.exitCode = exitCode;
