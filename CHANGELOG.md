@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-05-06
+
+- [x] `QLT-302` is now completed as the first delivered slice inside the active `v0.4.0-H173` quality wave, leaving `QLT-303` through `QLT-307` open in `TODO.md` / `ROADMAP.md`.
+- [x] `backend/src/runtime.js` now delegates the retained catalog/state normalization cluster into `backend/src/runtime-library-normalization.js` instead of keeping custom-command, deck, connection-profile, layout-profile, workspace-preset, and share-link shaping inline inside the backend runtime monolith. The extraction reduces `backend/src/runtime.js` from `4815` to `3280` lines while the new seam lands at `1724` lines and keeps the shipped runtime/library contract unchanged.
+- [x] Direct deterministic seam coverage for `QLT-302` now lives in `backend/test/runtime-library-normalization.test.js`, proving deterministic ordering, fail-closed validation, split-layout and control-pane normalization, workspace-preset shaping, and share-link restore behavior directly instead of only through broad runtime traversal. The validated active-tree hotspot snapshot reports `backend/src/runtime-library-normalization.js` at `79.35%` line / `74.32%` branch coverage and the reduced `backend/src/runtime.js` at `85.76%` line / `77.86%` branch coverage.
+- [x] Closeout validation for `QLT-302` passed with `node --test backend/test/runtime-library-normalization.test.js`, `node --test --experimental-test-coverage backend/test/runtime-library-normalization.test.js`, `npm --prefix backend run test:coverage`, `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`. Validated repo totals on the active tree are root tooling `92.82%` line / `77.09%` branch, backend `96.24%` line / `89.41%` branch, and frontend `97.40%` line / `89.96%` branch.
+
 ## 2026-05-05
 
 - [x] Fixed a multiline shell-send transport bug where text pasted into the command composer and sent through the normal `Send` path could reach shell-family sessions with the wrong internal line-separator semantics. `frontend/src/public/terminal-stream.js` now supports a session-aware multiline transport mode so shell-targeted sends can normalize internal separators to the configured terminator instead of always forcing raw `LF` inside the payload, while coding-agent and unknown sessions keep the previous `LF`-preserving behavior.
