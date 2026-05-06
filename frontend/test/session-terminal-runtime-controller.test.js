@@ -2357,6 +2357,42 @@ test("session-terminal-runtime controller tolerates missing mount listener APIs 
   entry.disposeClipboardBindings();
 });
 
+test("session-terminal-runtime controller tolerates focus and clipboard targets without removeEventListener during disposal", () => {
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    refreshTerminalViewport: () => {},
+    syncTerminalScrollArea: () => {}
+  });
+  const refs = createTerminalCardRefs("dispose-missing-remove");
+  const focusListeners = new Map();
+  refs.focusBtn = {
+    addEventListener(type, handler) {
+      const handlers = focusListeners.get(type) || [];
+      handlers.push(handler);
+      focusListeners.set(type, handlers);
+    }
+  };
+  refs.mount.helperTextarea.removeEventListener = undefined;
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  assert.doesNotThrow(() => entry.disposeClipboardBindings());
+});
+
 test("session-terminal-runtime controller falls back cleanly when no global scrollbar drag target exists", () => {
   const controller = createSessionTerminalRuntimeController({
     windowRef: {

@@ -446,3 +446,29 @@ test("slash-workflow runtime controller runs action-only workflows without a bou
   assert.equal(await controller.interruptWorkflowSession(), "No workflow session available to interrupt.");
   assert.equal(await controller.killWorkflowSession(), "No workflow session available to kill.");
 });
+
+test("slash-workflow runtime controller reports unexpected source-adapter failures as failed runs and recovers for later runs", async () => {
+  const { controller } = createControllerContext({
+    getTerminalEntry() {
+      throw new Error("terminal lookup exploded");
+    }
+  });
+
+  const failed = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/wait until line /^done$/ timeout 1s"
+  });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.failure?.code, "workflow.failed");
+  assert.equal(failed.failure?.message, "terminal lookup exploded");
+
+  const recovered = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/list"
+  });
+  assert.equal(recovered.ok, true);
+  assert.equal(recovered.status, "succeeded");
+});

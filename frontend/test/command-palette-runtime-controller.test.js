@@ -566,3 +566,56 @@ test("command palette controller handles empty matches, result clicks, shortcut 
   assert.doesNotThrow(() => domLightController.closePalette());
   assert.doesNotThrow(() => domLightController.refresh());
 });
+
+test("command palette controller cycles selection and closes cleanly when the default composer sync has no input target", () => {
+  const win = createWindowStub();
+  const dialogEl = createElement("dialog");
+  const searchInputEl = createElement("input");
+  const resultsEl = createElement("div");
+  const emptyEl = createElement("p");
+  const metaEl = createElement("p");
+
+  const controller = createCommandPaletteRuntimeController({
+    windowRef: win,
+    documentRef: createDocumentStub(),
+    dialogEl,
+    searchInputEl,
+    resultsEl,
+    emptyEl,
+    metaEl,
+    closeBtn: createElement("button"),
+    commandInput: null,
+    systemSlashCommands: ["help", "rename"],
+    getState: () => ({ sessions: [], decks: [], activeSessionId: "", activeDeckId: "" })
+  });
+
+  controller.openPalette("zzz");
+  searchInputEl.dispatchEvent({
+    type: "keydown",
+    key: "ArrowDown",
+    preventDefault() {}
+  });
+  assert.equal(controller.getSelectedEntry(), null);
+
+  controller.openPalette("");
+  assert.equal(controller.getSelectedEntry()?.title, "/help");
+  searchInputEl.dispatchEvent({
+    type: "keydown",
+    key: "ArrowDown",
+    preventDefault() {}
+  });
+  assert.equal(controller.getSelectedEntry()?.title, "/rename");
+  searchInputEl.dispatchEvent({
+    type: "keydown",
+    key: "ArrowUp",
+    preventDefault() {}
+  });
+  assert.equal(controller.getSelectedEntry()?.title, "/help");
+
+  searchInputEl.dispatchEvent({
+    type: "keydown",
+    key: "Enter",
+    preventDefault() {}
+  });
+  assert.equal(controller.isOpen(), false);
+});

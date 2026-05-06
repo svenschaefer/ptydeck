@@ -14,13 +14,12 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-306` Owner `FE`: Isolate workspace snapshot/group/layout orchestration from `frontend/src/public/workspace-preset-runtime-controller.js` and close the remaining deterministic branch gaps.
-- `QLT-307` Owner `FE`: Harden retained operator-interaction coverage across `frontend/src/public/command-palette-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`.
+- None.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role (active): deliver `QLT-306` and `QLT-307`.
+- `FE` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
 - `BE` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.
