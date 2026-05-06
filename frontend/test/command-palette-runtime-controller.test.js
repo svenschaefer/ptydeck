@@ -123,6 +123,19 @@ function createDocumentStub() {
   };
 }
 
+function createResultsFallbackElement() {
+  const appended = [];
+  return {
+    textContent: "seed",
+    children: undefined,
+    appended,
+    appendChild(child) {
+      appended.push(child);
+      return child;
+    }
+  };
+}
+
 test("buildCommandPaletteEntries keeps deterministic command-session-deck ordering", () => {
   const entries = buildCommandPaletteEntries({
     systemSlashCommands: ["new", "switch", "help"],
@@ -618,4 +631,45 @@ test("command palette controller cycles selection and closes cleanly when the de
     preventDefault() {}
   });
   assert.equal(controller.isOpen(), false);
+});
+
+test("command palette controller clamps selection after query shrink and tolerates results containers without children arrays", () => {
+  const win = createWindowStub();
+  const dialogEl = createElement("dialog");
+  const searchInputEl = createElement("input");
+  const resultsEl = createResultsFallbackElement();
+  const emptyEl = createElement("p");
+  const metaEl = createElement("p");
+
+  const controller = createCommandPaletteRuntimeController({
+    windowRef: win,
+    documentRef: createDocumentStub(),
+    dialogEl,
+    searchInputEl,
+    resultsEl,
+    emptyEl,
+    metaEl,
+    closeBtn: createElement("button"),
+    commandInput: null,
+    systemSlashCommands: ["help", "rename"],
+    getState: () => ({ sessions: [], decks: [], activeSessionId: "", activeDeckId: "" })
+  });
+
+  controller.openPalette("");
+  searchInputEl.dispatchEvent({
+    type: "keydown",
+    key: "ArrowDown",
+    preventDefault() {}
+  });
+  assert.equal(controller.getSelectedEntry()?.title, "/rename");
+
+  searchInputEl.value = "help";
+  searchInputEl.dispatchEvent({ type: "input" });
+  assert.equal(controller.getSelectedEntry()?.title, "/help");
+  assert.equal(resultsEl.textContent, "");
+  assert.ok(resultsEl.appended.length > 0);
+
+  const windowKeydownListener = win.listeners.get("keydown")?.[0];
+  assert.equal(typeof windowKeydownListener, "function");
+  assert.doesNotThrow(() => windowKeydownListener(null));
 });

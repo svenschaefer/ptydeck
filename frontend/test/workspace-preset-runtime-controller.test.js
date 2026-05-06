@@ -66,6 +66,10 @@ function createDocumentRef() {
   };
 }
 
+function flushUiEvents() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 test("workspace preset runtime controller manages preset lifecycle through backend-backed hooks", async () => {
   const calls = [];
   let activeDeckId = "ops";
@@ -887,6 +891,170 @@ test("workspace preset runtime controller clears stale preset state when reload 
   assert.equal(controller.listPresets().length, 0);
   assert.equal(controller.getSelectedPreset(), null);
   assert.equal(errors[0], "Failed to load workspace presets.");
+});
+
+test("workspace preset runtime controller shell routes guarded button failures through mapped fallback errors", async () => {
+  const errors = [];
+  const presetSelectEl = new FakeElement("select");
+  const presetNameInputEl = new FakeElement("input");
+  const presetSaveBtn = new FakeElement("button");
+  const presetApplyBtn = new FakeElement("button");
+  const presetDuplicateBtn = new FakeElement("button");
+  const presetRenameBtn = new FakeElement("button");
+  const presetDeleteBtn = new FakeElement("button");
+  const presetDeleteConfirmBtn = new FakeElement("button");
+  const presetDeleteCancelBtn = new FakeElement("button");
+  const groupSelectEl = new FakeElement("select");
+  const groupNameInputEl = new FakeElement("input");
+  const groupSaveBtn = new FakeElement("button");
+  const groupApplyBtn = new FakeElement("button");
+  const groupRenameBtn = new FakeElement("button");
+  const groupDeleteBtn = new FakeElement("button");
+  const groupDeleteConfirmBtn = new FakeElement("button");
+  const groupDeleteCancelBtn = new FakeElement("button");
+  const groupClearBtn = new FakeElement("button");
+
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    api: {
+      async createWorkspacePreset() {
+        throw new Error("create failed");
+      },
+      async updateWorkspacePreset() {
+        throw new Error("update failed");
+      },
+      async deleteWorkspacePreset() {
+        throw new Error("delete failed");
+      }
+    },
+    presetSelectEl,
+    presetNameInputEl,
+    presetSaveBtn,
+    presetApplyBtn,
+    presetDuplicateBtn,
+    presetRenameBtn,
+    presetDeleteBtn,
+    presetDeleteConfirmBtn,
+    presetDeleteCancelBtn,
+    groupSelectEl,
+    groupNameInputEl,
+    groupSaveBtn,
+    groupApplyBtn,
+    groupRenameBtn,
+    groupDeleteBtn,
+    groupDeleteConfirmBtn,
+    groupDeleteCancelBtn,
+    groupClearBtn,
+    statusEl: new FakeElement("p"),
+    summaryEl: new FakeElement("p"),
+    detailEl: new FakeElement("pre"),
+    groupSummaryEl: new FakeElement("p"),
+    groupPersistenceEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getSessions: () => [{ id: "s1", deckId: "ops" }, { id: "s2", deckId: "ops" }],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    listLayoutProfiles: () => [{ id: "focus" }],
+    applyLayoutProfileById: async () => {
+      throw new Error("apply failed");
+    },
+    getErrorMessage: (_error, fallback) => `mapped:${fallback}`,
+    setError: (message) => errors.push(message)
+  });
+
+  controller.replaceWorkspaceState({
+    activeDeckId: "ops",
+    layoutProfileId: "focus",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 185,
+    deckGroups: {},
+    deckSplitLayouts: {}
+  });
+  controller.replacePresets([
+    {
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: controller.getWorkspaceState()
+    }
+  ]);
+
+  presetSelectEl.value = "ops";
+  presetSelectEl.dispatchEvent("change");
+
+  presetSaveBtn.click();
+  await flushUiEvents();
+
+  presetApplyBtn.click();
+  await flushUiEvents();
+
+  presetNameInputEl.value = "Ops Copy";
+  presetDuplicateBtn.click();
+  await flushUiEvents();
+
+  presetNameInputEl.value = "";
+  presetRenameBtn.click();
+  await flushUiEvents();
+
+  presetDeleteBtn.click();
+  await flushUiEvents();
+  presetDeleteCancelBtn.click();
+  await flushUiEvents();
+
+  presetDeleteBtn.click();
+  await flushUiEvents();
+  presetDeleteConfirmBtn.click();
+  await flushUiEvents();
+
+  groupSaveBtn.click();
+  await flushUiEvents();
+
+  controller.createGroupFromVisibleDeckSessions("Ops Team", "ops");
+  controller.setSelectedGroupIdForDeck("ops", "ops-team");
+  groupSelectEl.value = "ops-team";
+  groupSelectEl.dispatchEvent("change");
+
+  groupApplyBtn.click();
+  await flushUiEvents();
+
+  groupNameInputEl.value = "";
+  groupRenameBtn.click();
+  await flushUiEvents();
+
+  groupDeleteBtn.click();
+  await flushUiEvents();
+  groupDeleteCancelBtn.click();
+  await flushUiEvents();
+
+  controller.createGroupFromVisibleDeckSessions("Ops Team", "ops");
+  controller.setSelectedGroupIdForDeck("ops", "ops-team");
+  groupSelectEl.value = "ops-team";
+  groupSelectEl.dispatchEvent("change");
+
+  groupDeleteBtn.click();
+  await flushUiEvents();
+  groupDeleteConfirmBtn.click();
+  await flushUiEvents();
+
+  controller.createGroupFromVisibleDeckSessions("Ops Team", "ops");
+  controller.setSelectedGroupIdForDeck("ops", "ops-team");
+  groupClearBtn.click();
+  await flushUiEvents();
+
+  assert.deepEqual(errors, [
+    "mapped:Failed to save workspace preset.",
+    "mapped:Failed to apply workspace preset.",
+    "mapped:Failed to duplicate workspace preset.",
+    "mapped:Failed to rename workspace preset.",
+    "mapped:Failed to delete workspace preset.",
+    "mapped:Failed to save workspace group.",
+    "mapped:Failed to apply workspace group.",
+    "mapped:Failed to rename workspace group.",
+    "mapped:Failed to delete workspace group.",
+    "mapped:Failed to clear workspace group."
+  ]);
 });
 
 test("workspace preset helpers resolve exact names and prefixes, and loadPresets fails closed without an API hook", async () => {

@@ -447,6 +447,28 @@ test("slash-workflow runtime controller runs action-only workflows without a bou
   assert.equal(await controller.killWorkflowSession(), "No workflow session available to kill.");
 });
 
+test("slash-workflow runtime controller reports wait workflows without an active target as target-required failures", async () => {
+  const store = createStore();
+  const controller = createSlashWorkflowRuntimeController({
+    store,
+    setWorkflowRunState() {},
+    clearWorkflowRunState() {},
+    requestRender() {},
+    formatSessionToken: () => "?",
+    formatSessionDisplayName: () => ""
+  });
+
+  const result = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/wait until session-state /^ready$/ timeout 1s"
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "failed");
+  assert.equal(result.failure?.code, "workflow.target_required");
+});
+
 test("slash-workflow runtime controller reports unexpected source-adapter failures as failed runs and recovers for later runs", async () => {
   const { controller } = createControllerContext({
     getTerminalEntry() {

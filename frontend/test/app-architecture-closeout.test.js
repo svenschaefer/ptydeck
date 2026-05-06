@@ -13,6 +13,9 @@ const appRuntimeBootstrapAssemblyPath = fileURLToPath(
 const appRuntimeInitializationAccessCompositionPath = fileURLToPath(
   new URL("../src/public/app-runtime-initialization-access-composition.js", import.meta.url)
 );
+const appRuntimeSessionGridActionsPath = fileURLToPath(
+  new URL("../src/public/app-runtime-session-grid-actions.js", import.meta.url)
+);
 const appRuntimeOperatorSupportAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-operator-support-assembly.js", import.meta.url)
 );
@@ -75,6 +78,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppRuntimeInitializationAccessComposition",
     "createAppRuntimeOperatorSupportAssembly",
     "createAppRuntimeRecoveryComposition",
+    "createAppRuntimeSessionGridActions",
     "createAppRuntimeStartupComposition",
     "createAppSessionRuntimeFacadeController",
     "createDeckRuntimeController",
@@ -95,6 +99,29 @@ test("runtime composition controller owns the delegated runtime assembly contrac
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+});
+
+test("runtime session-grid actions own the delegated deck error and reclaim bridge contract", async () => {
+  const source = await readFile(appRuntimeSessionGridActionsPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    'import { normalizeControlText } from "./session-control-runtime-state.js";',
+    "async function onRenameDeck()",
+    "async function onDeleteDeck()",
+    "async function onSwapDeckSessions(leftSession, rightSession)",
+    "async function takeTrustedLocalControl(scope, runtimeOptions)",
+    "function confirmForgetSessionControlClient(session, targetClient)",
+    "renameDeckFlow",
+    "deleteDeckFlow",
+    "swapSessionQuickIds",
+    "takeControlScope",
+    "requestText({",
+    "confirmAction({"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime session-grid actions marker ${marker}`);
   }
 });
 

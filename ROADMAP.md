@@ -14,19 +14,17 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H174` Repo-wide quality and coverage follow-up
+  - none
 - Queued next waves:
   - none
 
 ## Active Wave Order
 
-1. `QLT-312` Owner `FE`: extract the next initialization/error/reclaim seam from `frontend/src/public/app-runtime-composition-controller.js`.
-2. `QLT-313` Owner `FE`: isolate the next SSH/profile guarded-action seam from `frontend/src/public/connection-profile-runtime-controller.js`.
-3. `QLT-314` Owner `FE`: harden retained operator/workspace interaction coverage across command-palette, slash-workflow, session-terminal, and the workspace-preset controller shell.
+None.
 
 ## Wave Dependencies
 
-- `QLT-312 -> QLT-314`
+None.
 
 ## Sequencing Rules
 

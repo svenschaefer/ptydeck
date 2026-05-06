@@ -4,6 +4,7 @@ import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
 import { createAppRuntimeInitializationAccessComposition } from "./app-runtime-initialization-access-composition.js";
 import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-support-assembly.js";
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
+import { createAppRuntimeSessionGridActions } from "./app-runtime-session-grid-actions.js";
 import { createAppRuntimeStartupComposition } from "./app-runtime-startup-composition.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
@@ -1341,6 +1342,19 @@ sessionSettingsDialogController = createSessionSettingsDialogController({
   confirmAction: (options) => actionDialogController?.confirm(options)
 });
 
+const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
+  api,
+  defaultDeckId: DEFAULT_DECK_ID,
+  getAppLayoutDeckFacadeController: () => appLayoutDeckFacadeController,
+  getAppSessionRuntimeFacadeController: () => appSessionRuntimeFacadeController,
+  getAppRuntimeStateController: () => appRuntimeStateController,
+  getAppCommandUiFacadeController: () => appCommandUiFacadeController,
+  getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
+  requestText: (runtimeOptions) => actionDialogController?.requestText(runtimeOptions),
+  confirmAction: (runtimeOptions) => actionDialogController?.confirm(runtimeOptions),
+  renameTrustedLocalDevice: (sessionId, label) => renameTrustedLocalDevice(sessionId, label)
+});
+
 workspaceRenderController = createWorkspaceRenderController({
   stateEl,
   accessStateEl,
@@ -1431,54 +1445,10 @@ deckSidebarController = createDeckSidebarController({
   getSessionActivityIndicatorState: sessionUiFacadeController.getSessionActivityIndicatorState,
   onActivateDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
   onActivateSession: (session) => commandTargetRuntimeController?.activateSessionTarget(session),
-  onRenameDeck: async () => {
-    try {
-      await appLayoutDeckFacadeController?.renameDeckFlow?.();
-      appRuntimeStateController?.clearError?.();
-    } catch (error) {
-      appCommandUiFacadeController?.setError?.(
-        appCommandUiFacadeController?.getErrorMessage?.(error, "Failed to rename deck.") || "Failed to rename deck."
-      );
-    }
-  },
-  onDeleteDeck: async () => {
-    try {
-      await appLayoutDeckFacadeController?.deleteDeckFlow?.();
-      appRuntimeStateController?.clearError?.();
-    } catch (error) {
-      appCommandUiFacadeController?.setError?.(
-        appCommandUiFacadeController?.getErrorMessage?.(error, "Failed to delete deck.") || "Failed to delete deck."
-      );
-    }
-  },
-  onSwapDeckSessions: async (leftSession, rightSession) => {
-    const leftId = String(leftSession?.id || "").trim();
-    const rightId = String(rightSession?.id || "").trim();
-    if (!leftId || !rightId || leftId === rightId) {
-      return;
-    }
-    const leftTokenBefore = appSessionRuntimeFacadeController?.formatSessionToken?.(leftId) || "?";
-    const rightTokenBefore = appSessionRuntimeFacadeController?.formatSessionToken?.(rightId) || "?";
-    try {
-      const result = await api.swapSessionQuickIds(leftId, rightId);
-      if (!result?.leftSession || !result?.rightSession) {
-        throw new Error("Failed to swap session quick IDs.");
-      }
-      appSessionRuntimeFacadeController?.applyRuntimeEvent?.({ type: "session.updated", session: result.leftSession });
-      appSessionRuntimeFacadeController?.applyRuntimeEvent?.({ type: "session.updated", session: result.rightSession });
-      appCommandUiFacadeController?.setCommandFeedback?.(
-        `Swapped quick IDs: [${leftTokenBefore}] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(leftSession) || ""} <-> [${rightTokenBefore}] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(rightSession) || ""}.`
-      );
-      appRuntimeStateController?.clearError?.();
-      appCommandUiFacadeController?.render?.();
-    } catch (error) {
-      appCommandUiFacadeController?.setError?.(
-        appCommandUiFacadeController?.getErrorMessage?.(error, "Failed to swap session quick IDs.") ||
-          "Failed to swap session quick IDs."
-      );
-    }
-  },
-  canDeleteDeck: (deck) => String(deck?.id || "") !== DEFAULT_DECK_ID,
+  onRenameDeck: appRuntimeSessionGridActions.onRenameDeck,
+  onDeleteDeck: appRuntimeSessionGridActions.onDeleteDeck,
+  onSwapDeckSessions: appRuntimeSessionGridActions.onSwapDeckSessions,
+  canDeleteDeck: appRuntimeSessionGridActions.canDeleteDeck,
   isReadOnlyMode,
   getReadOnlyModeMessage
 });
@@ -1540,37 +1510,10 @@ sessionGridController = createSessionGridController({
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   toggleSettingsDialog: (dialog) => appLayoutDeckFacadeController?.toggleSettingsDialog(dialog),
   confirmSessionDelete: (session) => appLayoutDeckFacadeController?.confirmSessionDelete(session),
-  requestSessionRename: (session) =>
-    actionDialogController?.requestText({
-      title: "Rename Session",
-      message: `Enter a new name for [${
-        appSessionRuntimeFacadeController?.formatSessionToken?.(session?.id) || "?"
-      }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || session?.id || "session"}.`,
-      inputLabel: "Session Name",
-      defaultValue: session?.name || session?.id || "",
-      confirmLabel: "Rename"
-    }),
-  renameTrustedLocalDevice: (sessionId, label) => renameTrustedLocalDevice(sessionId, label),
-  takeTrustedLocalControl: async (scope, runtimeOptions) => {
-    const result = await trustedLocalHandoffRuntimeController?.takeControlScope?.(scope, runtimeOptions);
-    const normalizedSessionId = normalizeControlText(runtimeOptions?.sessionId);
-    if (normalizedSessionId) {
-      return (
-        result?.updatedSessions?.find?.((session) => session?.id === normalizedSessionId) ||
-        appSessionRuntimeFacadeController?.getSessionById?.(normalizedSessionId) ||
-        null
-      );
-    }
-    return result?.updatedSessions?.[0] || null;
-  },
-  confirmForgetSessionControlClient: (session, targetClient) =>
-    actionDialogController?.confirm({
-      title: "Forget Stale Device",
-      message: `Forget ${targetClient?.label || targetClient?.clientId || "this stale device"} from [${
-        appSessionRuntimeFacadeController?.formatSessionToken?.(session?.id) || "?"
-      }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || session?.id || "session"}?`,
-      confirmLabel: "Forget"
-    }),
+  requestSessionRename: appRuntimeSessionGridActions.requestSessionRename,
+  renameTrustedLocalDevice: appRuntimeSessionGridActions.renameTrustedLocalDevice,
+  takeTrustedLocalControl: appRuntimeSessionGridActions.takeTrustedLocalControl,
+  confirmForgetSessionControlClient: appRuntimeSessionGridActions.confirmForgetSessionControlClient,
   removeSession: (sessionId) => appSessionRuntimeFacadeController?.removeSession(sessionId),
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
