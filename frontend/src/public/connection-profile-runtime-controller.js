@@ -1,51 +1,15 @@
 import { createConnectionProfileRuntimeActions } from "./connection-profile-runtime-actions.js";
 import {
   buildBlankConnectionProfileLaunch,
-  buildConnectionProfileLaunchFromSession,
-  buildPersistedDraftLaunch,
-  cloneDraftLaunch,
-  cloneRemoteAuth,
-  cloneRemoteConnection,
-  cloneStringRecord,
   cloneThemeProfile,
-  createDraftState,
   formatConnectionProfileReport,
   formatConnectionProfileSummary,
-  formatStringRecord,
-  formatTags,
-  getDeckOptionsForDraft,
-  getDraftLaunchFromInputs,
-  getThemePresetSelectOptions,
   normalizeConnectionProfileLaunch,
-  normalizeConnectionProfileCollection,
-  normalizeConnectionProfileRecord,
-  normalizeLower,
-  normalizeTagList,
-  normalizeText,
-  normalizeThemePresetCollection,
-  parseStringRecord,
-  parseTags,
-  resolveConnectionProfileToken,
-  resolveThemePresetSelectionId,
-  resolveThemeProfileFromSelection,
-  themeProfilesEqual
+  normalizeConnectionProfileRecord
 } from "./connection-profile-draft-state.js";
-import {
-  createConnectionProfileSshLifecycle,
-  formatSshTarget,
-  getSshTrustTargetKey,
-  isSameSshTrustTarget,
-  normalizeSshTrustTargetInput
-} from "./connection-profile-ssh-lifecycle.js";
-import {
-  buildConnectionProfileDraftViewState
-} from "./connection-profile-runtime-view-state.js";
+import { createConnectionProfileRuntimePresentation } from "./connection-profile-runtime-presentation.js";
+import { createConnectionProfileSshLifecycle } from "./connection-profile-ssh-lifecycle.js";
 import { createConnectionProfileUiBindings } from "./connection-profile-ui-bindings.js";
-import {
-  applyConnectionProfileDraftViewState,
-  renderConnectionProfileProfileSelect,
-  setConnectionProfileSelectOptions
-} from "./connection-profile-ui-render.js";
 
 export {
   buildConnectionProfileLaunchFromSession,
@@ -56,8 +20,16 @@ export {
   resolveConnectionProfileToken
 } from "./connection-profile-draft-state.js";
 
+function normalizeTextValue(value) {
+  return String(value || "").trim();
+}
+
+function normalizeLowerValue(value) {
+  return normalizeTextValue(value).toLowerCase();
+}
+
 function authMethodRequiresSecret(remoteAuth) {
-  const method = normalizeLower(remoteAuth?.method);
+  const method = normalizeLowerValue(remoteAuth?.method);
   return method === "password" || method === "keyboardinteractive";
 }
 
@@ -65,64 +37,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const documentRef = options.documentRef || null;
   const api = options.api || {};
-  const selectEl = options.selectEl || null;
-  const newBtn = options.newBtn || null;
-  const newSshBtn = options.newSshBtn || null;
-  const saveBtn = options.saveBtn || null;
-  const saveDraftBtn = options.saveDraftBtn || null;
-  const saveAndLaunchBtn = options.saveAndLaunchBtn || null;
-  const resetDraftBtn = options.resetDraftBtn || null;
-  const applyBtn = options.applyBtn || null;
-  const duplicateBtn = options.duplicateBtn || null;
-  const renameBtn = options.renameBtn || null;
-  const deleteBtn = options.deleteBtn || null;
-  const deleteConfirmEl = options.deleteConfirmEl || null;
-  const deleteConfirmMessageEl = options.deleteConfirmMessageEl || null;
-  const deleteConfirmBtn = options.deleteConfirmBtn || null;
-  const deleteCancelBtn = options.deleteCancelBtn || null;
-  const statusEl = options.statusEl || null;
-  const summaryEl = options.summaryEl || null;
-  const draftNameInputEl = options.draftNameInputEl || null;
-  const draftKindSelectEl = options.draftKindSelectEl || null;
-  const draftDeckSelectEl = options.draftDeckSelectEl || null;
-  const draftShellInputEl = options.draftShellInputEl || null;
-  const draftStartCwdInputEl = options.draftStartCwdInputEl || null;
-  const draftStartCommandTextareaEl = options.draftStartCommandTextareaEl || null;
-  const draftEnvTextareaEl = options.draftEnvTextareaEl || null;
-  const draftTagsInputEl = options.draftTagsInputEl || null;
-  const draftActiveThemeSelectEl = options.draftActiveThemeSelectEl || null;
-  const draftInactiveThemeSelectEl = options.draftInactiveThemeSelectEl || null;
-  const sshFieldsEl = options.sshFieldsEl || null;
-  const draftRemoteHostInputEl = options.draftRemoteHostInputEl || null;
-  const draftRemotePortInputEl = options.draftRemotePortInputEl || null;
-  const draftRemoteUsernameInputEl = options.draftRemoteUsernameInputEl || null;
-  const draftRemoteAuthMethodSelectEl = options.draftRemoteAuthMethodSelectEl || null;
-  const draftRemotePrivateKeyFieldEl = options.draftRemotePrivateKeyFieldEl || null;
-  const draftRemotePrivateKeyPathInputEl = options.draftRemotePrivateKeyPathInputEl || null;
-  const authHintEl = options.authHintEl || null;
-  const secretHintEl = options.secretHintEl || null;
-  const runtimeSecretFieldEl = options.runtimeSecretFieldEl || null;
-  const runtimeSecretInputEl = options.runtimeSecretInputEl || null;
-  const sshTrustStatusEl = options.sshTrustStatusEl || null;
-  const sshTrustGuidanceEl = options.sshTrustGuidanceEl || null;
-  const sshTrustProbeBtn = options.sshTrustProbeBtn || null;
-  const sshProbeSelectEl = options.sshProbeSelectEl || null;
-  const sshTrustSelectEl = options.sshTrustSelectEl || null;
-  const sshTrustKeyTypeInputEl = options.sshTrustKeyTypeInputEl || null;
-  const sshTrustFingerprintInputEl = options.sshTrustFingerprintInputEl || null;
-  const sshTrustPublicKeyTextareaEl = options.sshTrustPublicKeyTextareaEl || null;
-  const sshTrustCompareEl = options.sshTrustCompareEl || null;
-  const sshTrustCompareStatusEl = options.sshTrustCompareStatusEl || null;
-  const sshTrustCurrentKeyTypeInputEl = options.sshTrustCurrentKeyTypeInputEl || null;
-  const sshTrustCurrentFingerprintInputEl = options.sshTrustCurrentFingerprintInputEl || null;
-  const sshTrustCandidateKeyTypeInputEl = options.sshTrustCandidateKeyTypeInputEl || null;
-  const sshTrustCandidateFingerprintInputEl = options.sshTrustCandidateFingerprintInputEl || null;
-  const sshTrustRefreshBtn = options.sshTrustRefreshBtn || null;
-  const sshTrustSaveBtn = options.sshTrustSaveBtn || null;
-  const sshTrustDeleteBtn = options.sshTrustDeleteBtn || null;
-  const sshTrustReplaceBtn = options.sshTrustReplaceBtn || null;
-  const draftLaunchTextareaEl = options.draftLaunchTextareaEl || null;
-  const draftStatusEl = options.draftStatusEl || null;
   const getDecks = typeof options.getDecks === "function" ? options.getDecks : () => [];
   const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
   const getSessionById =
@@ -143,568 +57,100 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
   const normalizeThemeProfile =
     typeof options.normalizeThemeProfile === "function" ? options.normalizeThemeProfile : (value) => (value && typeof value === "object" ? value : {});
-  const defaultDeckId = normalizeText(options.defaultDeckId) || "default";
-  const themePresets = normalizeThemePresetCollection(options.themePresets);
+  const defaultDeckId = normalizeTextValue(options.defaultDeckId) || "default";
   const defaultThemeProfile =
     cloneThemeProfile(options.defaultThemeProfile) || cloneThemeProfile(normalizeThemeProfile({})) || undefined;
-  const hasGuidedDraftControls = Boolean(
-    draftKindSelectEl ||
-      draftDeckSelectEl ||
-      draftShellInputEl ||
-      draftStartCwdInputEl ||
-      draftStartCommandTextareaEl ||
-      draftEnvTextareaEl ||
-      draftTagsInputEl
-  );
 
-  let profiles = [];
-  let selectedProfileId = "";
-  let draftState = null;
-  let sshTrustEntries = [];
-  let selectedSshTrustEntryId = "";
-  let sshHostKeyProbeCandidates = [];
-  let selectedSshProbeCandidateId = "";
-  let probingSshHostKeys = false;
-  let sshProbeTargetKey = "";
-  let pendingDeleteProfileId = "";
-  let isRenderingDraft = false;
-  let loadingSshTrustEntries = false;
+  let refreshSshTrustEntriesRef = async () => [];
 
-  function getSshLifecycleState() {
-    return {
-      sshTrustEntries,
-      selectedSshTrustEntryId,
-      sshHostKeyProbeCandidates,
-      selectedSshProbeCandidateId,
-      probingSshHostKeys,
-      sshProbeTargetKey,
-      loadingSshTrustEntries
-    };
-  }
-
-  function updateSshLifecycleState(patch = {}) {
-    if (Object.prototype.hasOwnProperty.call(patch, "sshTrustEntries")) {
-      sshTrustEntries = Array.isArray(patch.sshTrustEntries) ? patch.sshTrustEntries : [];
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "selectedSshTrustEntryId")) {
-      selectedSshTrustEntryId = normalizeText(patch.selectedSshTrustEntryId);
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "sshHostKeyProbeCandidates")) {
-      sshHostKeyProbeCandidates = Array.isArray(patch.sshHostKeyProbeCandidates) ? patch.sshHostKeyProbeCandidates : [];
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "selectedSshProbeCandidateId")) {
-      selectedSshProbeCandidateId = normalizeText(patch.selectedSshProbeCandidateId);
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "probingSshHostKeys")) {
-      probingSshHostKeys = patch.probingSshHostKeys === true;
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "sshProbeTargetKey")) {
-      sshProbeTargetKey = normalizeText(patch.sshProbeTargetKey);
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "loadingSshTrustEntries")) {
-      loadingSshTrustEntries = patch.loadingSshTrustEntries === true;
-    }
-  }
-
-  function setStatus(message) {
-    if (statusEl) {
-      statusEl.textContent = normalizeText(message);
-    }
-  }
-
-  function getProfile(profileId) {
-    const normalizedId = normalizeText(profileId);
-    if (!normalizedId) {
-      return null;
-    }
-    return profiles.find((entry) => entry.id === normalizedId) || null;
-  }
-
-  function getSelectedProfile() {
-    return getProfile(selectedProfileId);
-  }
-
-  function readDraftLaunchFromInputs() {
-    return getDraftLaunchFromInputs({
-      hasGuidedDraftControls,
-      rawDraftLaunch: draftLaunchTextareaEl?.value,
-      draftState,
-      defaultDeckId,
-      defaultThemeProfile,
-      themePresets,
-      kindValue: draftKindSelectEl?.value,
-      deckValue: draftDeckSelectEl?.value,
-      shellValue: draftShellInputEl?.value,
-      startCwdValue: draftStartCwdInputEl?.value,
-      startCommandValue: draftStartCommandTextareaEl?.value,
-      envText: draftEnvTextareaEl?.value,
-      tagsText: draftTagsInputEl?.value,
-      activeThemeSelection: draftActiveThemeSelectEl?.value,
-      inactiveThemeSelection: draftInactiveThemeSelectEl?.value,
-      remoteHostValue: draftRemoteHostInputEl?.value,
-      remotePortValue: draftRemotePortInputEl?.value,
-      remoteUsernameValue: draftRemoteUsernameInputEl?.value,
-      remoteAuthMethodValue: draftRemoteAuthMethodSelectEl?.value,
-      remotePrivateKeyPathValue: draftRemotePrivateKeyPathInputEl?.value
-    });
-  }
-
-  function readPersistedDraftLaunch() {
-    return buildPersistedDraftLaunch(readDraftLaunchFromInputs(), {
-      defaultDeckId,
-      defaultThemeProfile
-    });
-  }
-
-  function setDraftStatus(message) {
-    if (draftStatusEl) {
-      draftStatusEl.textContent = normalizeText(message);
-    }
-  }
-
-  function getDraftNameInputValue() {
-    return normalizeText(draftNameInputEl?.value || draftState?.name);
-  }
-
-  function clearPendingDeleteConfirmation() {
-    pendingDeleteProfileId = "";
-  }
-
-  function describeSshLaunchContext(profile) {
-    const launch = profile?.launch;
-    const target = formatSshTarget(launch?.remoteConnection?.host, launch?.remoteConnection?.port, launch?.remoteConnection?.username);
-    const profileId = normalizeText(profile?.id);
-    const profileName = normalizeText(profile?.name);
-    if (profileId && profileName) {
-      return {
-        label: `saved SSH profile [${profileId}] ${profileName}`,
-        target
-      };
-    }
-    return {
-      label: `SSH target ${target}`,
-      target
-    };
-  }
-
-  function getCurrentSshTrustTarget() {
-    const draftLaunch = readDraftLaunchFromInputs();
-    if (normalizeLower(draftLaunch.kind) !== "ssh") {
-      return null;
-    }
-    const host = normalizeText(draftLaunch.remoteConnection?.host);
-    const port = Number.parseInt(String(draftLaunch.remoteConnection?.port ?? 22), 10);
-    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
-      return null;
-    }
-    return { host, port };
-  }
-
-  function shouldRenderSshTrustTarget(target) {
-    return isSameSshTrustTarget(getCurrentSshTrustTarget(), target);
-  }
-
-  function clearSshProbeCandidates() {
-    updateSshLifecycleState({
-      sshHostKeyProbeCandidates: [],
-      selectedSshProbeCandidateId: "",
-      sshProbeTargetKey: ""
-    });
-  }
-
-  function clearSshTrustState() {
-    updateSshLifecycleState({
-      sshTrustEntries: [],
-      selectedSshTrustEntryId: ""
-    });
-    clearSshProbeCandidates();
-  }
-
-  function getTrustEntriesForCurrentTarget() {
-    const target = getCurrentSshTrustTarget();
-    if (!target) {
-      return [];
-    }
-    return sshTrustEntries.filter((entry) => entry.host === target.host && entry.port === target.port);
-  }
-
-  function getSshProbeCandidatesForCurrentTarget() {
-    const target = getCurrentSshTrustTarget();
-    if (!target || getSshTrustTargetKey(target) !== sshProbeTargetKey) {
-      return [];
-    }
-    return sshHostKeyProbeCandidates.slice();
-  }
-
-  function getSshProbeCandidatesForTarget(target) {
-    const normalizedTarget = normalizeSshTrustTargetInput(target, "SSH host-key target");
-    return getSshTrustTargetKey(normalizedTarget) === sshProbeTargetKey ? sshHostKeyProbeCandidates.slice() : [];
-  }
-
-  function getSshTrustEntriesForTarget(target) {
-    const normalizedTarget = normalizeSshTrustTargetInput(target, "SSH host-key target");
-    return sshTrustEntries.filter((entry) => entry.host === normalizedTarget.host && entry.port === normalizedTarget.port);
-  }
-
-  function findSshTrustConflictEntry(target, probeCandidate) {
-    if (!probeCandidate) {
-      return null;
-    }
-    const normalizedTarget = normalizeSshTrustTargetInput(target, "SSH host-key target");
-    return getSshTrustEntriesForTarget(normalizedTarget).find(
-      (entry) => entry.keyType === probeCandidate.keyType && entry.publicKey !== probeCandidate.publicKey
-    ) || null;
-  }
-
-  function syncDraftStateFromInputs() {
-    if (!draftState || isRenderingDraft) {
-      return;
-    }
-    const previousTargetKey = getSshTrustTargetKey(draftState.launch?.remoteConnection);
-    const nextLaunch = readDraftLaunchFromInputs();
-    draftState = {
-      ...draftState,
-      name: normalizeText(draftNameInputEl?.value || draftState.name),
-      launch: nextLaunch
-    };
-    if (getSshTrustTargetKey(nextLaunch?.remoteConnection) !== previousTargetKey) {
-      clearSshProbeCandidates();
-    }
-    renderDraftComputedState();
-  }
-
-  function renderDraftComputedState() {
-    if (!draftState) {
-      return;
-    }
-    const selectedProfile = getSelectedProfile();
-    const currentLaunch = cloneDraftLaunch(readDraftLaunchFromInputs(), {
-      defaultDeckId,
-      defaultThemeProfile
-    });
-    const target = getCurrentSshTrustTarget();
-    const matchingTrustEntries = getTrustEntriesForCurrentTarget();
-    const probeCandidates = getSshProbeCandidatesForCurrentTarget();
-    const viewState = buildConnectionProfileDraftViewState({
-      draftState,
-      getProfile,
-      selectedProfile,
-      currentLaunch,
-      pendingDeleteProfileId,
-      target,
-      matchingTrustEntries,
-      probeCandidates,
-      selectedSshTrustEntryId,
-      selectedSshProbeCandidateId,
-      probingSshHostKeys,
-      loadingSshTrustEntries,
-      documentRef,
-      api
-    });
-    const nextSelection = applyConnectionProfileDraftViewState({
-      viewState,
-      setDraftStatus,
-      refs: {
-        summaryEl,
-        sshFieldsEl,
-        draftRemotePrivateKeyFieldEl,
-        authHintEl,
-        secretHintEl,
-        runtimeSecretFieldEl,
-        runtimeSecretInputEl,
-        draftLaunchTextareaEl,
-        deleteBtn,
-        deleteConfirmEl,
-        deleteConfirmMessageEl,
-        sshProbeSelectEl,
-        sshTrustSelectEl,
-        sshTrustKeyTypeInputEl,
-        sshTrustFingerprintInputEl,
-        sshTrustPublicKeyTextareaEl,
-        sshTrustGuidanceEl,
-        sshTrustStatusEl,
-        sshTrustCompareEl,
-        sshTrustCompareStatusEl,
-        sshTrustCurrentKeyTypeInputEl,
-        sshTrustCurrentFingerprintInputEl,
-        sshTrustCandidateKeyTypeInputEl,
-        sshTrustCandidateFingerprintInputEl,
-        sshTrustProbeBtn,
-        sshTrustRefreshBtn,
-        sshTrustSaveBtn,
-        sshTrustDeleteBtn,
-        sshTrustReplaceBtn
-      }
-    });
-    selectedSshTrustEntryId = nextSelection.selectedSshTrustEntryId;
-    selectedSshProbeCandidateId = nextSelection.selectedSshProbeCandidateId;
-  }
-
-  function renderDraft() {
-    if (!draftState) {
-      return;
-    }
-    const currentLaunch = cloneDraftLaunch(draftState.launch, { defaultDeckId, defaultThemeProfile });
-    isRenderingDraft = true;
-    if (draftNameInputEl) {
-      draftNameInputEl.value = draftState.name;
-    }
-    setConnectionProfileSelectOptions(
-      draftKindSelectEl,
-      [
-        { value: "local", label: "Local", documentRef },
-        { value: "ssh", label: "SSH", documentRef }
-      ],
-      currentLaunch.kind
-    );
-    setConnectionProfileSelectOptions(
-      draftDeckSelectEl,
-      getDeckOptionsForDraft(draftState, { defaultDeckId, getDecks, documentRef }),
-      currentLaunch.deckId
-    );
-    if (draftShellInputEl) {
-      draftShellInputEl.value = currentLaunch.shell;
-    }
-    if (draftStartCwdInputEl) {
-      draftStartCwdInputEl.value = currentLaunch.startCwd;
-    }
-    if (draftStartCommandTextareaEl) {
-      draftStartCommandTextareaEl.value = currentLaunch.startCommand || "";
-    }
-    if (draftEnvTextareaEl) {
-      draftEnvTextareaEl.value = formatStringRecord(currentLaunch.env);
-    }
-    if (draftTagsInputEl) {
-      draftTagsInputEl.value = formatTags(currentLaunch.tags);
-    }
-    const activeThemeSelection = resolveThemePresetSelectionId(themePresets, currentLaunch.activeThemeProfile);
-    const inactiveThemeSelection = resolveThemePresetSelectionId(themePresets, currentLaunch.inactiveThemeProfile);
-    setConnectionProfileSelectOptions(
-      draftActiveThemeSelectEl,
-      getThemePresetSelectOptions(themePresets, activeThemeSelection, documentRef),
-      activeThemeSelection
-    );
-    setConnectionProfileSelectOptions(
-      draftInactiveThemeSelectEl,
-      getThemePresetSelectOptions(themePresets, inactiveThemeSelection, documentRef),
-      inactiveThemeSelection
-    );
-    if (draftRemoteHostInputEl) {
-      draftRemoteHostInputEl.value = currentLaunch.remoteConnection?.host || "";
-    }
-    if (draftRemotePortInputEl) {
-      draftRemotePortInputEl.value = String(currentLaunch.remoteConnection?.port || 22);
-    }
-    if (draftRemoteUsernameInputEl) {
-      draftRemoteUsernameInputEl.value = currentLaunch.remoteConnection?.username || "";
-    }
-    setConnectionProfileSelectOptions(
-      draftRemoteAuthMethodSelectEl,
-      [
-        { value: "privateKey", label: "Private Key", documentRef },
-        { value: "password", label: "Password", documentRef },
-        { value: "keyboardInteractive", label: "Keyboard-Interactive", documentRef }
-      ],
-      currentLaunch.remoteAuth?.method || "privateKey"
-    );
-    if (draftRemotePrivateKeyPathInputEl) {
-      draftRemotePrivateKeyPathInputEl.value = currentLaunch.remoteAuth?.privateKeyPath || "";
-    }
-    isRenderingDraft = false;
-    renderDraftComputedState();
-    if (normalizeLower(currentLaunch.kind) === "ssh") {
-      refreshSshTrustEntries({ silent: true }).catch(() => {});
-    }
-  }
-
-  function setDraftState(nextDraft) {
-    clearPendingDeleteConfirmation();
-    draftState = createDraftState(nextDraft, { defaultDeckId, defaultThemeProfile });
-    renderDraft();
-    return draftState;
-  }
-
-  function resetDraftFromSelectedProfile() {
-    const selectedProfile = getSelectedProfile();
-    if (selectedProfile) {
-      return setDraftState({
-        mode: "profile",
-        profileId: selectedProfile.id,
-        name: selectedProfile.name,
-        launch: selectedProfile.launch
-      });
-    }
-    const activeSession = getSessionById(getActiveSessionId());
-    return setDraftState({
-      mode: "blank",
-      name: "New Local Connection",
-      deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
-      launch: buildBlankConnectionProfileLaunch({
-        deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
-        defaultThemeProfile,
-        kind: "local"
-      })
-    });
-  }
-
-  function loadDraftFromActiveSession(sessionOrId = undefined) {
-    const activeSessionId = getActiveSessionId();
-    const session = sessionOrId
-      ? (typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId)
-      : getSessionById(activeSessionId);
-    if (!session) {
-      throw new Error("No active session to load into a connection profile draft.");
-    }
-    const launch = getLaunchForSession(session);
-    if (!launch) {
-      throw new Error("Session launch settings are incomplete and cannot seed a connection profile draft.");
-    }
-    return setDraftState({
-      mode: "session",
-      profileId: "",
-      name: `${formatSessionDisplayName(session)} Profile`,
-      launch
-    });
-  }
-
-  function syncSelection() {
-    if (!selectedProfileId || !profiles.some((entry) => entry.id === selectedProfileId)) {
-      selectedProfileId = profiles[0]?.id || "";
-    }
-    if (pendingDeleteProfileId && pendingDeleteProfileId !== selectedProfileId) {
-      clearPendingDeleteConfirmation();
-    }
-    if (selectEl) {
-      selectEl.value = selectedProfileId;
-      selectEl.disabled = profiles.length === 0;
-    }
-    if (applyBtn) {
-      applyBtn.disabled = profiles.length === 0;
-    }
-    if (renameBtn) {
-      renameBtn.disabled = profiles.length === 0;
-    }
-    if (duplicateBtn) {
-      duplicateBtn.disabled = profiles.length === 0;
-    }
-    if (deleteBtn) {
-      deleteBtn.disabled = profiles.length === 0;
-    }
-  }
-
-  function render() {
-    renderConnectionProfileProfileSelect({ selectEl, profiles, documentRef });
-    syncSelection();
-    if (!draftState || (draftState.mode === "profile" && !getProfile(draftState.profileId))) {
-      resetDraftFromSelectedProfile();
-    } else {
-      renderDraft();
-    }
-    setStatus(profiles.length > 0 ? `${profiles.length} profile(s)` : "No saved connection profiles.");
-  }
-
-  function replaceProfiles(nextProfiles) {
-    profiles = normalizeConnectionProfileCollection(nextProfiles);
-    render();
-    return profiles.slice();
-  }
-
-  function upsertProfile(profile) {
-    const normalized = normalizeConnectionProfileRecord(profile);
-    if (!normalized) {
-      return null;
-    }
-    profiles = profiles.filter((entry) => entry.id !== normalized.id);
-    profiles.push(normalized);
-    profiles = normalizeConnectionProfileCollection(profiles);
-    selectedProfileId = normalized.id;
-    render();
-    return normalized;
-  }
-
-  function requireUpsertedProfile(profile, operationLabel) {
-    const normalized = upsertProfile(profile);
-    if (normalized) {
-      return normalized;
-    }
-    throw new Error(
-      `Connection profile API returned an invalid profile record${normalizeText(operationLabel) ? ` for ${operationLabel}` : ""}.`
-    );
-  }
-
-  function removeProfile(profileId) {
-    const normalizedId = normalizeText(profileId);
-    if (!normalizedId) {
-      return false;
-    }
-    const beforeLength = profiles.length;
-    profiles = profiles.filter((entry) => entry.id !== normalizedId);
-    if (profiles.length === beforeLength) {
-      return false;
-    }
-    if (selectedProfileId === normalizedId) {
-      selectedProfileId = "";
-    }
-    render();
-    return true;
-  }
-
-  function listProfiles() {
-    return profiles.slice();
-  }
-
-  function resolveProfile(selectorText) {
-    return resolveConnectionProfileToken(profiles, selectorText);
-  }
-
-  function getLaunchForSession(sessionOrId) {
-    const session = typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId;
-    return buildConnectionProfileLaunchFromSession(session, {
-      defaultDeckId,
-      normalizeThemeProfile
-    });
-  }
-
-  function seedDraftOnMissingTrust(profile, launch) {
-    setDraftState({
-      mode: "blank",
-      profileId: "",
-      name: normalizeText(profile?.name) || "New SSH Connection",
-      deckId: normalizeText(launch?.deckId) || defaultDeckId,
-      launch
-    });
-  }
-
-  function selectProfileForMissingTrust(profile) {
-    if (normalizeText(selectedProfileId) === profile?.id) {
-      return;
-    }
-    selectedProfileId = normalizeText(profile?.id);
-    syncSelection();
-    resetDraftFromSelectedProfile();
-  }
+  const presentation = createConnectionProfileRuntimePresentation({
+    documentRef,
+    api,
+    refs: {
+      selectEl: options.selectEl,
+      applyBtn: options.applyBtn,
+      duplicateBtn: options.duplicateBtn,
+      renameBtn: options.renameBtn,
+      deleteBtn: options.deleteBtn,
+      deleteConfirmEl: options.deleteConfirmEl,
+      deleteConfirmMessageEl: options.deleteConfirmMessageEl,
+      statusEl: options.statusEl,
+      summaryEl: options.summaryEl,
+      draftNameInputEl: options.draftNameInputEl,
+      draftKindSelectEl: options.draftKindSelectEl,
+      draftDeckSelectEl: options.draftDeckSelectEl,
+      draftShellInputEl: options.draftShellInputEl,
+      draftStartCwdInputEl: options.draftStartCwdInputEl,
+      draftStartCommandTextareaEl: options.draftStartCommandTextareaEl,
+      draftEnvTextareaEl: options.draftEnvTextareaEl,
+      draftTagsInputEl: options.draftTagsInputEl,
+      draftActiveThemeSelectEl: options.draftActiveThemeSelectEl,
+      draftInactiveThemeSelectEl: options.draftInactiveThemeSelectEl,
+      sshFieldsEl: options.sshFieldsEl,
+      draftRemoteHostInputEl: options.draftRemoteHostInputEl,
+      draftRemotePortInputEl: options.draftRemotePortInputEl,
+      draftRemoteUsernameInputEl: options.draftRemoteUsernameInputEl,
+      draftRemoteAuthMethodSelectEl: options.draftRemoteAuthMethodSelectEl,
+      draftRemotePrivateKeyFieldEl: options.draftRemotePrivateKeyFieldEl,
+      draftRemotePrivateKeyPathInputEl: options.draftRemotePrivateKeyPathInputEl,
+      authHintEl: options.authHintEl,
+      secretHintEl: options.secretHintEl,
+      runtimeSecretFieldEl: options.runtimeSecretFieldEl,
+      runtimeSecretInputEl: options.runtimeSecretInputEl,
+      sshTrustStatusEl: options.sshTrustStatusEl,
+      sshTrustGuidanceEl: options.sshTrustGuidanceEl,
+      sshTrustProbeBtn: options.sshTrustProbeBtn,
+      sshProbeSelectEl: options.sshProbeSelectEl,
+      sshTrustSelectEl: options.sshTrustSelectEl,
+      sshTrustKeyTypeInputEl: options.sshTrustKeyTypeInputEl,
+      sshTrustFingerprintInputEl: options.sshTrustFingerprintInputEl,
+      sshTrustPublicKeyTextareaEl: options.sshTrustPublicKeyTextareaEl,
+      sshTrustCompareEl: options.sshTrustCompareEl,
+      sshTrustCompareStatusEl: options.sshTrustCompareStatusEl,
+      sshTrustCurrentKeyTypeInputEl: options.sshTrustCurrentKeyTypeInputEl,
+      sshTrustCurrentFingerprintInputEl: options.sshTrustCurrentFingerprintInputEl,
+      sshTrustCandidateKeyTypeInputEl: options.sshTrustCandidateKeyTypeInputEl,
+      sshTrustCandidateFingerprintInputEl: options.sshTrustCandidateFingerprintInputEl,
+      sshTrustRefreshBtn: options.sshTrustRefreshBtn,
+      sshTrustSaveBtn: options.sshTrustSaveBtn,
+      sshTrustDeleteBtn: options.sshTrustDeleteBtn,
+      sshTrustReplaceBtn: options.sshTrustReplaceBtn,
+      draftLaunchTextareaEl: options.draftLaunchTextareaEl,
+      draftStatusEl: options.draftStatusEl
+    },
+    getDecks,
+    getSessions,
+    getSessionById,
+    getActiveSessionId,
+    formatSessionDisplayName,
+    normalizeThemeProfile,
+    defaultDeckId,
+    themePresets: options.themePresets,
+    defaultThemeProfile,
+    getRefreshSshTrustEntries: () => refreshSshTrustEntriesRef
+  });
 
   const sshLifecycle = createConnectionProfileSshLifecycle({
     api,
     defaultDeckId,
-    normalizeText,
-    normalizeLower,
+    normalizeText: normalizeTextValue,
+    normalizeLower: normalizeLowerValue,
     authMethodRequiresSecret,
     requestSecret,
-    describeSshLaunchContext,
+    describeSshLaunchContext: presentation.describeSshLaunchContext,
     getErrorMessage,
-    getState: getSshLifecycleState,
-    updateState: updateSshLifecycleState,
-    getCurrentSshTrustTarget,
-    shouldRenderSshTrustTarget,
-    renderDraftComputedState,
+    getState: presentation.getSshLifecycleState,
+    updateState: presentation.updateSshLifecycleState,
+    getCurrentSshTrustTarget: presentation.getCurrentSshTrustTarget,
+    shouldRenderSshTrustTarget: presentation.shouldRenderSshTrustTarget,
+    renderDraftComputedState: presentation.renderDraftComputedState,
     setCommandFeedback,
-    setStatus,
-    getSshProbeCandidatesForTarget,
-    getSshTrustEntriesForTarget,
-    findSshTrustConflictEntry,
-    seedDraftOnMissingTrust,
-    selectProfileForMissingTrust
+    setStatus: presentation.setStatus,
+    getSshProbeCandidatesForTarget: presentation.getSshProbeCandidatesForTarget,
+    getSshTrustEntriesForTarget: presentation.getSshTrustEntriesForTarget,
+    findSshTrustConflictEntry: presentation.findSshTrustConflictEntry,
+    seedDraftOnMissingTrust: presentation.seedDraftOnMissingTrust,
+    selectProfileForMissingTrust: presentation.selectProfileForMissingTrust
   });
 
   const {
@@ -721,52 +167,51 @@ export function createConnectionProfileRuntimeController(options = {}) {
     deleteTrustEntryForTarget,
     deleteTrustEntryFlow
   } = sshLifecycle;
+  refreshSshTrustEntriesRef = refreshSshTrustEntries;
 
   const runtimeActions = createConnectionProfileRuntimeActions({
     api,
     defaultDeckId,
     defaultThemeProfile,
-    normalizeText,
-    normalizeLower,
+    normalizeText: normalizeTextValue,
+    normalizeLower: normalizeLowerValue,
     getErrorMessage,
     getSessionById,
     getActiveSessionId,
-    getLaunchForSession,
-    getProfile,
-    getSelectedProfile,
-    requireUpsertedProfile,
-    removeProfile,
-    replaceProfiles,
-    listProfiles,
+    getLaunchForSession: presentation.getLaunchForSession,
+    getProfile: presentation.getProfile,
+    getSelectedProfile: presentation.getSelectedProfile,
+    requireUpsertedProfile: presentation.requireUpsertedProfile,
+    removeProfile: presentation.removeProfile,
+    replaceProfiles: presentation.replaceProfiles,
+    listProfiles: presentation.listProfiles,
     promptForLaunchSecret,
     ensureTrustedHostKeyBeforeLaunch,
-    runtimeSecretInputEl,
+    runtimeSecretInputEl: options.runtimeSecretInputEl || null,
     applyRuntimeEvent,
     setActiveDeck,
     setActiveSession,
     requestRender,
     formatSessionToken,
     formatSessionDisplayName,
-    buildPersistedDraftLaunch: readPersistedDraftLaunch,
+    buildPersistedDraftLaunch: presentation.readPersistedDraftLaunch,
     normalizeConnectionLaunch: normalizeConnectionProfileLaunch,
-    getDraftState: () => draftState,
-    setDraftState,
-    clearSshTrustState,
+    getDraftState: presentation.getDraftState,
+    setDraftState: presentation.setDraftState,
+    clearSshTrustState: presentation.clearSshTrustState,
     refreshSshTrustEntries,
     setError,
     setCommandFeedback,
-    setStatus,
+    setStatus: presentation.setStatus,
     windowRef,
     buildBlankConnectionProfileLaunch,
-    loadDraftFromActiveSession,
-    resetDraftFromSelectedProfile,
-    getDraftNameInputValue,
-    clearPendingDeleteConfirmation,
-    renderDraftComputedState,
-    getPendingDeleteProfileId: () => pendingDeleteProfileId,
-    setPendingDeleteProfileId: (value) => {
-      pendingDeleteProfileId = normalizeText(value);
-    }
+    loadDraftFromActiveSession: presentation.loadDraftFromActiveSession,
+    resetDraftFromSelectedProfile: presentation.resetDraftFromSelectedProfile,
+    getDraftNameInputValue: presentation.getDraftNameInputValue,
+    clearPendingDeleteConfirmation: presentation.clearPendingDeleteConfirmation,
+    renderDraftComputedState: presentation.renderDraftComputedState,
+    getPendingDeleteProfileId: presentation.getPendingDeleteProfileId,
+    setPendingDeleteProfileId: presentation.setPendingDeleteProfileId
   });
 
   const {
@@ -793,35 +238,33 @@ export function createConnectionProfileRuntimeController(options = {}) {
   } = runtimeActions;
 
   const { bindUiEvents } = createConnectionProfileUiBindings({
-    normalizeText,
+    normalizeText: normalizeTextValue,
     getErrorMessage,
     setError,
-    selectEl,
-    newBtn,
-    newSshBtn,
-    saveBtn,
-    saveDraftBtn,
-    saveAndLaunchBtn,
-    resetDraftBtn,
-    applyBtn,
-    duplicateBtn,
-    renameBtn,
-    deleteBtn,
-    deleteConfirmBtn,
-    deleteCancelBtn,
-    sshTrustRefreshBtn,
-    sshTrustProbeBtn,
-    sshTrustSaveBtn,
-    sshTrustDeleteBtn,
-    sshTrustReplaceBtn,
-    sshTrustSelectEl,
-    sshProbeSelectEl,
-    setSelectedProfileId: (value) => {
-      selectedProfileId = value;
-    },
-    syncSelection,
-    resetDraftFromSelectedProfile,
-    syncDraftStateFromInputs,
+    selectEl: options.selectEl || null,
+    newBtn: options.newBtn || null,
+    newSshBtn: options.newSshBtn || null,
+    saveBtn: options.saveBtn || null,
+    saveDraftBtn: options.saveDraftBtn || null,
+    saveAndLaunchBtn: options.saveAndLaunchBtn || null,
+    resetDraftBtn: options.resetDraftBtn || null,
+    applyBtn: options.applyBtn || null,
+    duplicateBtn: options.duplicateBtn || null,
+    renameBtn: options.renameBtn || null,
+    deleteBtn: options.deleteBtn || null,
+    deleteConfirmBtn: options.deleteConfirmBtn || null,
+    deleteCancelBtn: options.deleteCancelBtn || null,
+    sshTrustRefreshBtn: options.sshTrustRefreshBtn || null,
+    sshTrustProbeBtn: options.sshTrustProbeBtn || null,
+    sshTrustSaveBtn: options.sshTrustSaveBtn || null,
+    sshTrustDeleteBtn: options.sshTrustDeleteBtn || null,
+    sshTrustReplaceBtn: options.sshTrustReplaceBtn || null,
+    sshTrustSelectEl: options.sshTrustSelectEl || null,
+    sshProbeSelectEl: options.sshProbeSelectEl || null,
+    setSelectedProfileId: presentation.setSelectedProfileId,
+    syncSelection: presentation.syncSelection,
+    resetDraftFromSelectedProfile: presentation.resetDraftFromSelectedProfile,
+    syncDraftStateFromInputs: presentation.syncDraftStateFromInputs,
     newDraftFlow,
     loadActiveDraftFlow,
     saveDraftFlow,
@@ -837,53 +280,49 @@ export function createConnectionProfileRuntimeController(options = {}) {
     saveTrustEntryFlow,
     deleteTrustEntryFlow,
     replaceTrustEntryFlow,
-    setSelectedSshTrustEntryId: (value) => {
-      selectedSshTrustEntryId = value;
-    },
-    setSelectedSshProbeCandidateId: (value) => {
-      selectedSshProbeCandidateId = value;
-    },
-    renderDraftComputedState,
+    setSelectedSshTrustEntryId: presentation.setSelectedSshTrustEntryId,
+    setSelectedSshProbeCandidateId: presentation.setSelectedSshProbeCandidateId,
+    renderDraftComputedState: presentation.renderDraftComputedState,
     draftInputElements: [
-      draftNameInputEl,
-      { element: draftKindSelectEl, eventName: "change" },
-      { element: draftDeckSelectEl, eventName: "change" },
-      draftShellInputEl,
-      draftStartCwdInputEl,
-      draftStartCommandTextareaEl,
-      draftEnvTextareaEl,
-      draftTagsInputEl,
-      { element: draftActiveThemeSelectEl, eventName: "change" },
-      { element: draftInactiveThemeSelectEl, eventName: "change" },
-      draftRemoteHostInputEl,
-      draftRemotePortInputEl,
-      draftRemoteUsernameInputEl,
-      { element: draftRemoteAuthMethodSelectEl, eventName: "change" },
-      draftRemotePrivateKeyPathInputEl,
-      sshTrustKeyTypeInputEl,
-      sshTrustPublicKeyTextareaEl
+      options.draftNameInputEl || null,
+      { element: options.draftKindSelectEl || null, eventName: "change" },
+      { element: options.draftDeckSelectEl || null, eventName: "change" },
+      options.draftShellInputEl || null,
+      options.draftStartCwdInputEl || null,
+      options.draftStartCommandTextareaEl || null,
+      options.draftEnvTextareaEl || null,
+      options.draftTagsInputEl || null,
+      { element: options.draftActiveThemeSelectEl || null, eventName: "change" },
+      { element: options.draftInactiveThemeSelectEl || null, eventName: "change" },
+      options.draftRemoteHostInputEl || null,
+      options.draftRemotePortInputEl || null,
+      options.draftRemoteUsernameInputEl || null,
+      { element: options.draftRemoteAuthMethodSelectEl || null, eventName: "change" },
+      options.draftRemotePrivateKeyPathInputEl || null,
+      options.sshTrustKeyTypeInputEl || null,
+      options.sshTrustPublicKeyTextareaEl || null
     ]
   });
 
   bindUiEvents();
-  render();
+  presentation.render();
 
   return {
-    listProfiles,
-    getProfile,
-    getSelectedProfile,
-    getSelectedProfileId: () => selectedProfileId,
-    resolveProfile,
-    replaceProfiles,
-    upsertProfile,
-    removeProfile,
-    getLaunchForSession,
+    listProfiles: presentation.listProfiles,
+    getProfile: presentation.getProfile,
+    getSelectedProfile: presentation.getSelectedProfile,
+    getSelectedProfileId: presentation.getSelectedProfileId,
+    resolveProfile: presentation.resolveProfile,
+    replaceProfiles: presentation.replaceProfiles,
+    upsertProfile: presentation.upsertProfile,
+    removeProfile: presentation.removeProfile,
+    getLaunchForSession: presentation.getLaunchForSession,
     createProfileFromSession,
     launchConnectionLaunch,
     saveDraftById,
-    loadDraftFromActiveSession,
-    setDraftState,
-    getDraftState: () => (draftState ? { ...draftState, launch: normalizeConnectionProfileLaunch(draftState.launch) } : null),
+    loadDraftFromActiveSession: presentation.loadDraftFromActiveSession,
+    setDraftState: presentation.setDraftState,
+    getDraftState: presentation.getDraftStateSnapshot,
     applyProfileById,
     renameProfileById,
     duplicateProfileById,
@@ -911,6 +350,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
     replaceTrustEntryFlow,
     deleteTrustEntryFlow,
     bindUiEvents,
-    render
+    render: presentation.render
   };
 }
