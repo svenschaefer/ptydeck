@@ -12,6 +12,7 @@ import { JsonPersistence } from "./persistence.js";
 import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messaging-runtime.js";
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
+import { createRuntimeCatalogAuthority } from "./runtime-catalog-authority.js";
 import { createRuntimeHttpHelpers } from "./runtime-http-helpers.js";
 import { createRuntimeHttpRequestHandler } from "./runtime-http-request-handler.js";
 import { createRuntimeLibraryAuthority } from "./runtime-library-authority.js";
@@ -1294,44 +1295,6 @@ export function createRuntime(config) {
     enabled: config.auditLogs,
     filePath: config.auditLogFile
   });
-
-  const messagingRuntime = createMessagingRuntime({
-    telegramBotToken: config.messagingTelegramBotToken,
-    telegramTargets: config.messagingTelegramTargets,
-    telegramTopicBindings: Array.from(telegramTopicBindings.values()),
-    telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
-    telegramOutboundEnabled: config.messagingTelegramOutboundEnabled,
-    telegramInboundEnabled: config.messagingTelegramInboundEnabled,
-    telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
-    discordTargets: config.messagingDiscordTargets,
-    discordApiBaseUrl: config.messagingDiscordApiBaseUrl,
-    discordOutboundEnabled: config.messagingDiscordOutboundEnabled,
-    createTelegramTransport: config.createMessagingTelegramTransport,
-    fetchImpl: config.fetchImpl,
-    resolveDeckNameForSession: (session) => {
-      const deckId = typeof session?.deckId === "string" && session.deckId.trim() ? session.deckId.trim() : DEFAULT_DECK_ID;
-      return decks.get(deckId)?.name || deckId || "Default";
-    },
-    resolveDeckForSession: (session) => {
-      const deckId = typeof session?.deckId === "string" && session.deckId.trim() ? session.deckId.trim() : DEFAULT_DECK_ID;
-      const deck = decks.get(deckId) || null;
-      return {
-        id: deck?.id || deckId,
-        name: deck?.name || deckId || "Default"
-      };
-    },
-    listCustomCommands,
-    onTelegramTopicBindingUpsert: async (binding) => {
-      telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
-      await persistNow("messaging.telegram.topic_binding");
-    },
-    resolveSessionForMessagingTarget,
-    requestMessagingStop,
-    requestMessagingRetry,
-    requestMessagingSendInput,
-    requestMessagingReplayExcerpt,
-    logDebug
-  });
   const runtimeAccessPolicy = createRuntimeAccessPolicy({
     shareLinks,
     shareLinkPermissionModeReadOnly: SHARE_LINK_PERMISSION_MODE_READ_ONLY
@@ -1370,31 +1333,6 @@ export function createRuntime(config) {
       broadcastSessionControlRefreshForAuth(null, { source: "ws" });
     }
   });
-  const startupWarmup = createRuntimeStartupWarmup({
-    quietMs: startupWarmupQuietMs,
-    countActiveSessions: () => countActiveRuntimeSessions(manager.list()),
-    onReady: () => {
-      if (isReady) {
-        return;
-      }
-      messagingRuntime.markRuntimeReady();
-      isReady = true;
-      if (typeof startupWarmupResolve === "function") {
-        startupWarmupResolve();
-      }
-      startupWarmupResolve = null;
-      const startupWarmupState = startupWarmup.getState();
-      logDebug("runtime.ready", {
-        port: config.port,
-        sessionCount: manager.list().length,
-        startupWarmupEnabled: startupWarmupState.enabled,
-        startupWarmupQuietMs: startupWarmupState.quietMs
-      });
-    },
-    onDebug: (event, details) => {
-      logDebug(event, details);
-    }
-  });
   const wsTicketRegistry = createRuntimeWsTicketRegistry({
     ttlSeconds: authWsTicketTtlSeconds,
     normalizeSessionControlClientLabel
@@ -1428,6 +1366,7 @@ export function createRuntime(config) {
     swapSessionQuickIds,
     withDeckId
   } = runtimeSessionState;
+  let runtimeCatalogAuthority = null;
   const runtimeSessionAuthority = createRuntimeSessionAuthority({
     manager,
     unrestoredSessions,
@@ -1480,6 +1419,111 @@ export function createRuntime(config) {
     transferSessionControlOrThrow,
     withPersistedSessionControlState
   } = runtimeSessionControlAuthority;
+  runtimeCatalogAuthority = createRuntimeCatalogAuthority({
+    customCommands,
+    buildCustomCommandEntry,
+    buildCustomCommandKey,
+    compareCustomCommandEntries,
+    normalizeCustomCommandName,
+    normalizeCustomCommandScope,
+    normalizeCustomCommandSessionId,
+    ensureSessionExistsOrThrow,
+    customCommandMaxNameLength,
+    customCommandMaxContentLength,
+    customCommandMaxCount,
+    customCommandNamePattern: CUSTOM_COMMAND_NAME_PATTERN,
+    customCommandReservedNames: CUSTOM_COMMAND_RESERVED_NAMES,
+    decks,
+    defaultDeckId: DEFAULT_DECK_ID,
+    normalizeDeckName,
+    normalizeDeckIdInput,
+    slugifyDeckId,
+    normalizeDeckSettings,
+    compareDeckEntries,
+    isDeckVisibleToAuth,
+    ensureDefaultDeck,
+    manager,
+    unrestoredSessions,
+    resolveSessionDeckId,
+    setSessionDeckAssignment,
+    cleanupConnectionProfiles,
+    cleanupLayoutProfiles,
+    cleanupWorkspacePresets,
+    sessionControlStates,
+    normalizeSessionControlState,
+    createSessionControlPrincipal,
+    withPersistedSessionControlState,
+    withDeckId,
+    sessionReplayPersistMaxChars,
+    listPersistedConnectionProfiles,
+    listPersistedLayoutProfiles,
+    listPersistedWorkspacePresets,
+    listSshTrustEntries,
+    listPersistedShareLinks,
+    telegramTopicBindings
+  });
+  const messagingRuntime = createMessagingRuntime({
+    telegramBotToken: config.messagingTelegramBotToken,
+    telegramTargets: config.messagingTelegramTargets,
+    telegramTopicBindings: Array.from(telegramTopicBindings.values()),
+    telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
+    telegramOutboundEnabled: config.messagingTelegramOutboundEnabled,
+    telegramInboundEnabled: config.messagingTelegramInboundEnabled,
+    telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
+    discordTargets: config.messagingDiscordTargets,
+    discordApiBaseUrl: config.messagingDiscordApiBaseUrl,
+    discordOutboundEnabled: config.messagingDiscordOutboundEnabled,
+    createTelegramTransport: config.createMessagingTelegramTransport,
+    fetchImpl: config.fetchImpl,
+    resolveDeckNameForSession: (session) => {
+      const deckId = typeof session?.deckId === "string" && session.deckId.trim() ? session.deckId.trim() : DEFAULT_DECK_ID;
+      return decks.get(deckId)?.name || deckId || "Default";
+    },
+    resolveDeckForSession: (session) => {
+      const deckId = typeof session?.deckId === "string" && session.deckId.trim() ? session.deckId.trim() : DEFAULT_DECK_ID;
+      const deck = decks.get(deckId) || null;
+      return {
+        id: deck?.id || deckId,
+        name: deck?.name || deckId || "Default"
+      };
+    },
+    listCustomCommands,
+    onTelegramTopicBindingUpsert: async (binding) => {
+      telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
+      await persistNow("messaging.telegram.topic_binding");
+    },
+    resolveSessionForMessagingTarget,
+    requestMessagingStop,
+    requestMessagingRetry,
+    requestMessagingSendInput,
+    requestMessagingReplayExcerpt,
+    logDebug
+  });
+  const startupWarmup = createRuntimeStartupWarmup({
+    quietMs: startupWarmupQuietMs,
+    countActiveSessions: () => countActiveRuntimeSessions(manager.list()),
+    onReady: () => {
+      if (isReady) {
+        return;
+      }
+      messagingRuntime.markRuntimeReady();
+      isReady = true;
+      if (typeof startupWarmupResolve === "function") {
+        startupWarmupResolve();
+      }
+      startupWarmupResolve = null;
+      const startupWarmupState = startupWarmup.getState();
+      logDebug("runtime.ready", {
+        port: config.port,
+        sessionCount: manager.list().length,
+        startupWarmupEnabled: startupWarmupState.enabled,
+        startupWarmupQuietMs: startupWarmupState.quietMs
+      });
+    },
+    onDebug: (event, details) => {
+      logDebug(event, details);
+    }
+  });
   const handleAcceptedWsConnection = createRuntimeWsConnectionHandler({
     sockets,
     metrics,
@@ -1517,339 +1561,72 @@ export function createRuntime(config) {
     onAccepted: handleAcceptedWsConnection
   });
 
-  function listCustomCommands({ scope = null, sessionId = null } = {}) {
-    const entries = Array.from(customCommands.values());
-    const filtered = scope
-      ? entries.filter((entry) =>
-          entry.scope === scope && (scope !== "session" || entry.sessionId === normalizeCustomCommandSessionId(sessionId))
-        )
-      : entries;
-    return filtered.sort(compareCustomCommandEntries);
+  function listCustomCommands(options = {}) {
+    return runtimeCatalogAuthority.listCustomCommands(options);
   }
 
-  function listCustomCommandsByName(name) {
-    const normalizedName = normalizeCustomCommandName(name);
-    return listCustomCommands().filter((entry) => entry.name === normalizedName);
-  }
-
-  function getCustomCommandOrThrow(name, { scope = null, sessionId = null } = {}) {
-    const normalizedName = normalizeCustomCommandName(name);
-    if (!normalizedName) {
-      throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
-    }
-    if (scope) {
-      const entry = customCommands.get(buildCustomCommandKey(normalizedName, scope, sessionId));
-      if (!entry) {
-        throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
-      }
-      return { ...entry };
-    }
-    const candidates = listCustomCommandsByName(normalizedName);
-    if (candidates.length === 0) {
-      throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
-    }
-    if (candidates.length > 1) {
-      throw new ApiError(
-        409,
-        "CustomCommandAmbiguous",
-        "Multiple scoped custom commands share this name. Specify scope (and sessionId for session scope)."
-      );
-    }
-    return { ...candidates[0] };
+  function getCustomCommandOrThrow(name, options = {}) {
+    return runtimeCatalogAuthority.getCustomCommandOrThrow(name, options);
   }
 
   function upsertCustomCommand(name, payload) {
-    const normalizedName = normalizeCustomCommandName(name);
-    if (normalizedName.length > customCommandMaxNameLength) {
-      throw new ApiError(
-        400,
-        "CustomCommandNameTooLong",
-        `Custom command name exceeds maximum length (${customCommandMaxNameLength}).`
-      );
-    }
-    if (!CUSTOM_COMMAND_NAME_PATTERN.test(normalizedName)) {
-      throw new ApiError(
-        400,
-        "CustomCommandNameInvalid",
-        "Custom command name must match pattern [A-Za-z0-9][A-Za-z0-9_-]*."
-      );
-    }
-    if (CUSTOM_COMMAND_RESERVED_NAMES.has(normalizedName)) {
-      throw new ApiError(409, "CustomCommandNameReserved", "Custom command name collides with a system command.");
-    }
-    const nextInput = {
-      ...payload,
-      name: normalizedName
-    };
-    const nextScope = normalizeCustomCommandScope(nextInput.scope);
-    const nextSessionId = nextScope === "session" ? normalizeCustomCommandSessionId(nextInput.sessionId) : "";
-    if (nextScope === "session") {
-      ensureSessionExistsOrThrow(nextSessionId);
-    }
-    const current = customCommands.get(buildCustomCommandKey(normalizedName, nextScope, nextSessionId));
-    const next = buildCustomCommandEntry(normalizedName, nextInput, {
-      strict: true,
-      fieldPathPrefix: "body",
-      currentEntry: current
-    });
-    const existingSameName = listCustomCommandsByName(normalizedName);
-    if (existingSameName.some((entry) => entry.kind !== next.kind)) {
-      throw new ApiError(
-        409,
-        "CustomCommandKindConflict",
-        "Scoped custom commands sharing the same name must use the same kind."
-      );
-    }
-    if (next.content.length > customCommandMaxContentLength) {
-      throw new ApiError(
-        400,
-        "CustomCommandContentTooLarge",
-        `Custom command content exceeds maximum length (${customCommandMaxContentLength}).`
-      );
-    }
-    const nextKey = buildCustomCommandKey(normalizedName, next.scope, next.sessionId);
-    if (!customCommands.has(nextKey) && customCommands.size >= customCommandMaxCount) {
-      throw new ApiError(
-        409,
-        "CustomCommandLimitExceeded",
-        `Custom command limit reached (${customCommandMaxCount}).`
-      );
-    }
-    customCommands.set(nextKey, next);
-    return { ...next };
+    return runtimeCatalogAuthority.upsertCustomCommand(name, payload);
   }
 
-  function deleteCustomCommand(name, { scope = null, sessionId = null } = {}) {
-    const existing = getCustomCommandOrThrow(name, { scope, sessionId });
-    const key = buildCustomCommandKey(existing.name, existing.scope, existing.sessionId);
-    if (!customCommands.has(key)) {
-      throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
-    }
-    customCommands.delete(key);
-    return { ...existing };
+  function deleteCustomCommand(name, options = {}) {
+    return runtimeCatalogAuthority.deleteCustomCommand(name, options);
   }
 
-  function hasCustomCommand(name, { scope = null, sessionId = null } = {}) {
-    if (!scope) {
-      return listCustomCommandsByName(name).length > 0;
-    }
-    return customCommands.has(buildCustomCommandKey(name, scope, sessionId));
+  function hasCustomCommand(name, options = {}) {
+    return runtimeCatalogAuthority.hasCustomCommand(name, options);
   }
 
   function removeCustomCommandsForSession(sessionId) {
-    const normalizedSessionId = normalizeCustomCommandSessionId(sessionId);
-    if (!normalizedSessionId) {
-      return [];
-    }
-    const deleted = [];
-    for (const [key, entry] of customCommands.entries()) {
-      if (entry.scope === "session" && entry.sessionId === normalizedSessionId) {
-        deleted.push({ ...entry });
-        customCommands.delete(key);
-      }
-    }
-    deleted.sort(compareCustomCommandEntries);
-    return deleted;
+    return runtimeCatalogAuthority.removeCustomCommandsForSession(sessionId);
   }
 
   function toApiDeck(deck) {
-    return {
-      id: deck.id,
-      name: deck.name,
-      createdAt: deck.createdAt,
-      updatedAt: deck.updatedAt,
-      settings: deck.settings
-    };
+    return runtimeCatalogAuthority.toApiDeck(deck);
   }
 
   function listDecks(auth = null) {
-    ensureDefaultDeck();
-    return Array.from(decks.values())
-      .filter((deck) => isDeckVisibleToAuth(deck, auth))
-      .sort(compareDeckEntries)
-      .map(toApiDeck);
+    return runtimeCatalogAuthority.listDecks(auth);
   }
 
   function getDeckOrThrow(deckId, auth = null) {
-    const deck = decks.get(deckId);
-    if (!deck) {
-      throw new ApiError(404, "DeckNotFound", `Deck '${deckId}' was not found.`);
-    }
-    if (!isDeckVisibleToAuth(deck, auth)) {
-      throw new ApiError(404, "DeckNotFound", `Deck '${deckId}' was not found.`);
-    }
-    return deck;
+    return runtimeCatalogAuthority.getDeckOrThrow(deckId, auth);
   }
 
   function createDeck(body) {
-    const name = normalizeDeckName(body?.name);
-    const requestedId = normalizeDeckIdInput(body?.id);
-    let deckId = requestedId;
-    if (!deckId) {
-      const slug = slugifyDeckId(name);
-      deckId = slug;
-      let suffix = 2;
-      while (decks.has(deckId)) {
-        const suffixText = `-${suffix}`;
-        const rootMaxLength = 32 - suffixText.length;
-        const rooted = slug.slice(0, rootMaxLength).replace(/-+$/g, "") || "deck";
-        deckId = `${rooted}${suffixText}`;
-        suffix += 1;
-      }
-    }
-    if (decks.has(deckId)) {
-      throw new ApiError(409, "DeckAlreadyExists", `Deck '${deckId}' already exists.`);
-    }
-    const now = Date.now();
-    const deck = {
-      id: deckId,
-      name,
-      createdAt: now,
-      updatedAt: now,
-      settings: normalizeDeckSettings(body?.settings, { strict: true })
-    };
-    decks.set(deck.id, deck);
-    return toApiDeck(deck);
+    return runtimeCatalogAuthority.createDeck(body);
   }
 
   function updateDeck(deckId, body) {
-    const existing = getDeckOrThrow(deckId);
-    const hasName = body?.name !== undefined;
-    const hasSettings = body?.settings !== undefined;
-    if (!hasName && !hasSettings) {
-      throw new ApiError(400, "ValidationError", "At least one updatable deck field is required.");
-    }
-    const next = {
-      ...existing,
-      name: hasName ? normalizeDeckName(body.name) : existing.name,
-      settings: hasSettings ? normalizeDeckSettings(body.settings, { strict: true }) : existing.settings,
-      updatedAt: Date.now()
-    };
-    decks.set(deckId, next);
-    return toApiDeck(next);
+    return runtimeCatalogAuthority.updateDeck(deckId, body);
   }
 
-  function countSessionsInDeck(deckId) {
-    let count = 0;
-    for (const session of manager.list()) {
-      if (resolveSessionDeckId(session.id) === deckId) {
-        count += 1;
-      }
-    }
-    for (const [sessionId] of unrestoredSessions.entries()) {
-      if (resolveSessionDeckId(sessionId) === deckId) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-  function reassignDeckSessions(deckId, targetDeckId) {
-    for (const session of manager.list()) {
-      if (resolveSessionDeckId(session.id) === deckId) {
-        setSessionDeckAssignment(session.id, targetDeckId);
-      }
-    }
-    for (const [sessionId] of unrestoredSessions.entries()) {
-      if (resolveSessionDeckId(sessionId) === deckId) {
-        setSessionDeckAssignment(sessionId, targetDeckId);
-      }
-    }
-  }
-
-  function listSessionIdsInDeck(deckId) {
-    const sessionIds = [];
-    for (const session of manager.list()) {
-      if (resolveSessionDeckId(session.id) === deckId) {
-        sessionIds.push(session.id);
-      }
-    }
-    for (const [sessionId] of unrestoredSessions.entries()) {
-      if (resolveSessionDeckId(sessionId) === deckId) {
-        sessionIds.push(sessionId);
-      }
-    }
-    return sessionIds;
-  }
-
-  function deleteDeck(deckId, { force = false } = {}) {
-    if (deckId === DEFAULT_DECK_ID) {
-      throw new ApiError(409, "DeckDeleteForbidden", "Default deck cannot be deleted.");
-    }
-    getDeckOrThrow(deckId);
-    const affectedSessionIds = listSessionIdsInDeck(deckId);
-    if (affectedSessionIds.length > 0 && !force) {
-      throw new ApiError(409, "DeckNotEmpty", "Deck is not empty. Use force=true to delete and reassign sessions.");
-    }
-    if (affectedSessionIds.length > 0 && force) {
-      ensureDefaultDeck();
-      reassignDeckSessions(deckId, DEFAULT_DECK_ID);
-    }
-    decks.delete(deckId);
-    cleanupConnectionProfiles();
-    cleanupLayoutProfiles();
-    cleanupWorkspacePresets();
-    return {
-      deckId,
-      fallbackDeckId: DEFAULT_DECK_ID,
-      reassignedSessionIds: force ? affectedSessionIds : []
-    };
+  function deleteDeck(deckId, options = {}) {
+    return runtimeCatalogAuthority.deleteDeck(deckId, options);
   }
 
   function createDefaultSessionOwner(auth = null) {
-    return createSessionControlPrincipal(auth);
+    return runtimeCatalogAuthority.createDefaultSessionOwner(auth);
   }
 
   function setSessionControlState(sessionId, value, fallbackOwner = null) {
-    const normalized = normalizeSessionControlState(value, {
-      fallbackOwner: fallbackOwner || createDefaultSessionOwner()
-    });
-    sessionControlStates.set(sessionId, normalized);
-    return normalized;
+    return runtimeCatalogAuthority.setSessionControlState(sessionId, value, fallbackOwner);
   }
 
   function getSessionControlState(sessionId, fallbackOwner = null) {
-    const existing = sessionControlStates.get(sessionId);
-    if (existing) {
-      return existing;
-    }
-    return setSessionControlState(sessionId, {}, fallbackOwner);
+    return runtimeCatalogAuthority.getSessionControlState(sessionId, fallbackOwner);
   }
 
   function deleteSessionControlState(sessionId) {
-    sessionControlStates.delete(sessionId);
+    return runtimeCatalogAuthority.deleteSessionControlState(sessionId);
   }
 
   function snapshotRuntimeState() {
-    const snapshot = manager.getSnapshot({
-      outputMaxChars: sessionReplayPersistMaxChars,
-      includeTruncationMetadata: true,
-      includeEmptyOutputs: true
-    });
-    const sessionMap = new Map();
-    for (const session of snapshot.sessions) {
-      sessionMap.set(session.id, withPersistedSessionControlState(withDeckId(session)));
-    }
-    for (const [sessionId, session] of unrestoredSessions.entries()) {
-      if (!sessionMap.has(sessionId)) {
-        sessionMap.set(sessionId, withPersistedSessionControlState(withDeckId(session)));
-      }
-    }
-    ensureDefaultDeck();
-    return {
-      sessions: Array.from(sessionMap.values()),
-      sessionOutputs: snapshot.outputs,
-      customCommands: listCustomCommands(),
-      decks: Array.from(decks.values()),
-      connectionProfiles: listPersistedConnectionProfiles(),
-      layoutProfiles: listPersistedLayoutProfiles(),
-      workspacePresets: listPersistedWorkspacePresets(),
-      sshTrustEntries: listSshTrustEntries().map((entry) => ({ ...entry })),
-      shareLinks: listPersistedShareLinks(),
-      messagingTelegramTopicBindings: Array.from(telegramTopicBindings.values())
-        .sort((left, right) => `${left.chatId}:${left.sessionId}`.localeCompare(`${right.chatId}:${right.sessionId}`))
-        .map((entry) => ({ ...entry }))
-    };
+    return runtimeCatalogAuthority.snapshotRuntimeState();
   }
 
   function toApiSession(session, explicitState) {

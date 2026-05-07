@@ -255,3 +255,46 @@ test("session-manager app-identity runtime schedules foreground refreshes determ
     false
   );
 });
+
+test("session-manager app-identity runtime fails closed for noop identity updates and unavailable foreground refreshes", () => {
+  const { runtime, sessions, updates } = createHarness();
+  const session = createSession(runtime, sessions, {
+    id: "session-noop"
+  });
+  const initialIdentity = { ...session.meta.appIdentity };
+  const initialUpdatedAt = session.meta.updatedAt;
+
+  const applied = runtime.applySessionAppIdentity(
+    session,
+    { ...session.meta.appIdentity, updatedAt: 1710000000700 },
+    {
+      emitUpdatedEvent: true,
+      updatedAt: 1710000000700
+    }
+  );
+
+  assert.equal(applied.family, initialIdentity.family);
+  assert.equal(session.meta.updatedAt, initialUpdatedAt);
+  assert.equal(updates.length, 0);
+
+  const missing = runtime.refreshSessionForegroundProcessIdentity("missing-session", {
+    updatedAt: 1710000000800
+  });
+  assert.equal(missing.family, "unknown");
+  assert.equal(missing.source, "unknown");
+
+  session.meta.kind = "ssh";
+  session.ptyProcess = { pid: 1234 };
+  const sshSkipped = runtime.refreshSessionForegroundProcessIdentity(session, {
+    updatedAt: 1710000000900
+  });
+  assert.equal(sshSkipped.family, initialIdentity.family);
+  assert.equal(sshSkipped.source, initialIdentity.source);
+
+  const noSessionSignals = runtime.observeSessionTerminalSignals(null, "\u001b[?1049h", {
+    updatedAt: 1710000001000
+  });
+  assert.equal(Array.isArray(noSessionSignals.signals), true);
+  assert.equal(noSessionSignals.appIdentityChanged, false);
+  assert.equal(noSessionSignals.cwdChanged, false);
+});

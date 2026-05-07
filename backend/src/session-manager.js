@@ -26,6 +26,7 @@ import {
   DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
 } from "./session-manager-remote-runtime.js";
 import { createSessionManagerLaunchRuntime } from "./session-manager-launch-runtime.js";
+import { createSessionManagerSessionRuntime } from "./session-manager-session-runtime.js";
 import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
 import {
   recordQuickSendUsageEntry
@@ -36,8 +37,6 @@ import {
   applySessionPatch,
   buildReplayRetentionResult,
   buildReplayRetentionState,
-  buildRestartSessionCreatePayload,
-  buildSessionRecord,
   normalizeReplayShellBlocks
 } from "./session-manager-lifecycle.js";
 
@@ -303,6 +302,34 @@ export class SessionManager {
       clearForegroundProcessRefreshTimer: (session) => this.clearForegroundProcessRefreshTimer(session),
       emitSessionUpdated: (session, options) => this.emitSessionUpdated(session, options),
       getSessionById: (sessionId) => this.sessions.get(sessionId)
+    });
+    this.sessionRuntime = createSessionManagerSessionRuntime({
+      sessions: this.sessions,
+      defaultShell: this.defaultShell,
+      sessionMaxConcurrent: this.sessionMaxConcurrent,
+      sessionIdleTimeoutMs: this.sessionIdleTimeoutMs,
+      sessionMaxLifetimeMs: this.sessionMaxLifetimeMs,
+      sessionReplayMemoryMaxChars: this.sessionReplayMemoryMaxChars,
+      remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+      remoteReconnectDelayMs: this.remoteReconnectDelayMs,
+      nowFn: this.nowFn,
+      normalizeTraceSeed,
+      buildLaunchBundle: (options) => this.buildLaunchBundle(options),
+      createInitialIdentityRuntime: (identityInput, options) =>
+        this.appIdentityRuntime.createInitialIdentityRuntime(identityInput, options),
+      createTraceEnvelope: (seed, overrides = {}) => createTraceEnvelope(this.createTraceId, seed, overrides),
+      updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
+      transitionToRunning: (session) => this.transitionToRunning(session),
+      attachPtyProcess: (session, launchBundle) => this.attachPtyProcess(session, launchBundle),
+      armLaunchPostStartInput: (session, launchSpec, options = {}) =>
+        this.armLaunchPostStartInput(session, launchSpec, options),
+      clearSessionActivityTimer: (session) => this.clearSessionActivityTimer(session),
+      clearLaunchPostStartInputTimer: (session) => this.clearLaunchPostStartInputTimer(session),
+      clearForegroundProcessRefreshTimer: (session) => this.clearForegroundProcessRefreshTimer(session),
+      clearRemoteReconnectTimers: (session) => this.clearRemoteReconnectTimers(session),
+      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
+      emitSessionCreated: (event) => this.events.emit("session.created", event),
+      emitSessionClosed: (event) => this.events.emit("session.closed", event)
     });
   }
 
@@ -902,65 +929,34 @@ export class SessionManager {
     updatedAt,
     trace
   } = {}) {
-    if (this.sessionMaxConcurrent > 0 && this.sessions.size >= this.sessionMaxConcurrent) {
-      throw new ApiError(
-        409,
-        "SessionLimitExceeded",
-        `Maximum concurrent session limit (${this.sessionMaxConcurrent}) reached.`
-      );
-    }
-    const { session, launchBundle } = buildSessionRecord(
-      {
-        id,
-        quickIdToken,
-        kind,
-        remoteConnection,
-        remoteAuth,
-        remoteSecret,
-        cwd,
-        shell,
-        name,
-        startCwd,
-        startCommand,
-        env,
-        deckId,
-        replayOutput,
-        replayOutputTruncated,
-        note,
-        mouseForwardingMode,
-        inputSafetyProfile,
-        tags,
-        quickSendUsage,
-        themeProfile,
-        activeThemeProfile,
-        inactiveThemeProfile,
-        createdAt,
-        updatedAt,
-        traceSeed: normalizeTraceSeed(trace)
-      },
-      {
-        defaultShell: this.defaultShell,
-        buildLaunchBundle: (options) => this.buildLaunchBundle(options),
-        createInitialIdentityRuntime: (identityInput, options) =>
-          this.appIdentityRuntime.createInitialIdentityRuntime(identityInput, options),
-        remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-        remoteReconnectDelayMs: this.remoteReconnectDelayMs,
-        sessionReplayMemoryMaxChars: this.sessionReplayMemoryMaxChars,
-        nowFn: this.nowFn
-      }
-    );
-
-    this.sessions.set(id, session);
-    this.attachPtyProcess(session, launchBundle);
-    const createdTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-      sessionId: session.id,
-      source: session.traceSeed?.source || "rest"
+    return this.sessionRuntime.createSession({
+      id,
+      quickIdToken,
+      kind,
+      remoteConnection,
+      remoteAuth,
+      remoteSecret,
+      cwd,
+      shell,
+      name,
+      startCwd,
+      startCommand,
+      env,
+      deckId,
+      replayOutput,
+      replayOutputTruncated,
+      note,
+      mouseForwardingMode,
+      inputSafetyProfile,
+      tags,
+      quickSendUsage,
+      themeProfile,
+      activeThemeProfile,
+      inactiveThemeProfile,
+      createdAt,
+      updatedAt,
+      trace
     });
-    this.updateSessionTraceSeed(session, createdTrace, { source: session.traceSeed?.source || "rest" });
-    this.events.emit("session.created", { session: session.meta, trace: createdTrace });
-    this.transitionToRunning(session);
-    this.armLaunchPostStartInput(session, launchBundle.launchSpec, { trace: createdTrace });
-    return session.meta;
   }
 
   delete(sessionId, options = {}) {
@@ -1104,76 +1100,15 @@ export class SessionManager {
   }
 
   restart(sessionId, options = {}) {
-    const session = this.get(sessionId);
-    const trace = normalizeTraceSeed(options.trace);
-    const restartPayload = buildRestartSessionCreatePayload({
-      sessionMeta: session.meta,
-      remoteSecret: session.remoteSecret,
-      updatedAt: this.nowFn(),
-      trace
-    });
-    this.delete(sessionId, { trace });
-    return this.create(restartPayload);
+    return this.sessionRuntime.restartSession(sessionId, options);
   }
 
   closeWithReason(sessionId, reason, options = {}) {
-    const session = this.get(sessionId);
-    this.updateSessionTraceSeed(session, options.trace, {
-      sessionId,
-      source: options.trace?.source || "rest"
-    });
-    this.clearSessionActivityTimer(session);
-    this.clearLaunchPostStartInputTimer(session);
-    this.clearForegroundProcessRefreshTimer(session);
-    this.clearRemoteReconnectTimers(session);
-    this.clearExpectedExitReason(session);
-    session.expectedExitReason = reason;
-    if (session.ptyProcess) {
-      const ptyProcess = session.ptyProcess;
-      session.ptyProcess = null;
-      ptyProcess.kill();
-    }
-    this.sessions.delete(sessionId);
-    this.events.emit("session.closed", {
-      sessionId,
-      reason,
-      session: { ...session.meta },
-      trace: createTraceEnvelope(this.createTraceId, session.traceSeed, {
-        sessionId,
-        source: session.traceSeed?.source || "rest"
-      })
-    });
+    return this.sessionRuntime.closeSessionWithReason(sessionId, reason, options);
   }
 
   enforceGuardrails(currentTime = this.nowFn()) {
-    if (this.sessionIdleTimeoutMs <= 0 && this.sessionMaxLifetimeMs <= 0) {
-      return;
-    }
-
-    const toClose = [];
-    for (const session of this.sessions.values()) {
-      if (
-        this.sessionIdleTimeoutMs > 0 &&
-        Number.isInteger(session.lastActivityAt) &&
-        currentTime - session.lastActivityAt >= this.sessionIdleTimeoutMs
-      ) {
-        toClose.push({ sessionId: session.id, reason: "idle-timeout" });
-        continue;
-      }
-      if (
-        this.sessionMaxLifetimeMs > 0 &&
-        Number.isInteger(session.meta.createdAt) &&
-        currentTime - session.meta.createdAt >= this.sessionMaxLifetimeMs
-      ) {
-        toClose.push({ sessionId: session.id, reason: "max-lifetime" });
-      }
-    }
-
-    for (const item of toClose) {
-      if (this.sessions.has(item.sessionId)) {
-        this.closeWithReason(item.sessionId, item.reason);
-      }
-    }
+    return this.sessionRuntime.enforceGuardrails(currentTime);
   }
 
   on(eventName, listener) {

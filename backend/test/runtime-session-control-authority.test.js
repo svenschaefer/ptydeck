@@ -495,3 +495,178 @@ test("runtime session-control authority mutates take, release, transfer, rename,
   assert.ok(broadcasts.length >= 6);
   assert.equal(attachments.has("client-offline"), false);
 });
+
+test("runtime session-control authority covers attachment and request guard rails", () => {
+  const { attachments, authority, sessionControlStates } = createAuthorityHarness();
+
+  assert.deepEqual(authority.listAttachedClientsForSession("missing-session"), []);
+  assert.equal(authority.findAttachedClientForSession("session-1", null, { subject: "owner", tenantId: "default" }), null);
+  assert.equal(
+    authority.resolveSessionControlClientId(
+      { headers: { "x-ptydeck-client-id": [" client-owner "] } },
+      "session-1",
+      { subject: "owner", tenantId: "default" }
+    ),
+    "client-owner"
+  );
+
+  assert.throws(
+    () =>
+      authority.requireActiveSessionControlAttachment(
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-offline" } }
+      ),
+    /active attached session client/i
+  );
+  assert.throws(
+    () =>
+      authority.requireSessionControlRequestClient(
+        "session-3",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      ),
+    /active attached session client/i
+  );
+  assert.throws(
+    () =>
+      authority.requireOperatorSessionControlRequestClient(
+        "session-1",
+        { subject: "viewer", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-spectator" } }
+      ),
+    /Read-only spectator clients/i
+  );
+  assert.throws(
+    () =>
+      authority.requireOperatorSessionControlAttachment(
+        { subject: "viewer", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-spectator" } }
+      ),
+    /Read-only spectator clients/i
+  );
+
+  attachments.get("client-owner").auth.allowedSessions = [];
+  sessionControlStates.set("session-2", {
+    owner: { subject: "owner", tenantId: "default" },
+    controllerClientId: null,
+    controllerChangedAt: 7,
+    allowAutoAssign: false
+  });
+  assert.equal(authority.reconcileSessionControllerForSession("session-2"), true);
+  assert.equal(sessionControlStates.get("session-2").allowAutoAssign, true);
+});
+
+test("runtime session-control authority covers controller, owner, rename, and scope edge cases", () => {
+  const { attachments, authority, broadcasts, sessionControlStates } = createAuthorityHarness();
+
+  sessionControlStates.set("session-1", {
+    owner: { subject: "owner", tenantId: "default" },
+    controllerClientId: null,
+    controllerChangedAt: 12,
+    allowAutoAssign: false
+  });
+  assert.throws(
+    () =>
+      authority.ensureSessionControllerAccess(
+        "session-1",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } },
+        "write to this session"
+      ),
+    /No client currently holds session control/i
+  );
+
+  authority.takeSessionControlOrThrow(
+    "session-1",
+    { subject: "owner", tenantId: "default" },
+    { headers: { "x-ptydeck-client-id": "client-owner" } }
+  );
+  attachments.get("client-other").auth.allowedSessions = ["session-1"];
+  assert.throws(
+    () =>
+      authority.releaseSessionControlOrThrow(
+        "session-1",
+        { subject: "other-owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-other" } }
+      ),
+    /Only the owner or active controller can release session control/i
+  );
+  assert.throws(
+    () =>
+      authority.transferSessionControlOrThrow(
+        "session-1",
+        "client-offline",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      ),
+    /not actively attached/i
+  );
+  assert.throws(
+    () =>
+      authority.renameSessionControlClientOrThrow(
+        "session-1",
+        "   ",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      ),
+    /Field 'label' must be a non-empty string/i
+  );
+  assert.throws(
+    () =>
+      authority.forgetSessionControlClientOrThrow(
+        "session-1",
+        "missing-client",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      ),
+    /not attached to this session/i
+  );
+
+  sessionControlStates.set("session-1", {
+    ...sessionControlStates.get("session-1"),
+    owner: { subject: "", tenantId: "" }
+  });
+  const messagingAccess = authority.ensureMessagingSessionInputAccess("session-1", "send terminal input through messaging");
+  assert.equal(messagingAccess.requestClient, null);
+  assert.equal(messagingAccess.controlView.owner.subject, "");
+
+  assert.deepEqual(
+    authority.listClaimableSessionIdsForScope(
+      "all",
+      {},
+      { subject: "owner", tenantId: "default", allowedSessions: ["session-1", "session-2"] }
+    ),
+    ["session-1", "session-2"]
+  );
+  assert.deepEqual(
+    authority.listClaimableSessionIdsForScope(
+      "session",
+      { sessionId: " session-1 " },
+      { subject: "owner", tenantId: "default", allowedSessions: ["session-1", "session-2"] }
+    ),
+    ["session-1"]
+  );
+  assert.throws(
+    () => authority.listClaimableSessionIdsForScope("deck", {}, { subject: "owner", tenantId: "default" }),
+    /Field 'deckId' is required/i
+  );
+  assert.throws(
+    () => authority.listClaimableSessionIdsForScope("session", {}, { subject: "owner", tenantId: "default" }),
+    /Field 'sessionId' is required/i
+  );
+
+  const updatedState = authority.updateSessionControlStateAndBroadcast("session-1", {
+    controllerClientId: "client-owner",
+    controllerChangedAt: 42,
+    allowAutoAssign: false
+  });
+  assert.equal(updatedState.currentController?.clientId, "client-owner");
+  assert.equal(sessionControlStates.get("session-1").owner.subject, "");
+
+  authority.broadcastSessionControlRefreshForAuth(
+    { subject: "owner", tenantId: "default", allowedSessions: ["session-1", "session-2"] },
+    { source: "refresh" }
+  );
+  assert.ok(broadcasts.some((entry) => entry.sessionId === "session-1" && entry.traceSeed?.source === "refresh"));
+  assert.ok(broadcasts.some((entry) => entry.sessionId === "session-2" && entry.traceSeed?.source === "refresh"));
+});

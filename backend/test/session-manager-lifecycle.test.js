@@ -402,3 +402,83 @@ test("session manager lifecycle helpers preserve restart payload state determini
     trace: { requestId: "req-9" }
   });
 });
+
+test("session manager lifecycle helpers normalize local defaults, quick-send usage, and theme slots deterministically", () => {
+  const launchInputs = [];
+  const { session, launchBundle } = buildSessionRecord(
+    {
+      id: "local-1",
+      quickIdToken: "   ",
+      cwd: "",
+      startCwd: "",
+      env: {
+        FOO: "BAR",
+        INVALID: 42
+      },
+      tags: [" Ops ", "ops", "invalid tag", "prod"],
+      quickSendUsage: [
+        { lookupKey: "cmd::deploy", count: 1, lastUsedAt: 10 },
+        { lookupKey: "cmd::deploy", count: "2", lastUsedAt: "20" },
+        { lookupKey: "  ", count: 9, lastUsedAt: 30 }
+      ],
+      themeProfile: {
+        background: "invalid",
+        cursor: "#112233"
+      },
+      activeThemeProfile: {
+        background: "#445566"
+      }
+    },
+    {
+      defaultShell: "zsh",
+      defaultLocalCwd: "/workspace/default",
+      buildLaunchBundle: (input) => {
+        launchInputs.push(input);
+        return {
+          launchSpec: {
+            metaCwd: "/workspace/default",
+            command: "zsh"
+          }
+        };
+      },
+      createInitialIdentityRuntime: () => ({
+        appIdentityState: {},
+        terminalSignalState: {},
+        appIdentity: {
+          title: "shell",
+          terminalType: "shell"
+        }
+      }),
+      nowFn: () => 1710000010000
+    }
+  );
+
+  assert.deepEqual(launchInputs, [
+    {
+      kind: "local",
+      shell: "zsh",
+      cwd: "/workspace/default",
+      startCwd: "/workspace/default",
+      startCommand: "",
+      env: {
+        FOO: "BAR"
+      },
+      remoteConnection: undefined,
+      remoteAuth: undefined,
+      remoteSecret: undefined
+    }
+  ]);
+  assert.equal(session.meta.quickIdToken, undefined);
+  assert.equal(session.meta.cwd, "/workspace/default");
+  assert.equal(session.meta.startCwd, "/workspace/default");
+  assert.deepEqual(session.meta.tags, ["ops", "prod"]);
+  assert.deepEqual(session.meta.quickSendUsage, [
+    { lookupKey: "cmd::deploy", count: 3, lastUsedAt: 20 }
+  ]);
+  assert.equal(session.meta.themeProfile.background, "#445566");
+  assert.equal(session.meta.activeThemeProfile.background, "#445566");
+  assert.equal(session.meta.inactiveThemeProfile.background, "#0a0d12");
+  assert.equal(session.meta.themeProfile.cursor, "#8ec07c");
+  assert.equal(session.remoteSecret, undefined);
+  assert.equal(launchBundle.launchSpec.command, "zsh");
+});

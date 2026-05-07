@@ -798,3 +798,155 @@ test("runtime library normalization validates share-link failures and slug-like 
     /Persisted share link entry is invalid/i
   );
 });
+
+test("runtime library normalization covers strict layout and workspace guard rails", () => {
+  const normalization = createHarness();
+
+  assert.throws(
+    () => normalization.normalizeLayoutProfileLayout([]),
+    /Field 'layout' must be an object/i
+  );
+  assert.throws(
+    () => normalization.normalizeLayoutProfileLayout({ activeDeckId: "Invalid Deck" }),
+    /layout\.activeDeckId/i
+  );
+  assert.throws(
+    () => normalization.normalizeLayoutProfileLayout({ deckTerminalSettings: [] }),
+    /layout\.deckTerminalSettings/i
+  );
+
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace([]),
+    /Field 'workspace' must be an object/i
+  );
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace({ activeDeckId: "Invalid Deck" }),
+    /workspace\.activeDeckId/i
+  );
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace({ activeDeckId: "missing" }),
+    /Deck 'missing' was not found for workspace preset/i
+  );
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace({ deckGroups: [] }),
+    /workspace\.deckGroups' must be an object/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckGroups: {
+          "Invalid Deck": { groups: [] }
+        }
+      }),
+    /workspace\.deckGroups' contains an invalid deck id/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckSplitLayouts: {
+          missing: {
+            root: {
+              type: "row",
+              children: [
+                { type: "pane", paneId: "main" },
+                { type: "pane", paneId: "side" }
+              ]
+            }
+          }
+        }
+      }),
+    /Deck 'missing' was not found for split-layout state/i
+  );
+});
+
+test("runtime library normalization covers share-link and workspace detail guard rails", () => {
+  const normalization = createHarness();
+
+  const deckShareLink = normalization.normalizeShareLinkEntity(
+    {
+      targetType: "deck",
+      targetId: "ops",
+      expiresInSeconds: ""
+    },
+    null
+  );
+  assert.equal(deckShareLink.targetType, "deck");
+  assert.equal(deckShareLink.targetId, "ops");
+  assert.equal(deckShareLink.creatorSubject, "");
+  assert.equal(deckShareLink.creatorTenantId, "");
+  assert.equal(deckShareLink.expiresAt, 1700086400000);
+
+  const lenientDeckShareLink = normalization.normalizeShareLinkEntity(
+    {
+      targetType: "deck",
+      targetId: "ops",
+      expiresInSeconds: 9999999
+    },
+    {},
+    { strict: false }
+  );
+  assert.equal(lenientDeckShareLink.expiresAt, 1700086400000);
+
+  assert.equal(normalization.normalizeShareLinkEntity([], {}, { strict: false }), null);
+
+  const restored = normalization.normalizePersistedShareLinkEntity(
+    {
+      ...deckShareLink,
+      revokedAt: 1700000100000
+    },
+    { strict: false }
+  );
+  assert.equal(restored.revokedAt, 1700000100000);
+
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace({ layoutProfileId: "Invalid Profile" }),
+    /workspace\.layoutProfileId/i
+  );
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace({ layoutProfileId: "missing" }),
+    /Layout profile 'missing' was not found/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckGroups: {
+          ops: []
+        }
+      }),
+    /Each 'workspace\.deckGroups' entry must be an object/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckGroups: {
+          ops: {
+            groups: {}
+          }
+        }
+      }),
+    /workspace\.deckGroups\.\*\.groups' must be an array/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckGroups: {
+          ops: {
+            groups: [{ id: "deploy", name: "Deploy", sessionIds: ["missing"] }]
+          }
+        }
+      }),
+    /workspace group membership/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckGroups: {
+          ops: {
+            activeGroupId: "Invalid Group",
+            groups: [{ id: "deploy", name: "Deploy", sessionIds: ["session-2"] }]
+          }
+        }
+      }),
+    /activeGroupId' must be a valid group id/i
+  );
+});
