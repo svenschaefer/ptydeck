@@ -90,6 +90,8 @@ export function createLayoutProfileRuntimeController(options = {}) {
   const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
   const getDeckSplitLayouts = typeof options.getDeckSplitLayouts === "function" ? options.getDeckSplitLayouts : null;
   const setDeckSplitLayouts = typeof options.setDeckSplitLayouts === "function" ? options.setDeckSplitLayouts : null;
+  const mergeDeckSplitLayouts =
+    typeof options.mergeDeckSplitLayouts === "function" ? options.mergeDeckSplitLayouts : null;
 
   let profiles = [];
   let selectedProfileId = "";
@@ -302,12 +304,21 @@ export function createLayoutProfileRuntimeController(options = {}) {
     if (typeof setControlPaneState === "function") {
       setControlPaneState(normalizeLayoutControlPaneState(normalizedLayout));
     }
-    if (typeof setDeckSplitLayouts === "function") {
+    if (typeof mergeDeckSplitLayouts === "function") {
+      mergeDeckSplitLayouts(normalizedLayout.deckSplitLayouts, {
+        scope,
+        targetDeckId: targetActiveDeckId
+      });
+    } else if (typeof setDeckSplitLayouts === "function") {
       setDeckSplitLayouts(
-        mergeDeckSplitLayoutSnapshot(typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : {}, normalizedLayout.deckSplitLayouts, {
-          scope,
-          targetDeckId: targetActiveDeckId
-        })
+        mergeDeckSplitLayoutSnapshot(
+          typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : {},
+          normalizedLayout.deckSplitLayouts,
+          {
+            scope,
+            targetDeckId: targetActiveDeckId
+          }
+        )
       );
     }
     if (currentDecks.some((deck) => normalizeText(deck?.id) === targetActiveDeckId)) {

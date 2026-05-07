@@ -1,12 +1,4 @@
-import {
-  assignSessionToDeckSplitLayoutPane,
-  ensureDeckSplitLayoutEntry,
-  getDeckSplitLayoutEntry,
-  normalizeDeckSplitLayoutMap,
-  removeDeckSplitLayoutPane,
-  setDeckSplitLayoutContainerWeightRatio,
-  splitDeckSplitLayoutPane
-} from "./layout-split-layout-runtime-state.js";
+import { createLayoutSplitLayoutRuntimeModel } from "./layout-split-layout-runtime-model.js";
 import { getSplitLayoutNodeByPath } from "./layout-runtime-state.js";
 import { collectSplitLayoutPaneIds, normalizeSplitLayoutWeights } from "./split-layout-state.js";
 import { serializeSplitLayoutRoot } from "./layout-workspace-capture-state.js";
@@ -97,7 +89,6 @@ export function createSplitLayoutRuntimeController(options = {}) {
   const sortSessionsByQuickId =
     typeof options.sortSessionsByQuickId === "function" ? options.sortSessionsByQuickId : (sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
 
-  let deckSplitLayouts = {};
   let canvasEl = null;
   let stashEl = null;
   let renderedDeckId = "";
@@ -105,6 +96,13 @@ export function createSplitLayoutRuntimeController(options = {}) {
   let renderedRootEl = null;
   const paneRefs = new Map();
   const containerRefs = new Map();
+  const splitLayoutRuntimeModel = createLayoutSplitLayoutRuntimeModel({
+    defaultDeckId,
+    onLayoutsChanged() {
+      renderedDeckId = "";
+      renderedSignature = "";
+    }
+  });
 
   function createElement(tagName) {
     return documentRef?.createElement?.(tagName) || { tagName: String(tagName || "div").toUpperCase(), style: {}, dataset: {}, children: [] };
@@ -165,71 +163,15 @@ export function createSplitLayoutRuntimeController(options = {}) {
     return ensureRootContainers().stashEl;
   }
 
-  function captureDeckSplitLayouts() {
-    return normalizeDeckSplitLayoutMap(deckSplitLayouts, { fallbackToDefault: true });
-  }
-
-  function replaceDeckSplitLayouts(nextLayouts) {
-    deckSplitLayouts = normalizeDeckSplitLayoutMap(nextLayouts, { fallbackToDefault: true });
-    renderedDeckId = "";
-    renderedSignature = "";
-  }
-
-  function getDeckSplitLayout(deckId) {
-    return getDeckSplitLayoutEntry(deckSplitLayouts, deckId, { defaultDeckId });
-  }
-
-  function ensureDeckLayoutEntry(deckId, sessionIds = []) {
-    const result = ensureDeckSplitLayoutEntry(deckSplitLayouts, deckId, sessionIds, { defaultDeckId });
-    deckSplitLayouts = result.deckSplitLayouts;
-    return result.entry;
-  }
-
-  function assignSessionToPane(deckId, paneId, sessionId) {
-    const result = assignSessionToDeckSplitLayoutPane(deckSplitLayouts, deckId, paneId, sessionId, { defaultDeckId });
-    if (!result) {
-      return null;
-    }
-    deckSplitLayouts = result.deckSplitLayouts;
-    renderedDeckId = "";
-    renderedSignature = "";
-    return result.entry;
-  }
-
-  function splitPane(deckId, paneId, orientation) {
-    const result = splitDeckSplitLayoutPane(deckSplitLayouts, deckId, paneId, orientation, { defaultDeckId });
-    if (!result) {
-      return null;
-    }
-    deckSplitLayouts = result.deckSplitLayouts;
-    renderedDeckId = "";
-    renderedSignature = "";
-    return result.entry;
-  }
-
-  function removePane(deckId, paneId) {
-    const result = removeDeckSplitLayoutPane(deckSplitLayouts, deckId, paneId, { defaultDeckId });
-    if (!result) {
-      return null;
-    }
-    deckSplitLayouts = result.deckSplitLayouts;
-    renderedDeckId = "";
-    renderedSignature = "";
-    return result.entry;
-  }
-
-  function setContainerWeightRatio(deckId, path, handleIndex, ratio) {
-    const result = setDeckSplitLayoutContainerWeightRatio(deckSplitLayouts, deckId, path, handleIndex, ratio, {
-      defaultDeckId
-    });
-    if (!result) {
-      return null;
-    }
-    deckSplitLayouts = result.deckSplitLayouts;
-    renderedDeckId = "";
-    renderedSignature = "";
-    return result.entry;
-  }
+  const captureDeckSplitLayouts = (...args) => splitLayoutRuntimeModel.captureDeckSplitLayouts(...args);
+  const replaceDeckSplitLayouts = (...args) => splitLayoutRuntimeModel.replaceDeckSplitLayouts(...args);
+  const getDeckSplitLayout = (...args) => splitLayoutRuntimeModel.getDeckSplitLayout(...args);
+  const ensureDeckLayoutEntry = (...args) => splitLayoutRuntimeModel.ensureDeckLayoutEntry(...args);
+  const assignSessionToPane = (...args) => splitLayoutRuntimeModel.assignSessionToPane(...args);
+  const splitPane = (...args) => splitLayoutRuntimeModel.splitPane(...args);
+  const removePane = (...args) => splitLayoutRuntimeModel.removePane(...args);
+  const setContainerWeightRatio = (...args) => splitLayoutRuntimeModel.setContainerWeightRatio(...args);
+  const mergeDeckSplitLayouts = (...args) => splitLayoutRuntimeModel.mergeDeckSplitLayouts(...args);
 
   function clearChildren(element) {
     if (!element || typeof element.removeChild !== "function") {
@@ -271,7 +213,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
       if (!listenersTarget || typeof listenersTarget.addEventListener !== "function") {
         return;
       }
-      const entry = deckSplitLayouts[normalizeText(deckId) || defaultDeckId];
+      const entry = getDeckSplitLayout(deckId);
       const node = getSplitLayoutNodeByPath(entry?.root, path);
       if (!node || !Array.isArray(node.children)) {
         return;
@@ -536,6 +478,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
     captureDeckSplitLayouts,
     replaceDeckSplitLayouts,
     getDeckSplitLayout,
+    mergeDeckSplitLayouts,
     renderDeckLayout,
     assignSessionToPane,
     splitPane,

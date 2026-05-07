@@ -9,6 +9,7 @@ import {
   computeSplitLayoutPairWeights,
   getSplitLayoutNodeByPath,
   normalizeLayoutControlPaneState,
+  normalizeLayoutProfileCollection,
   normalizeLayoutProfileRecord,
   removeSplitLayoutPaneFromNode,
   replaceSplitLayoutPaneWithSplit,
@@ -224,4 +225,52 @@ test("layout runtime state covers fail-closed selectors and snapshot helpers det
     }),
     ["main", "side"]
   );
+});
+
+test("layout runtime state normalizes profile collections by dropping invalid entries, deduping ids, and sorting by name and id", () => {
+  const profiles = normalizeLayoutProfileCollection([
+    {
+      id: "beta",
+      name: "Zulu",
+      createdAt: 2,
+      updatedAt: 2,
+      layout: {
+        activeDeckId: "default",
+        deckTerminalSettings: {},
+        deckSplitLayouts: {}
+      }
+    },
+    {
+      id: "alpha",
+      name: "Alpha",
+      createdAt: 1,
+      updatedAt: 1,
+      layout: {
+        activeDeckId: "default",
+        deckTerminalSettings: {},
+        deckSplitLayouts: {}
+      }
+    },
+    {
+      id: "alpha",
+      name: "Duplicate",
+      createdAt: 9,
+      updatedAt: 9,
+      layout: {
+        activeDeckId: "default",
+        deckTerminalSettings: {},
+        deckSplitLayouts: {}
+      }
+    },
+    null,
+    {
+      id: "",
+      name: "Broken",
+      layout: {}
+    }
+  ]);
+
+  assert.deepEqual(profiles.map((profile) => profile.id), ["alpha", "beta"]);
+  assert.equal(profiles[0].name, "Alpha");
+  assert.deepEqual(normalizeLayoutProfileCollection(null), []);
 });

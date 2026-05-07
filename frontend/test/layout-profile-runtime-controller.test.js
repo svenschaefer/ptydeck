@@ -680,6 +680,73 @@ test("layout profile runtime controller clears stale deck split layouts during d
   assert.equal(currentLayouts.ops, undefined);
 });
 
+test("layout profile runtime controller prefers the injected split-layout merge seam when available", async () => {
+  const mergedLayouts = [];
+  const controller = createLayoutProfileRuntimeController({
+    api: {
+      async updateDeck() {
+        throw new Error("updateDeck should not run");
+      }
+    },
+    getDecks: () => [{ id: "ops" }],
+    getDeckById: () => ({ id: "ops", settings: {} }),
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    getSidebarVisible: () => true,
+    getDeckTerminalGeometry: () => ({ cols: 132, rows: 40 }),
+    getDeckSplitLayouts: () => ({
+      ops: {
+        root: { type: "pane", paneId: "main" },
+        paneSessions: { main: ["s-1"] }
+      }
+    }),
+    setDeckSplitLayouts() {
+      throw new Error("setDeckSplitLayouts should not run");
+    },
+    mergeDeckSplitLayouts(layouts, runtimeOptions) {
+      mergedLayouts.push([layouts, runtimeOptions]);
+    },
+    setSidebarVisible() {},
+    setSessionFilterText() {},
+    setControlPaneState() {},
+    setActiveDeck() {},
+    applyRuntimeEvent() {},
+    requestRender() {}
+  });
+
+  const feedback = await controller.applyLayoutSnapshot({
+    activeDeckId: "ops",
+    sidebarVisible: true,
+    sessionFilterText: "",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 240,
+    deckTerminalSettings: {},
+    deckSplitLayouts: {
+      ops: {
+        root: { type: "pane", paneId: "detail" },
+        paneSessions: { detail: ["s-1"] }
+      }
+    }
+  });
+
+  assert.equal(feedback, "Applied layout snapshot for deck [ops].");
+  assert.deepEqual(mergedLayouts, [
+    [
+      {
+        ops: {
+          root: { type: "pane", paneId: "detail" },
+          paneSessions: { detail: ["s-1"] }
+        }
+      },
+      {
+        scope: "all",
+        targetDeckId: "ops"
+      }
+    ]
+  ]);
+});
+
 test("layout profile runtime controller rejects malformed create and update payloads deterministically", async () => {
   const controller = createLayoutProfileRuntimeController({
     documentRef: createDocumentRef(),

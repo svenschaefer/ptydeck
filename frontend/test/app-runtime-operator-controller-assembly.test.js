@@ -19,6 +19,7 @@ test("app runtime operator controller assembly wires control, layout, connection
   let connectionArgs = null;
   let workspaceArgs = null;
   let latestControlPaneState = { dock: "right" };
+  const mergedSplitLayouts = [];
 
   const controlPaneRuntimeController = {
     getState() {
@@ -140,6 +141,9 @@ test("app runtime operator controller assembly wires control, layout, connection
       captureDeckSplitLayouts() {
         return { ops: { kind: "split" } };
       },
+      mergeDeckSplitLayouts(snapshotLayouts, runtimeOptions) {
+        mergedSplitLayouts.push([snapshotLayouts, runtimeOptions]);
+      },
       replaceDeckSplitLayouts(nextLayouts) {
         return nextLayouts;
       }
@@ -184,6 +188,16 @@ test("app runtime operator controller assembly wires control, layout, connection
   assert.equal(layoutArgs.setActiveDeck("ops"), true);
   assert.deepEqual(layoutArgs.setControlPaneState({ dock: "left" }), { dock: "left" });
   assert.deepEqual(layoutArgs.getControlPaneState(), { dock: "left" });
+  layoutArgs.mergeDeckSplitLayouts(
+    { ops: { root: { type: "pane", paneId: "main" }, paneSessions: {} } },
+    { scope: "deck" }
+  );
+  assert.deepEqual(mergedSplitLayouts, [
+    [
+      { ops: { root: { type: "pane", paneId: "main" }, paneSessions: {} } },
+      { scope: "deck" }
+    ]
+  ]);
 
   assert.deepEqual(connectionArgs.getDecks(), state.decks);
   assert.deepEqual(connectionArgs.getSessions(), state.sessions);
@@ -237,6 +251,7 @@ test("app runtime operator controller assembly fails closed for missing facades 
   assert.equal(layoutArgs.getActiveDeckId(), "default");
   assert.deepEqual(layoutArgs.getDeckTerminalGeometry("missing"), { cols: 80, rows: 20 });
   assert.deepEqual(layoutArgs.getControlPaneState(), {});
+  assert.equal(layoutArgs.mergeDeckSplitLayouts({}, { scope: "deck", targetDeckId: "default" }), undefined);
 
   assert.deepEqual(connectionArgs.getDecks(), []);
   assert.deepEqual(connectionArgs.getSessions(), []);

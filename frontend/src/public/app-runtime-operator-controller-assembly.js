@@ -101,6 +101,8 @@ export function createAppRuntimeOperatorControllerAssembly(options = {}) {
     confirmAction: (runtimeOptions) => options.actionDialogController?.confirm?.(runtimeOptions),
     requestRender: () => options.appCommandUiFacadeController?.render?.(),
     getDeckSplitLayouts: () => options.splitLayoutRuntimeController?.captureDeckSplitLayouts?.() || {},
+    mergeDeckSplitLayouts: (snapshotLayouts, runtimeOptions) =>
+      options.splitLayoutRuntimeController?.mergeDeckSplitLayouts?.(snapshotLayouts, runtimeOptions),
     setDeckSplitLayouts: (nextLayouts) =>
       options.splitLayoutRuntimeController?.replaceDeckSplitLayouts?.(nextLayouts)
   });

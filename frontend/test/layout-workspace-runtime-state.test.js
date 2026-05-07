@@ -6,6 +6,7 @@ import {
   captureCurrentWorkspace,
   captureLayoutProfileSnapshot,
   formatWorkspacePresetDetail,
+  formatWorkspacePresetSummary,
   normalizeWorkspacePresetRecord,
   resolveWorkspaceDeckSessions,
   serializeSplitLayoutRoot
@@ -169,4 +170,22 @@ test("layout workspace runtime state falls back to ordered deck sessions when th
     }),
     orderedSessions
   );
+});
+
+test("layout workspace runtime state fails closed for invalid presets and unresolved filter selectors", () => {
+  assert.equal(normalizeWorkspacePresetRecord({ id: "", name: "Missing" }), null);
+  assert.equal(formatWorkspacePresetSummary(null), "No saved workspace preset selected.");
+
+  const visibleSessions = captureCurrentVisibleDeckSessions({
+    deckId: "",
+    getActiveDeckId: () => "default",
+    getSessions: () => [{ id: "s-1", deckId: "default" }],
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    resolveSessionDeckId: (session) => session.deckId,
+    deckGroups: {},
+    getSessionFilterText: () => "ops",
+    resolveFilterSelectors: () => ({ error: "ignored" })
+  });
+
+  assert.deepEqual(visibleSessions.map((session) => session.id), ["s-1"]);
 });

@@ -1,4 +1,4 @@
-import { createAppRuntimeAccessControlAssembly } from "./app-runtime-access-control-assembly.js";
+import { createAppRuntimeAccessControlComposition } from "./app-runtime-access-control-composition.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
 import { createAppRuntimeLayoutFoundationAssembly } from "./app-runtime-layout-foundation-assembly.js";
@@ -557,130 +557,122 @@ if (typeof window !== "undefined") {
   window.__PTYDECK_PERF__ = startupPerf;
 }
 
-const appRuntimeAccessControlAssembly = createAppRuntimeAccessControlAssembly({
-  initializationAccessOptions: {
-    windowRef: window,
-    documentRef: document,
-    config,
-    uiState,
-    startupPerf,
-    nowMs,
-    wsBootstrapFallbackMs: WS_BOOTSTRAP_FALLBACK_MS,
-    debugLog,
-    terminalSearchState,
-    store,
-    getAppRuntimeStateController: () => appRuntimeStateController,
-    getAppCommandUiFacadeController: () => appCommandUiFacadeController,
-    getAuthBootstrapRuntimeController: () => authBootstrapRuntimeController,
-    getTerminalSearchController: () => terminalSearchController,
-    getCommandComposerAutocompleteController: () => commandComposerAutocompleteController,
-    getCommandComposerRuntimeController: () => commandComposerRuntimeController,
-    getCommandTargetRuntimeController: () => commandTargetRuntimeController,
-    getSessionGridController: () => sessionGridController,
-    getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
-    getControlPaneRuntimeController: () => controlPaneRuntimeController,
-    getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
-    getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
-    getSendHistoryRuntimeController: () => sendHistoryRuntimeController,
-    getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
-    getPasteObservationRuntimeController: () => pasteObservationRuntimeController,
-    getCommandExecutor: () => commandExecutor,
-    api,
-    getSessions: () => {
-      const state = store?.getState?.() || {};
-      return Array.isArray(state.sessions) ? state.sessions : [];
-    },
-    getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
-    formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-    formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
-    takeSessionControlScope: (scope, runtimeOptions) =>
-      trustedLocalHandoffRuntimeController?.takeControlScope?.(scope, runtimeOptions),
-    renameTrustedLocalClientIdentity: (label) => trustedLocalClientRuntimeController.renameClientIdentity(label),
-    retryBlockedAction: (retryAction) => commandComposerRuntimeController?.retryBlockedAction?.(retryAction),
-    applyResizeForSession: (sessionId, runtimeOptions) =>
-      sessionTerminalResizeController?.applyResizeForSession?.(sessionId, runtimeOptions),
-    showControlPane: () => controlPaneRuntimeController?.show?.(),
-    listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
-    resolveDeckForSession: (session) => {
-      const deckId = appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID;
-      const deck = store.getState().decks.find((entry) => entry.id === deckId) || null;
-      return {
-        id: deck?.id || deckId,
-        name: deck?.name || deckId || "Default"
-      };
-    },
-    canReadClipboardText: () => clipboardRuntimeController.canReadText(),
-    readClipboardText: () => clipboardRuntimeController.readText(),
-    submitTerminalPaste: (sessionId, text, runtimeOptions) =>
-      commandComposerRuntimeController?.submitProgrammaticPaste?.(sessionId, text, runtimeOptions) ||
-      Promise.resolve({ ok: false, status: "unavailable", feedback: "Clipboard send is unavailable." }),
-    apiSendInput: (sessionId, data, requestOptions) => api.sendInput(sessionId, data, requestOptions),
-    sendInputWithConfiguredTerminator,
-    normalizeCustomCommandPayloadForShell,
-    normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode?.(value) || "auto",
-    getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
-    delayedSubmitMs: DELAYED_SUBMIT_MS,
-    recordCommandSubmission: (sessionId, submission) => store.recordSessionCommandSubmission(sessionId, submission),
-    isSessionActionBlocked: (session) => sessionUiFacadeController?.isSessionActionBlocked?.(session) === true,
-    getBlockedSessionActionMessage: (sessions, actionLabel) =>
-      sessionUiFacadeController?.getBlockedSessionActionMessage?.(sessions, actionLabel) || "",
-    defaultDeckId: DEFAULT_DECK_ID
-  },
-  testHooks,
+const appRuntimeAccessControlComposition = createAppRuntimeAccessControlComposition({
+  windowRef: window,
+  documentRef: document,
+  config,
   uiState,
-  api,
+  startupPerf,
+  nowMs,
+  wsBootstrapFallbackMs: WS_BOOTSTRAP_FALLBACK_MS,
+  debugLog,
+  terminalSearchState,
   store,
+  api,
+  testHooks,
   streamAdapter,
-  getInitializationErrorMessage: () => appRuntimeInitializationController?.getInitializationErrorMessage?.() || "",
+  getAppRuntimeStateController: () => appRuntimeStateController,
+  getAppCommandUiFacadeController: () => appCommandUiFacadeController,
+  getAuthBootstrapRuntimeController: () => authBootstrapRuntimeController,
+  getTerminalSearchController: () => terminalSearchController,
+  getCommandComposerAutocompleteController: () => commandComposerAutocompleteController,
+  getCommandComposerRuntimeController: () => commandComposerRuntimeController,
+  getCommandTargetRuntimeController: () => commandTargetRuntimeController,
+  getSessionGridController: () => sessionGridController,
+  getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
+  getControlPaneRuntimeController: () => controlPaneRuntimeController,
+  getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
+  getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
+  getSendHistoryRuntimeController: () => sendHistoryRuntimeController,
   getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
+  getPasteObservationRuntimeController: () => pasteObservationRuntimeController,
+  getCommandExecutor: () => commandExecutor,
+  getSessions: () => {
+    const state = store?.getState?.() || {};
+    return Array.isArray(state.sessions) ? state.sessions : [];
+  },
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  takeSessionControlScope: (scope, runtimeOptions) =>
+    trustedLocalHandoffRuntimeController?.takeControlScope?.(scope, runtimeOptions),
+  renameTrustedLocalClientIdentity: (label) => trustedLocalClientRuntimeController.renameClientIdentity(label),
+  retryBlockedAction: (retryAction) => commandComposerRuntimeController?.retryBlockedAction?.(retryAction),
+  applyResizeForSession: (sessionId, runtimeOptions) =>
+    sessionTerminalResizeController?.applyResizeForSession?.(sessionId, runtimeOptions),
+  showControlPane: () => controlPaneRuntimeController?.show?.(),
+  listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
+  resolveDeckForSession: (session) => {
+    const deckId = appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID;
+    const deck = store.getState().decks.find((entry) => entry.id === deckId) || null;
+    return {
+      id: deck?.id || deckId,
+      name: deck?.name || deckId || "Default"
+    };
+  },
+  canReadClipboardText: () => clipboardRuntimeController.canReadText(),
+  readClipboardText: () => clipboardRuntimeController.readText(),
+  submitTerminalPaste: (sessionId, text, runtimeOptions) =>
+    commandComposerRuntimeController?.submitProgrammaticPaste?.(sessionId, text, runtimeOptions) ||
+    Promise.resolve({ ok: false, status: "unavailable", feedback: "Clipboard send is unavailable." }),
+  apiSendInput: (sessionId, data, requestOptions) => api.sendInput(sessionId, data, requestOptions),
+  sendInputWithConfiguredTerminator,
+  normalizeCustomCommandPayloadForShell,
+  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode?.(value) || "auto",
+  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
+  delayedSubmitMs: DELAYED_SUBMIT_MS,
+  recordCommandSubmission: (sessionId, submission) => store.recordSessionCommandSubmission(sessionId, submission),
+  isSessionActionBlocked: (session) => sessionUiFacadeController?.isSessionActionBlocked?.(session) === true,
+  getBlockedSessionActionMessage: (sessions, actionLabel) =>
+    sessionUiFacadeController?.getBlockedSessionActionMessage?.(sessions, actionLabel) || "",
+  defaultDeckId: DEFAULT_DECK_ID,
+  getInitializationErrorMessage: () => appRuntimeInitializationController?.getInitializationErrorMessage?.() || "",
   getOriginHandoffSourceOrigin: () => sessionControlRuntimeController.getOriginHandoffSourceOrigin(),
   setOriginHandoffSourceOrigin: (origin) => sessionControlRuntimeController.setOriginHandoffSourceOrigin(origin),
   setRuntimeClientIdentityCreatedOnThisOrigin: (value) =>
     sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(value),
   normalizeCommandFeedbackActionSessionId: normalizeControlText,
-  collaboratorSetters: {
-    appSessionRuntimeFacadeController: (value) => {
-      appSessionRuntimeFacadeController = value;
-    },
-    appRuntimeStateController: (value) => {
-      appRuntimeStateController = value;
-    },
-    appCommandUiFacadeController: (value) => {
-      appCommandUiFacadeController = value;
-    },
-    trustedLocalHandoffRuntimeController: (value) => {
-      trustedLocalHandoffRuntimeController = value;
-    },
-    commandComposerRuntimeController: (value) => {
-      commandComposerRuntimeController = value;
-    },
-    sessionTerminalResizeController: (value) => {
-      sessionTerminalResizeController = value;
-    },
-    controlPaneRuntimeController: (value) => {
-      controlPaneRuntimeController = value;
-    }
+  setAppSessionRuntimeFacadeController: (value) => {
+    appSessionRuntimeFacadeController = value;
+  },
+  setAppRuntimeStateController: (value) => {
+    appRuntimeStateController = value;
+  },
+  setAppCommandUiFacadeController: (value) => {
+    appCommandUiFacadeController = value;
+  },
+  setTrustedLocalHandoffRuntimeController: (value) => {
+    trustedLocalHandoffRuntimeController = value;
+  },
+  setCommandComposerRuntimeController: (value) => {
+    commandComposerRuntimeController = value;
+  },
+  setSessionTerminalResizeController: (value) => {
+    sessionTerminalResizeController = value;
+  },
+  setControlPaneRuntimeController: (value) => {
+    controlPaneRuntimeController = value;
   }
 });
-appRuntimeStateController = appRuntimeAccessControlAssembly.appRuntimeStateController;
-appCommandUiFacadeController = appRuntimeAccessControlAssembly.appCommandUiFacadeController;
-sessionControlRuntimeController = appRuntimeAccessControlAssembly.sessionControlRuntimeController;
-sessionQuickSendRuntimeController = appRuntimeAccessControlAssembly.sessionQuickSendRuntimeController;
-const setAccessState = appRuntimeAccessControlAssembly.setAccessState;
-const isReadOnlyMode = appRuntimeAccessControlAssembly.isReadOnlyMode;
-const getReadOnlyModeMessage = appRuntimeAccessControlAssembly.getReadOnlyModeMessage;
-const canWriteToSession = appRuntimeAccessControlAssembly.canWriteToSession;
-const getSessionWriteBlockMessage = appRuntimeAccessControlAssembly.getSessionWriteBlockMessage;
-const canTakeSessionControl = appRuntimeAccessControlAssembly.canTakeSessionControl;
-const setRuntimeClientId = appRuntimeAccessControlAssembly.setRuntimeClientId;
-const getRuntimeClientId = appRuntimeAccessControlAssembly.getRuntimeClientId;
-const renameTrustedLocalDevice = appRuntimeAccessControlAssembly.renameTrustedLocalDevice;
-const showBlockedWriteReclaimUi = appRuntimeAccessControlAssembly.showBlockedWriteReclaimUi;
-const renderSessionControl = appRuntimeAccessControlAssembly.renderSessionControl;
-const maybeRedirectToCanonicalOrigin = appRuntimeAccessControlAssembly.maybeRedirectToCanonicalOrigin;
+appRuntimeStateController = appRuntimeAccessControlComposition.appRuntimeStateController;
+appCommandUiFacadeController = appRuntimeAccessControlComposition.appCommandUiFacadeController;
+sessionControlRuntimeController = appRuntimeAccessControlComposition.sessionControlRuntimeController;
+sessionQuickSendRuntimeController = appRuntimeAccessControlComposition.sessionQuickSendRuntimeController;
+const setAccessState = appRuntimeAccessControlComposition.setAccessState;
+const isReadOnlyMode = appRuntimeAccessControlComposition.isReadOnlyMode;
+const getReadOnlyModeMessage = appRuntimeAccessControlComposition.getReadOnlyModeMessage;
+const canWriteToSession = appRuntimeAccessControlComposition.canWriteToSession;
+const getSessionWriteBlockMessage = appRuntimeAccessControlComposition.getSessionWriteBlockMessage;
+const canTakeSessionControl = appRuntimeAccessControlComposition.canTakeSessionControl;
+const setRuntimeClientId = appRuntimeAccessControlComposition.setRuntimeClientId;
+const getRuntimeClientId = appRuntimeAccessControlComposition.getRuntimeClientId;
+const renameTrustedLocalDevice = appRuntimeAccessControlComposition.renameTrustedLocalDevice;
+const showBlockedWriteReclaimUi = appRuntimeAccessControlComposition.showBlockedWriteReclaimUi;
+const renderSessionControl = appRuntimeAccessControlComposition.renderSessionControl;
+const maybeRedirectToCanonicalOrigin = appRuntimeAccessControlComposition.maybeRedirectToCanonicalOrigin;
 const maybeAutoRepairOriginHandoffControl =
-  appRuntimeAccessControlAssembly.maybeAutoRepairOriginHandoffControl;
-const handleCommandFeedbackAction = appRuntimeAccessControlAssembly.handleCommandFeedbackAction;
+  appRuntimeAccessControlComposition.maybeAutoRepairOriginHandoffControl;
+const handleCommandFeedbackAction = appRuntimeAccessControlComposition.handleCommandFeedbackAction;
 
 ({
   controlPaneRuntimeController,

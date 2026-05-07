@@ -16,6 +16,9 @@ const appRuntimeInitializationAccessCompositionPath = fileURLToPath(
 const appRuntimeAccessControlAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-access-control-assembly.js", import.meta.url)
 );
+const appRuntimeAccessControlCompositionPath = fileURLToPath(
+  new URL("../src/public/app-runtime-access-control-composition.js", import.meta.url)
+);
 const appRuntimeLayoutFoundationAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-layout-foundation-assembly.js", import.meta.url)
 );
@@ -27,6 +30,9 @@ const layoutWorkspaceCaptureStatePath = fileURLToPath(
 );
 const layoutWorkspaceRuntimeStatePath = fileURLToPath(
   new URL("../src/public/layout-workspace-runtime-state.js", import.meta.url)
+);
+const layoutSplitLayoutRuntimeModelPath = fileURLToPath(
+  new URL("../src/public/layout-split-layout-runtime-model.js", import.meta.url)
 );
 const appRuntimeSessionGridActionsPath = fileURLToPath(
   new URL("../src/public/app-runtime-session-grid-actions.js", import.meta.url)
@@ -92,7 +98,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
   const source = await readFile(appRuntimeCompositionPath, "utf8");
 
   const requiredDelegationMarkers = [
-    "createAppRuntimeAccessControlAssembly",
+    "createAppRuntimeAccessControlComposition",
     "createAppRuntimeLayoutFoundationAssembly",
     "createAppRuntimeOperatorSupportAssembly",
     "createAppRuntimeRecoveryComposition",
@@ -192,6 +198,25 @@ test("runtime access control assembly owns the delegated initialization-access a
   }
 });
 
+test("runtime access control composition owns the delegated access-control composition bridge contract", async () => {
+  const source = await readFile(appRuntimeAccessControlCompositionPath, "utf8");
+
+  const requiredMarkers = [
+    "createAppRuntimeAccessControlAssembly",
+    "initializationAccessOptions",
+    "collaboratorSetters",
+    "setAppRuntimeStateController",
+    "setAppCommandUiFacadeController",
+    "setTrustedLocalHandoffRuntimeController",
+    "sessionQuickSendRuntimeController",
+    "appRuntimeAccessControlAssembly"
+  ];
+
+  for (const marker of requiredMarkers) {
+    assert.ok(source.includes(marker), `expected runtime access control composition marker ${marker}`);
+  }
+});
+
 test("runtime composition helper assembly owns the delegated test-hook and collaborator bridge contract", async () => {
   const source = await readFile(appRuntimeCompositionHelperAssemblyPath, "utf8");
 
@@ -237,6 +262,24 @@ test("layout workspace runtime state owns the delegated split-layout snapshot an
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected layout workspace runtime state marker ${marker}`);
+  }
+});
+
+test("layout split-layout runtime model owns the delegated stateful deck split-layout orchestration contract", async () => {
+  const source = await readFile(layoutSplitLayoutRuntimeModelPath, "utf8");
+
+  const requiredMarkers = [
+    "assignSessionToDeckSplitLayoutPane",
+    "ensureDeckSplitLayoutEntry",
+    "mergeDeckSplitLayoutSnapshot",
+    "notifyLayoutsChanged",
+    "function replaceDeckSplitLayouts(nextLayouts)",
+    "function mergeDeckSplitLayouts(snapshotLayouts, mergeOptions = {})",
+    "function setContainerWeightRatio(deckId, path, handleIndex, ratio)"
+  ];
+
+  for (const marker of requiredMarkers) {
+    assert.ok(source.includes(marker), `expected layout split-layout runtime model marker ${marker}`);
   }
 });
 

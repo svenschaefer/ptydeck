@@ -1702,6 +1702,35 @@ test("session-terminal-runtime controller forwards bootstrap-safe terminal contr
   assert.deepEqual(terminalWrites, [["s1", "\u001b[1;1R"]]);
 });
 
+test("session-terminal-runtime controller forwards concatenated bootstrap-safe cursor reports before operator arming", () => {
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const refs = createTerminalCardRefs("bootstrap-control-response-batch");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.emitData("\u001b[1;1R\u001b[2;2R");
+  entry.terminal.emitData("\u001b[I");
+
+  assert.deepEqual(terminalWrites, [["s1", "\u001b[1;1R\u001b[2;2R"]]);
+});
+
 test("session-terminal-runtime controller suppresses empty bootstrap input before operator arming", () => {
   const calls = [];
   const controller = createSessionTerminalRuntimeController({
