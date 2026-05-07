@@ -318,3 +318,85 @@ test("workspace preset runtime state fails closed when preset reload fails and w
   assert.deepEqual(await apiLessState.loadPresets(), []);
   assert.deepEqual(apiLessState.listPresets(), []);
 });
+
+test("workspace preset runtime state hardens preset CRUD, selector fallbacks, and grouped deck filtering", () => {
+  const state = createWorkspacePresetState({
+    getSessions: () => [
+      { id: "s1", deckId: "default" },
+      { id: "s2", deckId: "ops" },
+      { id: "s3", deckId: "ops" }
+    ],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "s3",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    resolveFilterSelectors: () => ({ invalid: true })
+  });
+
+  state.replaceWorkspaceState({
+    activeDeckId: "ops",
+    layoutProfileId: "",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 185,
+    deckGroups: {
+      ops: {
+        activeGroupId: "group-a",
+        groups: [
+          { id: "group-a", name: "Group A", sessionIds: ["s3", "s2"] },
+          { id: "group-b", name: "Group B", sessionIds: ["s2"] }
+        ]
+      }
+    },
+    deckSplitLayouts: {}
+  });
+
+  assert.equal(state.upsertPreset(null), null);
+  assert.throws(
+    () => state.requireUpsertedPreset(null, "workspace preset save"),
+    /Workspace preset API returned an invalid preset record for workspace preset save/
+  );
+
+  state.replacePresets([
+    {
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: state.getWorkspaceState()
+    },
+    {
+      id: "build",
+      name: "Build Workspace",
+      workspace: state.getWorkspaceState()
+    }
+  ]);
+
+  assert.equal(state.getSelectedPresetId(), "build");
+  const upserted = state.upsertPreset({
+    id: "ops-2",
+    name: "Ops Workspace 2",
+    workspace: state.getWorkspaceState()
+  });
+  assert.equal(upserted?.id, "ops-2");
+  assert.equal(state.getSelectedPresetId(), "ops-2");
+  assert.equal(state.removePreset("missing"), false);
+  assert.equal(state.removePreset("ops-2"), true);
+  assert.equal(state.getSelectedPresetId(), "build");
+
+  assert.equal(state.resolvePreset("ops").preset?.id, "ops");
+  assert.match(state.resolvePreset("unknown").error, /Unknown workspace preset/);
+  assert.equal(state.resolveGroup("Group A", "ops").group?.id, "group-a");
+  assert.match(state.resolveGroup("missing", "ops").error, /Unknown workspace group/);
+
+  assert.deepEqual(
+    state.resolveDeckSessions("ops", [
+      { id: "s1", deckId: "default" },
+      { id: "s2", deckId: "ops" },
+      { id: "s3", deckId: "ops" }
+    ]).map((session) => session.id),
+    ["s3", "s2"]
+  );
+  assert.deepEqual(
+    state.captureCurrentVisibleDeckSessions("ops").map((session) => session.id),
+    ["s3", "s2"]
+  );
+});

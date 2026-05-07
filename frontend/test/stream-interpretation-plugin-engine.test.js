@@ -107,3 +107,54 @@ test("stream interpretation plugin engine isolates plugin failures and explicit 
     errors: [{ pluginId: "bad", message: "boom" }]
   });
 });
+
+test("stream interpretation plugin engine fails closed for invalid registrations, non-events, and malformed plugin batches", () => {
+  const engine = createStreamInterpretationPluginEngine();
+
+  assert.equal(engine.registerPlugin(null), false);
+  assert.equal(engine.registerPlugin({ id: "", interpret: () => [] }), false);
+  assert.equal(
+    engine.registerPlugin({
+      id: "bad-batch",
+      eventTypes: ["session.data"],
+      interpret: () => ({
+        batches: [
+          null,
+          { sessionId: "", actions: [{ type: "setSessionStatus", value: "ignored" }] },
+          {
+            sessionId: "s-2",
+            actions: [
+              { type: "unknown", value: "ignored" },
+              { type: "setSessionBadges", badges: [{ id: "b-1", text: "ready" }] }
+            ]
+          }
+        ]
+      })
+    }),
+    true
+  );
+
+  assert.deepEqual(engine.interpretRuntimeEvent(null), { batches: [], errors: [] });
+  assert.deepEqual(engine.interpretRuntimeEvent({ type: "" }), { batches: [], errors: [] });
+  assert.deepEqual(engine.interpretRuntimeEvent({ type: "session.updated" }), { batches: [], errors: [] });
+
+  const result = engine.interpretRuntimeEvent({ type: "session.data", sessionId: "s-1", data: "ok" });
+  assert.deepEqual(result, {
+    batches: [
+      {
+        sessionId: "s-1",
+        actions: [{ type: "setSessionStatus", value: "ignored" }]
+      },
+      {
+        sessionId: "s-2",
+        actions: [
+          {
+            type: "setSessionBadges",
+            badges: [{ id: "b-1", text: "ready", pluginId: "bad-batch" }]
+          }
+        ]
+      }
+    ],
+    errors: []
+  });
+});

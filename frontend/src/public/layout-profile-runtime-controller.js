@@ -1,3 +1,5 @@
+import { cloneDeckSplitLayoutEntry, cloneDeckSplitLayoutMap } from "./split-layout-state.js";
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
@@ -71,111 +73,6 @@ function normalizeControlPaneState(source) {
     controlPanePosition: normalizeControlPanePosition(value.controlPanePosition),
     controlPaneSize: normalizeControlPaneSize(value.controlPaneSize)
   };
-}
-
-function cloneSplitLayoutNode(node) {
-  if (!node || typeof node !== "object" || Array.isArray(node)) {
-    return null;
-  }
-  const type = normalizeLower(node.type);
-  if (type === "pane") {
-    const paneId = normalizeText(node.paneId).toLowerCase();
-    if (!paneId) {
-      return null;
-    }
-    return {
-      type: "pane",
-      paneId
-    };
-  }
-  if (type !== "row" && type !== "column") {
-    return null;
-  }
-  const children = [];
-  for (const rawChild of Array.isArray(node.children) ? node.children : []) {
-    const child = cloneSplitLayoutNode(rawChild);
-    if (child) {
-      children.push(child);
-    }
-  }
-  if (children.length < 2) {
-    return children[0] || null;
-  }
-  const weights =
-    Array.isArray(node.weights) && node.weights.length === children.length
-      ? node.weights.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry) && entry > 0)
-      : [];
-  return {
-    type,
-    children,
-    weights: weights.length === children.length ? weights : Array.from({ length: children.length }, () => 1 / children.length)
-  };
-}
-
-function collectSplitLayoutPaneIds(node, target = []) {
-  if (!node || typeof node !== "object" || Array.isArray(node)) {
-    return target;
-  }
-  if (node.type === "pane" && normalizeText(node.paneId)) {
-    target.push(normalizeText(node.paneId).toLowerCase());
-    return target;
-  }
-  for (const child of Array.isArray(node.children) ? node.children : []) {
-    collectSplitLayoutPaneIds(child, target);
-  }
-  return target;
-}
-
-function cloneDeckSplitLayoutEntry(entry) {
-  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-    return null;
-  }
-  const root = cloneSplitLayoutNode(entry.root);
-  if (!root) {
-    return null;
-  }
-  const paneIds = new Set(collectSplitLayoutPaneIds(root));
-  const paneSessions = Object.fromEntries(Array.from(paneIds, (paneId) => [paneId, []]));
-  if (entry.paneSessions && typeof entry.paneSessions === "object" && !Array.isArray(entry.paneSessions)) {
-    for (const [rawPaneId, rawSessionIds] of Object.entries(entry.paneSessions)) {
-      const paneId = normalizeText(rawPaneId).toLowerCase();
-      if (!paneId || !paneIds.has(paneId)) {
-        continue;
-      }
-      const seenSessionIds = new Set();
-      paneSessions[paneId] = [];
-      for (const rawSessionId of Array.isArray(rawSessionIds) ? rawSessionIds : []) {
-        const sessionId = normalizeText(rawSessionId);
-        if (!sessionId || seenSessionIds.has(sessionId)) {
-          continue;
-        }
-        seenSessionIds.add(sessionId);
-        paneSessions[paneId].push(sessionId);
-      }
-    }
-  }
-  return {
-    root,
-    paneSessions
-  };
-}
-
-function cloneDeckSplitLayoutMap(deckSplitLayouts) {
-  if (!deckSplitLayouts || typeof deckSplitLayouts !== "object" || Array.isArray(deckSplitLayouts)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(deckSplitLayouts)
-      .map(([deckId, entry]) => {
-        const normalizedDeckId = normalizeText(deckId);
-        const clonedEntry = cloneDeckSplitLayoutEntry(entry);
-        if (!normalizedDeckId || !clonedEntry) {
-          return null;
-        }
-        return [normalizedDeckId, clonedEntry];
-      })
-      .filter(Boolean)
-  );
 }
 
 export function normalizeLayoutProfileRecord(profile) {

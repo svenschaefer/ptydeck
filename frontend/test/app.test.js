@@ -2549,7 +2549,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   ws.emit("message", { data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops-noise-3\n" }) });
   await tick();
   deckNewSessionButton.click();
-  await tick();
+  await waitFor(() => {
+    const visibleAfterDeckSidebarSwitch = listVisibleTerminalCards(fixture.elements.terminalGrid);
+    return visibleAfterDeckSidebarSwitch.length === 1
+      && visibleAfterDeckSidebarSwitch[0].querySelector(".session-focus").textContent === "two"
+      && findDeckGroup(fixture.elements.deckTabs, "deck-new").querySelector(".deck-tab").classList.contains("active")
+      && findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2").classList.contains("active");
+  });
   const visibleAfterDeckSidebarSwitch = listVisibleTerminalCards(fixture.elements.terminalGrid);
   assert.equal(visibleAfterDeckSidebarSwitch.length, 1);
   assert.equal(visibleAfterDeckSidebarSwitch[0].querySelector(".session-focus").textContent, "two");
@@ -2559,7 +2565,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const defaultSessionButton = findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1");
   assert.ok(defaultSessionButton);
   defaultSessionButton.click();
-  await tick();
+  await waitFor(() => {
+    const visibleAfterDefaultSidebarSwitch = listVisibleTerminalCards(fixture.elements.terminalGrid);
+    return visibleAfterDefaultSidebarSwitch.length === 1
+      && visibleAfterDefaultSidebarSwitch[0].querySelector(".session-focus").textContent === "one"
+      && findDeckGroup(fixture.elements.deckTabs, "default").querySelector(".deck-tab").classList.contains("active")
+      && findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1").classList.contains("active");
+  });
   const visibleAfterDefaultSidebarSwitch = listVisibleTerminalCards(fixture.elements.terminalGrid);
   assert.equal(visibleAfterDefaultSidebarSwitch.length, 1);
   assert.equal(visibleAfterDefaultSidebarSwitch[0].querySelector(".session-focus").textContent, "one");
