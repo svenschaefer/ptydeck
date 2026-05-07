@@ -2360,6 +2360,40 @@ test("session-terminal-runtime controller falls back to selection text coercion 
   assert.deepEqual(clipboardWrites, ["12345"]);
 });
 
+test("session-terminal-runtime controller no-ops on selection copy shortcuts when selection APIs are absent", async () => {
+  let copiedText = "";
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: new FakeWindowEventTarget(),
+    writeClipboardText: async (text) => {
+      copiedText = text;
+      return true;
+    }
+  });
+  const refs = createTerminalCardRefs("missing-selection-apis");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.getSelection = undefined;
+  entry.terminal.hasSelection = undefined;
+
+  const enterEvent = createKeyEvent("Enter");
+  refs.mount.dispatchEvent(enterEvent);
+  const ctrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(ctrlCEvent);
+  await flushAsyncEvents();
+
+  assert.equal(enterEvent.defaultPrevented, false);
+  assert.equal(ctrlCEvent.defaultPrevented, false);
+  assert.equal(copiedText, "");
+});
+
 test("session-terminal-runtime controller tolerates missing mount listener APIs and stale terminal entries", () => {
   const terminals = new Map([["broken", { isVisible: true, applyResizeForSession() {} }]]);
   const controller = createSessionTerminalRuntimeController({

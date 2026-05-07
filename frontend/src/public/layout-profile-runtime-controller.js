@@ -1,4 +1,5 @@
 import { cloneDeckSplitLayoutEntry, cloneDeckSplitLayoutMap } from "./split-layout-state.js";
+import { captureLayoutProfileSnapshot } from "./layout-workspace-runtime-state.js";
 import {
   normalizeLayoutControlPaneState,
   normalizeLayoutProfileCollection,
@@ -211,33 +212,16 @@ export function createLayoutProfileRuntimeController(options = {}) {
   }
 
   function captureCurrentLayout() {
-    const selectedProfile = getSelectedProfile();
-    const deckTerminalSettings = {};
-    for (const deck of getDecks()) {
-      const deckId = normalizeText(deck?.id);
-      if (!deckId) {
-        continue;
-      }
-      const geometry = getDeckTerminalGeometry(deckId);
-      const cols = Number.parseInt(String(geometry?.cols ?? ""), 10);
-      const rows = Number.parseInt(String(geometry?.rows ?? ""), 10);
-      if (!Number.isInteger(cols) || !Number.isInteger(rows)) {
-        continue;
-      }
-      deckTerminalSettings[deckId] = { cols, rows };
-    }
-    return {
-      activeDeckId: normalizeText(getActiveDeckId()) || "default",
-      sidebarVisible: getSidebarVisible() !== false,
-      sessionFilterText: normalizeText(getSessionFilterText()),
-      ...normalizeLayoutControlPaneState(
-        typeof getControlPaneState === "function" ? getControlPaneState() : selectedProfile?.layout
-      ),
-      deckTerminalSettings,
-      deckSplitLayouts: cloneDeckSplitLayoutMap(
-        typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : selectedProfile?.layout?.deckSplitLayouts
-      )
-    };
+    return captureLayoutProfileSnapshot({
+      selectedProfile: getSelectedProfile(),
+      getDecks,
+      getDeckTerminalGeometry,
+      getActiveDeckId,
+      getSidebarVisible,
+      getSessionFilterText,
+      getControlPaneState,
+      getDeckSplitLayouts
+    });
   }
 
   async function updateDeckGeometry(deckId, nextGeometry, preferredActiveDeckId) {

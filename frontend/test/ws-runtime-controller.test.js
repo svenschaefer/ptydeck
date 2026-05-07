@@ -201,3 +201,69 @@ test("ws-runtime controller rethrows the original 401 error when refresh does no
 
   await assert.rejects(() => capturedOptions.protocolsProvider(), authError);
 });
+
+test("ws-runtime controller tolerates malformed interpretation payloads and logs thrown interpretation failures deterministically", () => {
+  const calls = [];
+  let capturedHandlers = null;
+  createWsRuntimeController({
+    createWsClient(_url, handlers) {
+      capturedHandlers = handlers;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    log: (event, payload) => calls.push([event, payload.type || payload.message || ""]),
+    hasTerminal: () => false,
+    interpretRuntimeEvent: (event) => {
+      if (event.type === "session.data") {
+        return [{ sessionId: "", actions: [] }, { sessionId: "s1", actions: [{ type: "setSessionStatus" }] }];
+      }
+      if (event.type === "session.exited") {
+        return null;
+      }
+      throw new Error("plugin exploded");
+    },
+    applySessionInterpretationActions: (sessionId, actions) =>
+      calls.push(["apply-interpretation", `${sessionId}:${actions[0].type}`]),
+    applyRuntimeEvent: (event) => calls.push(["event", event.type])
+  }).start();
+
+  capturedHandlers.onMessage({ type: "session.data", sessionId: "s1", data: "pwd\n" });
+  capturedHandlers.onMessage({ type: "session.exited", sessionId: "s1" });
+  capturedHandlers.onMessage({ type: "session.closed", sessionId: "s1" });
+
+  assert.deepEqual(calls, [
+    ["ws.event", "session.data"],
+    ["apply-interpretation", "s1:setSessionStatus"],
+    ["event", "session.data"],
+    ["ws.event", "session.exited"],
+    ["event", "session.exited"],
+    ["ws.event", "session.closed"],
+    ["event", "session.closed"],
+    ["ws.interpretation.error", "session.closed"]
+  ]);
+});
+
+test("ws-runtime controller rethrows non-401 ws ticket errors without retrying auth refresh", async () => {
+  let capturedOptions = null;
+  const transportError = new Error("Gateway timeout");
+  transportError.status = 504;
+  const refreshReasons = [];
+  createWsRuntimeController({
+    createWsClient(_url, _handlers, options) {
+      capturedOptions = options;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    getWsAuthToken: () => "bearer",
+    createWsTicket: async () => {
+      throw transportError;
+    },
+    bootstrapDevAuthToken: async ({ reason }) => {
+      refreshReasons.push(reason);
+      return true;
+    }
+  }).start();
+
+  await assert.rejects(() => capturedOptions.protocolsProvider(), transportError);
+  assert.deepEqual(refreshReasons, []);
+});

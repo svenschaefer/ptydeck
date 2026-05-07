@@ -12,6 +12,7 @@ import {
   collectSplitLayoutPaneIds,
   normalizeSplitLayoutWeights
 } from "./split-layout-state.js";
+import { serializeSplitLayoutRoot } from "./layout-workspace-runtime-state.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -19,10 +20,6 @@ function normalizeText(value) {
 
 function normalizeLower(value) {
   return normalizeText(value).toLowerCase();
-}
-
-function serializeLayoutRoot(root) {
-  return JSON.stringify(root || null);
 }
 
 function setDataValue(element, key, value) {
@@ -576,7 +573,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
     renderedRootEl = buildNodeElement(deckId, entry.root, [], paneCount);
     nextCanvasEl.appendChild(renderedRootEl);
     renderedDeckId = deckId;
-    renderedSignature = serializeLayoutRoot(entry.root);
+    renderedSignature = serializeSplitLayoutRoot(entry.root);
   }
 
   function updatePaneHeaders(deckId, entry, deckSessions, activeSessionId) {
@@ -607,7 +604,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
   function renderDeckLayout({ deckId, orderedSessions = [], deckSessions = [], activeSessionId = "", terminals = new Map() } = {}) {
     const normalizedDeckId = normalizeText(deckId) || defaultDeckId;
     const entry = ensureDeckLayoutEntry(normalizedDeckId, deckSessions.map((session) => session.id));
-    const signature = serializeLayoutRoot(entry.root);
+    const signature = serializeSplitLayoutRoot(entry.root);
     if (renderedDeckId !== normalizedDeckId || renderedSignature !== signature || !renderedRootEl) {
       rebuildShell(normalizedDeckId, entry);
     }

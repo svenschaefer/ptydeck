@@ -1,6 +1,7 @@
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
+import { createAppRuntimeCompositionHelperAssembly } from "./app-runtime-composition-helper-assembly.js";
 import { createAppRuntimeInitializationAccessComposition } from "./app-runtime-initialization-access-composition.js";
 import { createAppRuntimeOperatorControllerAssembly } from "./app-runtime-operator-controller-assembly.js";
 import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-support-assembly.js";
@@ -614,78 +615,49 @@ const maybeRedirectToCanonicalOrigin = appRuntimeInitializationAccessComposition
 const maybeAutoRepairOriginHandoffControl =
   appRuntimeInitializationAccessComposition.maybeAutoRepairOriginHandoffControl;
 const handleCommandFeedbackAction = appRuntimeInitializationAccessComposition.handleCommandFeedbackAction;
-
-function installTestHooks() {
-  if (!testHooks || typeof testHooks !== "object") {
-    return;
-  }
-  Object.assign(testHooks, {
-    uiState,
-    getApi: () => api,
-    getStoreState: () => store.getState(),
-    getStreamAdapter: () => streamAdapter,
-    setAccessState,
-    setRuntimeClientId,
-    setTrustedLocalClientLabel(label) {
-      sessionControlRuntimeController.setTrustedLocalClientLabel(label);
+createAppRuntimeCompositionHelperAssembly({
+  testHooks,
+  uiState,
+  api,
+  store,
+  streamAdapter,
+  setAccessState,
+  setRuntimeClientId,
+  sessionControlRuntimeController,
+  getInitializationErrorMessage: () => appRuntimeInitializationController?.getInitializationErrorMessage?.() || "",
+  showBlockedWriteReclaimUi,
+  maybeAutoRepairOriginHandoffControl,
+  handleCommandFeedbackAction,
+  getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
+  getOriginHandoffSourceOrigin: () => sessionControlRuntimeController.getOriginHandoffSourceOrigin(),
+  setOriginHandoffSourceOrigin: (origin) => sessionControlRuntimeController.setOriginHandoffSourceOrigin(origin),
+  setRuntimeClientIdentityCreatedOnThisOrigin: (value) =>
+    sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(value),
+  normalizeCommandFeedbackActionSessionId: normalizeControlText,
+  collaboratorSetters: {
+    appSessionRuntimeFacadeController: (value) => {
+      appSessionRuntimeFacadeController = value;
     },
-    getInitializationErrorMessage: () => appRuntimeInitializationController?.getInitializationErrorMessage?.() || "",
-    getSessionWriteBlockMessage: sessionControlRuntimeController.getSessionWriteBlockMessage,
-    getSessionControlSummary: sessionControlRuntimeController.getSessionControlSummary,
-    getSessionControlBadgeState: sessionControlRuntimeController.getSessionControlBadgeState,
-    getTakeOrReclaimControlLabel: sessionControlRuntimeController.getTakeOrReclaimControlLabel,
-    renderSessionControlClients: sessionControlRuntimeController.renderSessionControlClients,
-    showBlockedWriteReclaimUi,
-    maybeAutoRepairOriginHandoffControl,
-    handleCommandFeedbackAction,
-    getCommandFeedbackActionMeta: () => sessionControlRuntimeController.getCommandFeedbackActionMeta(),
-    getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
-    getOriginHandoffSourceOrigin: () => sessionControlRuntimeController.getOriginHandoffSourceOrigin(),
-    setOriginHandoffSourceOrigin(origin) {
-      sessionControlRuntimeController.setOriginHandoffSourceOrigin(origin);
+    appRuntimeStateController: (value) => {
+      appRuntimeStateController = value;
     },
-    setRuntimeClientIdentityCreatedOnThisOrigin(value) {
-      sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(value);
+    appCommandUiFacadeController: (value) => {
+      appCommandUiFacadeController = value;
     },
-    setSessionsForTest(sessions) {
-      store.setSessions(Array.isArray(sessions) ? sessions : []);
+    trustedLocalHandoffRuntimeController: (value) => {
+      trustedLocalHandoffRuntimeController = value;
     },
-    setCommandFeedbackActionSessionId(sessionId) {
-      uiState.commandFeedbackActionSessionId = normalizeControlText(sessionId);
+    commandComposerRuntimeController: (value) => {
+      commandComposerRuntimeController = value;
     },
-    setCommandFeedbackActionMeta(meta) {
-      sessionControlRuntimeController.setCommandFeedbackActionMeta(meta);
+    sessionTerminalResizeController: (value) => {
+      sessionTerminalResizeController = value;
     },
-    setCollaborators(overrides = {}) {
-      if (!overrides || typeof overrides !== "object") {
-        return;
-      }
-      if (Object.prototype.hasOwnProperty.call(overrides, "appSessionRuntimeFacadeController")) {
-        appSessionRuntimeFacadeController = overrides.appSessionRuntimeFacadeController;
-      }
-      if (Object.prototype.hasOwnProperty.call(overrides, "appRuntimeStateController")) {
-        appRuntimeStateController = overrides.appRuntimeStateController;
-      }
-      if (Object.prototype.hasOwnProperty.call(overrides, "appCommandUiFacadeController")) {
-        appCommandUiFacadeController = overrides.appCommandUiFacadeController;
-      }
-      if (Object.prototype.hasOwnProperty.call(overrides, "trustedLocalHandoffRuntimeController")) {
-        trustedLocalHandoffRuntimeController = overrides.trustedLocalHandoffRuntimeController;
-      }
-      if (Object.prototype.hasOwnProperty.call(overrides, "commandComposerRuntimeController")) {
-        commandComposerRuntimeController = overrides.commandComposerRuntimeController;
-      }
-      if (Object.prototype.hasOwnProperty.call(overrides, "sessionTerminalResizeController")) {
-        sessionTerminalResizeController = overrides.sessionTerminalResizeController;
-      }
-      if (Object.prototype.hasOwnProperty.call(overrides, "controlPaneRuntimeController")) {
-        controlPaneRuntimeController = overrides.controlPaneRuntimeController;
-      }
+    controlPaneRuntimeController: (value) => {
+      controlPaneRuntimeController = value;
     }
-  });
-}
-
-installTestHooks();
+  }
+}).installTestHooks();
 
 layoutRuntimeController = createLayoutRuntimeController({
   windowRef: window,

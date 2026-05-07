@@ -271,6 +271,70 @@ test("connection profile draft state clones, derives, and persists guided draft 
   );
 });
 
+test("connection profile draft state parses raw launch JSON, preserves local defaults, and persists keyboard-interactive ssh drafts", () => {
+  const parsedRawLaunch = getDraftLaunchFromInputs({
+    hasGuidedDraftControls: false,
+    rawDraftLaunch: JSON.stringify({
+      kind: "local",
+      deckId: "ops",
+      shell: "powershell",
+      startCwd: "/mnt/c",
+      startCommand: "Get-ChildItem",
+      env: { FOO: "bar" },
+      tags: ["ops"],
+      activeThemeProfile: DEFAULT_THEME,
+      inactiveThemeProfile: ALT_THEME
+    }),
+    draftState: null,
+    defaultDeckId: "default",
+    defaultThemeProfile: DEFAULT_THEME,
+    themePresets: THEME_PRESETS
+  });
+
+  assert.deepEqual(parsedRawLaunch, {
+    kind: "local",
+    deckId: "ops",
+    shell: "powershell",
+    startCwd: "/mnt/c",
+    startCommand: "Get-ChildItem",
+    env: { FOO: "bar" },
+    tags: ["ops"],
+    themeProfile: DEFAULT_THEME,
+    activeThemeProfile: DEFAULT_THEME,
+    inactiveThemeProfile: ALT_THEME
+  });
+
+  const blankLocal = buildBlankConnectionProfileLaunch({
+    defaultThemeProfile: DEFAULT_THEME,
+    deckId: "ops",
+    kind: "local"
+  });
+  assert.equal(blankLocal.shell, "bash");
+  assert.equal(blankLocal.startCwd, "/");
+
+  const persistedKeyboardInteractive = buildPersistedDraftLaunch(
+    {
+      kind: "ssh",
+      deckId: "ops",
+      shell: "ssh",
+      startCwd: "~",
+      startCommand: "",
+      env: {},
+      tags: [],
+      activeThemeProfile: DEFAULT_THEME,
+      inactiveThemeProfile: ALT_THEME,
+      remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
+      remoteAuth: { method: "keyboardInteractive", privateKeyPath: "~/.ssh/id_ed25519" }
+    },
+    {
+      defaultDeckId: "default",
+      defaultThemeProfile: DEFAULT_THEME
+    }
+  );
+
+  assert.deepEqual(persistedKeyboardInteractive.remoteAuth, { method: "keyboardInteractive" });
+});
+
 test("connection profile draft state captures reusable launches from sessions", () => {
   assert.deepEqual(
     buildConnectionProfileLaunchFromSession(
