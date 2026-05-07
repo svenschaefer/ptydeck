@@ -118,6 +118,12 @@ Quick switch the active session:
 > 4
 ```
 
+Start a direct local Windows PowerShell session from WSL-backed installs:
+
+```text
+/new powershell
+```
+
 Route a slash command to another session without changing the active one:
 
 ```text

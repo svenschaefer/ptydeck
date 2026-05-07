@@ -15,6 +15,12 @@ const REMOTE_USERNAME_MAX_LENGTH = 64;
 const REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH = 1024;
 const REMOTE_SECRET_MAX_LENGTH = 4096;
 const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
+const LOCAL_SHELL_ALIAS_MAP = Object.freeze(
+  new Map([
+    ["powershell", "powershell.exe"],
+    ["pwsh", "pwsh.exe"]
+  ])
+);
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -180,6 +186,15 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'"'"'`)}'`;
 }
 
+function normalizeLocalShellCommand(shell) {
+  const normalized = typeof shell === "string" ? shell.trim() : "";
+  if (!normalized) {
+    return "";
+  }
+  const alias = LOCAL_SHELL_ALIAS_MAP.get(normalized.toLowerCase());
+  return alias || normalized;
+}
+
 function buildSshRemoteCommand({ startCwd, startCommand }) {
   const steps = [];
   if (typeof startCwd === "string" && startCwd.trim() && startCwd.trim() !== "~") {
@@ -237,9 +252,10 @@ export function buildSessionLaunchSpec({
   sshKnownHostsPath
 }) {
   if (kind !== SESSION_KIND_SSH) {
+    const localShellCommand = normalizeLocalShellCommand(shell);
     return {
-      shellAdapterId: shell,
-      command: shell,
+      shellAdapterId: localShellCommand,
+      command: localShellCommand,
       args: [],
       spawnCwd,
       metaCwd: spawnCwd,

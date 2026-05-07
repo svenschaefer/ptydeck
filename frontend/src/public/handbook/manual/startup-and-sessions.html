@@ -40,7 +40,10 @@
 <p>You can create sessions from the sidebar, from the <code>New Session</code> action, or with slash commands.</p>
 
 <pre><code class="language-text">/new bash
-/new zsh</code></pre>
+/new zsh
+/new powershell</code></pre>
+
+<p>On WSL-backed installs, <code>/new powershell</code> launches Windows PowerShell directly instead of opening a WSL shell and running PowerShell inside it. If PowerShell 7 is installed on PATH, <code>/new pwsh</code> starts that launcher directly.</p>
 
 <p>If you already know the deck you want, create or switch the deck first:</p>
 

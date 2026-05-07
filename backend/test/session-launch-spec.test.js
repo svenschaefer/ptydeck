@@ -147,6 +147,28 @@ test("session launch spec builds local launch payloads from normalized start com
   });
 });
 
+test("session launch spec normalizes direct PowerShell local shell aliases", () => {
+  const windowsPowerShell = buildSessionLaunchSpec({
+    kind: "local",
+    shell: "powershell",
+    spawnCwd: "/workspace/project",
+    startCwd: "/workspace/project",
+    startCommand: ""
+  });
+  assert.equal(windowsPowerShell.shellAdapterId, "powershell.exe");
+  assert.equal(windowsPowerShell.command, "powershell.exe");
+
+  const powerShellSeven = buildSessionLaunchSpec({
+    kind: "local",
+    shell: "pwsh",
+    spawnCwd: "/workspace/project",
+    startCwd: "/workspace/project",
+    startCommand: ""
+  });
+  assert.equal(powerShellSeven.shellAdapterId, "pwsh.exe");
+  assert.equal(powerShellSeven.command, "pwsh.exe");
+});
+
 test("session launch spec builds deterministic password ssh launches with askpass env", () => {
   const launchSpec = buildSessionLaunchSpec({
     kind: "ssh",

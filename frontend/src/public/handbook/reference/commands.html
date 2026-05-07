@@ -292,6 +292,13 @@
 <li><code>/new [shell]</code></li>
 </ul>
 
+<h3 id="notes-3">Notes</h3>
+
+<ul>
+<li>The optional shell token is passed through to the backend as the local session launcher.</li>
+<li>Use <code>/new powershell</code> to open Windows PowerShell directly from WSL-backed installs. Use <code>/new pwsh</code> when PowerShell 7 is available on PATH.</li>
+</ul>
+
 <h3 id="aliases-3">Aliases</h3>
 
 <p><code>/session.new</code></p>
@@ -320,7 +327,7 @@
 <li><code>/note [text...]</code></li>
 </ul>
 
-<h3 id="notes-3">Notes</h3>
+<h3 id="notes-4">Notes</h3>
 
 <ul>
 <li>This command does not accept a positional session selector.</li>
@@ -355,7 +362,7 @@
 <li><code>/rename &lt;name&gt;</code></li>
 </ul>
 
-<h3 id="notes-4">Notes</h3>
+<h3 id="notes-5">Notes</h3>
 
 <ul>
 <li>This command does not accept a positional session selector.</li>
@@ -381,7 +388,7 @@
 <li><code>/replay paste &lt;sourceSelector&gt; &lt;targetSelector&gt; &lt;sliceSelector&gt;</code></li>
 </ul>
 
-<h3 id="notes-5">Notes</h3>
+<h3 id="notes-6">Notes</h3>
 
 <ul>
 <li>The <code>/replay view</code>, <code>/replay export</code>, and zero-selector <code>/replay copy</code> forms use the active session by default and support direct-route targeting.</li>
@@ -411,7 +418,7 @@
 <li><code>/restart [selector[,selector...]]</code></li>
 </ul>
 
-<h3 id="notes-6">Notes</h3>
+<h3 id="notes-7">Notes</h3>
 
 <ul>
 <li>Without selector arguments, <code>/restart</code> targets the active session.</li>
@@ -463,7 +470,7 @@
 <li><code>/settings mouse-forwarding set &lt;off|application&gt;</code></li>
 </ul>
 
-<h3 id="notes-7">Notes</h3>
+<h3 id="notes-8">Notes</h3>
 
 <ul>
 <li>This command family targets the active session by default and does not accept a positional session selector.</li>
@@ -495,7 +502,7 @@
 <li><code>/share revoke &lt;shareId&gt;</code></li>
 </ul>
 
-<h3 id="notes-8">Notes</h3>
+<h3 id="notes-9">Notes</h3>
 
 <ul>
 <li>Bare <code>/share</code> is shorthand for <code>/share list</code>.</li>
@@ -544,7 +551,7 @@
 <li><code>/ssh hostkey delete &lt;target&gt; [keyType|fingerprint]</code></li>
 </ul>
 
-<h3 id="notes-9">Notes</h3>
+<h3 id="notes-10">Notes</h3>
 
 <ul>
 <li>Target syntax is <code>[user@]host[:port]</code>. You can override the parsed username or port with <code>-l</code> / <code>--user</code> and <code>-p</code> / <code>--port</code>.</li>
@@ -601,7 +608,7 @@
 <li><code>/transfer download &lt;path&gt;</code></li>
 </ul>
 
-<h3 id="notes-10">Notes</h3>
+<h3 id="notes-11">Notes</h3>
 
 <ul>
 <li>Targets the active session by default.</li>
@@ -695,44 +702,45 @@
 <li><a class="handbook-page-toc-link" href="#usage-10">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#new">/new</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-11">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-3">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-3">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#next">/next</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-12">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-4">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#note">/note</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-13">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-3">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-4">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-5">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#prev">/prev</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-14">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-6">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#rename">/rename</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-15">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-4">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-5">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-7">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#replay">/replay</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-16">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-5">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-6">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-6">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#restart">/restart</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-17">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-6">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-7">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#aliases-8">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#run">/run</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-18">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#settings">/settings</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-19">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-7">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-8">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-7">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#share">/share</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-20">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-8">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-9">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-8">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#size">/size</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-21">Usage</a></li>
 <li><a class="handbook-page-toc-link" href="#ssh">/ssh</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-22">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-9">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-10">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-9">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#swap">/swap</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-23">Usage</a></li>
@@ -742,7 +750,7 @@
 <li><a class="handbook-page-toc-link" href="#aliases-10">Aliases</a></li>
 <li><a class="handbook-page-toc-link" href="#transfer">/transfer</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-25">Usage</a></li>
-<li><a class="handbook-page-toc-link" href="#notes-10">Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#notes-11">Notes</a></li>
 <li><a class="handbook-page-toc-link" href="#subcommands-10">Subcommands</a></li>
 <li><a class="handbook-page-toc-link" href="#workspace">/workspace</a></li>
 <li><a class="handbook-page-toc-link" href="#usage-26">Usage</a></li>

@@ -10,7 +10,8 @@ import {
 } from "../src/public/command-schema.js";
 
 test("command schema exposes declarative command metadata and distinct help/usage surfaces", () => {
-  const schema = createSlashCommandSchema(["deck", "swap", "note", "connection", "ssh", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "help", "run"]);
+  const schema = createSlashCommandSchema(["new", "deck", "swap", "note", "connection", "ssh", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "help", "run"]);
+  const newCommand = schema.find((entry) => entry.insertText === "new");
   const deck = schema.find((entry) => entry.insertText === "deck");
   const swap = schema.find((entry) => entry.insertText === "swap");
   const note = schema.find((entry) => entry.insertText === "note");
@@ -29,6 +30,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   const run = schema.find((entry) => entry.insertText === "run");
 
   assert.ok(deck);
+  assert.ok(newCommand);
   assert.ok(swap);
   assert.ok(note);
   assert.ok(connection);
@@ -45,6 +47,10 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(ccpAlias);
   assert.ok(run);
   assert.equal(deck.summary, "/deck | /deck new <name> | /deck rename ... | /deck switch <deckSelector> | /deck delete [deckSelector] [force]");
+  assert.deepEqual(newCommand.notes, [
+    "The optional shell token is passed through to the backend as the local session launcher.",
+    "Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. Use `/new pwsh` when PowerShell 7 is available on PATH."
+  ]);
   assert.equal(
     connection.summary,
     "/connection | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft ..."
@@ -186,6 +192,12 @@ test("command schema formats command help text from declarative command summarie
 });
 
 test("command schema formats topic help text for commands and subcommands", () => {
+  const newHelp = createCommandTopicHelpText("new", "", ["new", "help"]);
+  assert.match(newHelp, /^\/new$/m);
+  assert.match(newHelp, /Usage: \/new \[shell]/);
+  assert.match(newHelp, /\/new powershell/);
+  assert.match(newHelp, /\/new pwsh/);
+
   const topicHelp = createCommandTopicHelpText("deck", "", ["deck", "help"]);
   assert.match(topicHelp, /^\/deck$/m);
   assert.match(topicHelp, /Usage: \/deck \| \/deck new <name>/);
@@ -255,7 +267,11 @@ test("command schema formats topic help text for commands and subcommands", () =
 });
 
 test("command schema registry resolves declarative command definitions by name", () => {
-  const registry = createSlashCommandRegistry(["deck", "connection", "ssh", "layout", "workspace", "broadcast", "share", "settings", "help"]);
+  const registry = createSlashCommandRegistry(["new", "deck", "connection", "ssh", "layout", "workspace", "broadcast", "share", "settings", "help"]);
+  assert.deepEqual(registry.get("new")?.notes, [
+    "The optional shell token is passed through to the backend as the local session launcher.",
+    "Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. Use `/new pwsh` when PowerShell 7 is available on PATH."
+  ]);
   assert.equal(registry.get("deck")?.insertText, "deck");
   assert.deepEqual(registry.get("connection")?.subcommands?.apply?.usage, ["/connection apply <profile>"]);
   assert.deepEqual(registry.get("ssh")?.usage, [

@@ -35,6 +35,14 @@ const SHELL_CWD_TRACKING_CAPABILITY_MATRIX = Object.freeze({
     cwdTrackingSupported: false,
     shellBlockTrackingSupported: false,
     cwdTrackingMode: "unsupported",
+      fallbackBehavior: "retain_last_known_cwd"
+  }),
+  powershell: Object.freeze({
+    family: "powershell",
+    shellNames: Object.freeze(["powershell", "powershell.exe", "pwsh", "pwsh.exe"]),
+    cwdTrackingSupported: false,
+    shellBlockTrackingSupported: false,
+    cwdTrackingMode: "unsupported",
     fallbackBehavior: "retain_last_known_cwd"
   }),
   unknown: Object.freeze({
@@ -72,6 +80,14 @@ function resolveShellCapability(shell) {
   }
   if (shellName.includes("fish")) {
     return cloneCapability(SHELL_CWD_TRACKING_CAPABILITY_MATRIX.fish);
+  }
+  if (
+    shellName === "powershell" ||
+    shellName === "powershell.exe" ||
+    shellName === "pwsh" ||
+    shellName === "pwsh.exe"
+  ) {
+    return cloneCapability(SHELL_CWD_TRACKING_CAPABILITY_MATRIX.powershell);
   }
   if (
     shellName === "sh" ||

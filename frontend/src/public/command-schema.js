@@ -116,8 +116,12 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/new",
     kind: "command",
     description: "create a new session",
-    example: "/new bash",
-    usage: "/new [shell]"
+    example: "/new powershell",
+    usage: "/new [shell]",
+    notes: [
+      "The optional shell token is passed through to the backend as the local session launcher.",
+      "Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. Use `/new pwsh` when PowerShell 7 is available on PATH."
+    ]
   }),
   deck: freezeCommandDefinition({
     key: "slash:deck",

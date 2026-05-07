@@ -45,6 +45,13 @@ test("shell adapter exposes explicit cwd-tracking capability matrix", () => {
         fallbackBehavior: "retain_last_known_cwd"
       },
       {
+        family: "powershell",
+        cwdTrackingSupported: false,
+        shellBlockTrackingSupported: false,
+        cwdTrackingMode: "unsupported",
+        fallbackBehavior: "retain_last_known_cwd"
+      },
+      {
         family: "unknown",
         cwdTrackingSupported: false,
         shellBlockTrackingSupported: false,
@@ -90,7 +97,7 @@ test("bash shell adapter handles split cwd markers across chunks", () => {
 });
 
 test("unsupported shell adapters keep env/output unchanged and rely on last known cwd", () => {
-  for (const shell of ["zsh", "fish", "sh", "/usr/bin/unknown-shell"]) {
+  for (const shell of ["zsh", "fish", "sh", "powershell.exe", "pwsh.exe", "/usr/bin/unknown-shell"]) {
     const adapter = createShellAdapter(shell);
     const env = adapter.prepareSpawnEnv({ PROMPT_COMMAND: "echo existing" });
     assert.deepEqual(env, { PROMPT_COMMAND: "echo existing" });
@@ -105,6 +112,15 @@ test("unsupported shell adapters keep env/output unchanged and rely on last know
     assert.deepEqual(streamResult.promptBoundaries, []);
     assert.equal(session.meta.cwd, "/tmp/original");
     assert.equal(session.cwdTrackingBuffer, "");
+    assert.equal(adapter.capability.cwdTrackingSupported, false);
+    assert.equal(adapter.capability.shellBlockTrackingSupported, false);
+  }
+});
+
+test("shell adapter classifies PowerShell launchers explicitly", () => {
+  for (const shell of ["powershell", "powershell.exe", "pwsh", "pwsh.exe"]) {
+    const adapter = createShellAdapter(shell);
+    assert.equal(adapter.capability.family, "powershell");
     assert.equal(adapter.capability.cwdTrackingSupported, false);
     assert.equal(adapter.capability.shellBlockTrackingSupported, false);
   }
