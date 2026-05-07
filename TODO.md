@@ -14,7 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-322` Owner `BE`: harden retained normalization and control-authority coverage across `backend/src/runtime-library-normalization.js` and `backend/src/runtime-session-control-authority.js`.
 - [ ] `QLT-323` Owner `BE`: isolate the next launch/reconnect/restore helper seam from `backend/src/session-manager.js` and harden the remaining lifecycle branch gaps.
 - [ ] `QLT-324` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
 - [ ] `QLT-325` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js` and `frontend/src/public/layout-profile-runtime-controller.js`.
@@ -24,6 +23,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
 - `FE` ownership role (active): deliver `QLT-324` through `QLT-326`.
-- `BE` ownership role (active): deliver `QLT-322` and `QLT-323`.
+- `BE` ownership role (active): deliver `QLT-323`.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.

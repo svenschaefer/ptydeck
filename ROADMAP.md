@@ -20,7 +20,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Active Wave Order
 
-- `QLT-322` Owner `BE`
 - `QLT-323` Owner `BE`
 - `QLT-324` Owner `FE`
 - `QLT-325` Owner `FE`

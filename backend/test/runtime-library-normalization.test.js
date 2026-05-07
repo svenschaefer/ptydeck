@@ -799,6 +799,101 @@ test("runtime library normalization validates share-link failures and slug-like 
   );
 });
 
+test("runtime library normalization covers retained scalar guard rails and entity fallbacks deterministically", () => {
+  const normalization = createHarness();
+
+  assert.equal(normalization.normalizeConnectionProfileName(" Ops SSH "), "Ops SSH");
+  assert.equal(normalization.normalizeConnectionProfileIdInput(undefined), "");
+  assert.equal(normalization.normalizeConnectionProfileIdInput(" Ops-Ssh "), "ops-ssh");
+  assert.throws(
+    () => normalization.normalizeConnectionProfileName(null),
+    /Field 'name' must be a string/i
+  );
+  assert.throws(
+    () => normalization.normalizeConnectionProfileIdInput("Invalid Profile"),
+    /Field 'id' must match pattern/i
+  );
+
+  assert.equal(normalization.normalizeLayoutProfileName(" Focus "), "Focus");
+  assert.equal(normalization.normalizeLayoutProfileIdInput(undefined), "");
+  assert.equal(normalization.normalizeLayoutProfileIdInput(" Focus-Left "), "focus-left");
+  assert.throws(
+    () => normalization.normalizeLayoutProfileName(""),
+    /Field 'name' must be a non-empty string/i
+  );
+  assert.throws(
+    () => normalization.normalizeLayoutProfileIdInput("Invalid Layout"),
+    /Field 'id' must match pattern/i
+  );
+
+  assert.equal(normalization.normalizeWorkspacePresetName(" Ops Workspace "), "Ops Workspace");
+  assert.equal(normalization.normalizeWorkspacePresetIdInput(undefined), "");
+  assert.equal(normalization.normalizeWorkspacePresetIdInput(" Ops-Workspace "), "ops-workspace");
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetName({}),
+    /Field 'name' must be a string/i
+  );
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetIdInput("Invalid Workspace"),
+    /Field 'id' must match pattern/i
+  );
+
+  assert.throws(
+    () => normalization.normalizeConnectionProfileDeckId("Invalid Deck"),
+    /Field 'launch.deckId' must be a valid deck id/i
+  );
+  assert.throws(
+    () => normalization.normalizeConnectionProfileDeckId("missing"),
+    /Deck 'missing' was not found for connection profile launch/i
+  );
+  assert.equal(normalization.normalizeConnectionProfileDeckId("missing", { strict: false }), "default");
+
+  const layoutProfile = normalization.normalizeLayoutProfileEntity({
+    id: "focus-left",
+    name: " Focus Left ",
+    layout: {
+      activeDeckId: "ops",
+      controlPanePosition: "left",
+      controlPaneSize: 320
+    }
+  });
+  assert.equal(layoutProfile.name, "Focus Left");
+  assert.equal(layoutProfile.layout.activeDeckId, "ops");
+  assert.equal(layoutProfile.layout.controlPanePosition, "left");
+  assert.equal(layoutProfile.layout.controlPaneSize, 320);
+  assert.equal(
+    normalization.compareLayoutProfileEntries(
+      { id: "beta", name: "Beta", createdAt: 1 },
+      { id: "alpha", name: "Alpha", createdAt: 1 }
+    ) > 0,
+    true
+  );
+
+  assert.equal(
+    normalization.normalizeShareLinkEntity(
+      {
+        targetType: " deck ",
+        targetId: "   "
+      },
+      null,
+      { strict: false }
+    ),
+    null
+  );
+  assert.equal(
+    normalization.normalizeShareLinkEntity(
+      {
+        targetType: "bogus",
+        targetId: "ops",
+        expiresInSeconds: "not-a-number"
+      },
+      null,
+      { strict: false }
+    ),
+    null
+  );
+});
+
 test("runtime library normalization covers strict layout and workspace guard rails", () => {
   const normalization = createHarness();
 

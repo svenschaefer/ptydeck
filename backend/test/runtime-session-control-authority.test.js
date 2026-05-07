@@ -670,3 +670,168 @@ test("runtime session-control authority covers controller, owner, rename, and sc
   assert.ok(broadcasts.some((entry) => entry.sessionId === "session-1" && entry.traceSeed?.source === "refresh"));
   assert.ok(broadcasts.some((entry) => entry.sessionId === "session-2" && entry.traceSeed?.source === "refresh"));
 });
+
+test("runtime session-control authority covers retained success and fallback guard rails deterministically", () => {
+  const { attachments, authority, sessionControlStates } = createAuthorityHarness();
+
+  authority.takeSessionControlOrThrow(
+    "session-1",
+    { subject: "owner", tenantId: "default" },
+    { headers: { "x-ptydeck-client-id": "client-owner" } }
+  );
+  const controllerAccess = authority.ensureSessionControllerAccess(
+    "session-1",
+    { subject: "owner", tenantId: "default" },
+    { headers: { "x-ptydeck-client-id": "client-owner" } },
+    "write to this session"
+  );
+  assert.equal(controllerAccess.requestClient?.clientId, "client-owner");
+  assert.equal(controllerAccess.controlView.currentController?.clientId, "client-owner");
+
+  attachments.get("client-other").auth.allowedSessions = ["session-1"];
+  assert.throws(
+    () =>
+      authority.transferSessionControlOrThrow(
+        "session-1",
+        "client-spectator",
+        { subject: "other-owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-other" } }
+      ),
+    /Only the owner or active controller can transfer session control/i
+  );
+  assert.throws(
+    () =>
+      authority.transferSessionControlOrThrow(
+        "session-1",
+        "   ",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      ),
+    /Field 'clientId' must be a non-empty string/i
+  );
+  assert.throws(
+    () => {
+      const renameFailureAuthority = createRuntimeSessionControlAuthority({
+        sessionControlAttachmentRegistry: {
+          listEntries: () => [
+            {
+              auth: { subject: "owner", tenantId: "default", allowedSessions: ["session-1"] },
+              client: {
+                clientId: "client-owner",
+                subject: "owner",
+                tenantId: "default",
+                label: "Owner Desk",
+                accessMode: "operator",
+                active: true,
+                activeConnectionCount: 1
+              }
+            }
+          ],
+          findActiveAttachment: () => ({
+            clientId: "client-owner",
+            subject: "owner",
+            tenantId: "default",
+            label: "Owner Desk",
+            accessMode: "operator",
+            active: true,
+            activeConnectionCount: 1
+          }),
+          updateAttachmentLabel: () => null,
+          forgetAttachment() {}
+        },
+        createSessionControlPrincipal: (auth) =>
+          auth ? { subject: auth.subject || "", tenantId: auth.tenantId || "" } : { subject: "", tenantId: "" },
+        sessionControlPrincipalsMatch: (left, right) =>
+          Boolean(left && right && left.subject === right.subject && left.tenantId === right.tenantId),
+        getSessionControlState: () => ({
+          owner: { subject: "owner", tenantId: "default" },
+          controllerClientId: "client-owner",
+          controllerChangedAt: 1,
+          allowAutoAssign: true
+        }),
+        resolveSessionControlModel: () => ({ id: "session-1", deckId: "deck-a", state: "running" }),
+        getApiSessionOrThrow: () => ({ id: "session-1" })
+      });
+      return renameFailureAuthority.renameSessionControlClientOrThrow(
+        "session-1",
+        "Desk Alpha",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      );
+    },
+    /active attached session client/i
+  );
+
+  attachments.get("client-owner").client.label = "Owner Desk";
+  attachments.get("client-spectator").auth.subject = "owner";
+  attachments.get("client-spectator").client.subject = "owner";
+  assert.throws(
+    () =>
+      authority.forgetSessionControlClientOrThrow(
+        "session-1",
+        "client-spectator",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      ),
+    /Only stale offline devices can be forgotten/i
+  );
+
+  const fallbackStates = new Map();
+  const fallbackAuthority = createRuntimeSessionControlAuthority({
+    sessionControlStates: fallbackStates,
+    resolveSessionControlModel(sessionId) {
+      return sessionId === "session-fallback" ? { id: sessionId, deckId: "deck-a", state: "running" } : null;
+    },
+    sessionControlAttachmentRegistry: {
+      listEntries() {
+        return [
+          { auth: null, client: null },
+          {
+            auth: null,
+            client: {
+              clientId: "client-fallback",
+              accessMode: "operator",
+              active: true,
+              activeConnectionCount: 1
+            }
+          }
+        ];
+      },
+      findActiveAttachment() {
+        return null;
+      },
+      updateAttachmentLabel() {
+        return null;
+      },
+      forgetAttachment() {}
+    }
+  });
+
+  assert.deepEqual(fallbackAuthority.listAttachedClientsForSession("missing-session"), []);
+  assert.equal(fallbackAuthority.reconcileSessionControllerForSession("session-fallback"), true);
+  assert.deepEqual(fallbackStates.get("session-fallback"), {
+    owner: null,
+    controllerClientId: "client-fallback",
+    controllerChangedAt: 0,
+    allowAutoAssign: true
+  });
+  assert.throws(
+    () => fallbackAuthority.getSessionControlViewOrThrow("session-fallback"),
+    /Session not found/i
+  );
+
+  sessionControlStates.set("session-1", {
+    ...sessionControlStates.get("session-1"),
+    controllerClientId: "client-owner"
+  });
+  assert.throws(
+    () =>
+      authority.forgetSessionControlClientOrThrow(
+        "session-1",
+        "   ",
+        { subject: "owner", tenantId: "default" },
+        { headers: { "x-ptydeck-client-id": "client-owner" } }
+      ),
+    /Field 'clientId' must be a non-empty string/i
+  );
+});
