@@ -26,6 +26,7 @@ import { createRuntimeSessionControlAuthority } from "./runtime-session-control-
 import { createRuntimeSessionControlDispatch } from "./runtime-session-control-dispatch.js";
 import { createRuntimeSessionState } from "./runtime-session-state.js";
 import { createRuntimeSshTrust } from "./runtime-ssh-trust.js";
+import { createRuntimeStartupReadiness } from "./runtime-startup-readiness.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
 import { createRuntimeStartupRestore } from "./runtime-startup-restore.js";
 import { createRuntimeWsConnectionHandler } from "./runtime-ws-connection.js";
@@ -1204,11 +1205,6 @@ export function createRuntime(config) {
     Number.isInteger(config.customCommandMaxContentLength) && config.customCommandMaxContentLength > 0
       ? config.customCommandMaxContentLength
       : DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH;
-  let isReady = false;
-  let startupWarmupResolve = null;
-  let startupWarmupReadyPromise = Promise.resolve();
-  let isStopping = false;
-  let isStopped = false;
   let stopPromise = null;
   let persistTimer = null;
   let persistQueue = Promise.resolve();
@@ -1325,10 +1321,15 @@ export function createRuntime(config) {
     writeJson
   } = runtimeHttpHelpers;
 
+  const runtimeStartupReadiness = createRuntimeStartupReadiness({
+    logDebug,
+    listSessions: () => manager.list(),
+    port: config.port
+  });
   const sessionControlAttachmentRegistry = createSessionControlAttachmentRegistry({
     staleClientTtlMs: sessionControlStaleClientTtlMs,
-    isStopping: () => isStopping,
-    isStopped: () => isStopped,
+    isStopping: runtimeStartupReadiness.getIsStopping,
+    isStopped: runtimeStartupReadiness.getIsStopped,
     onPruned: () => {
       broadcastSessionControlRefreshForAuth(null, { source: "ws" });
     }
@@ -1499,31 +1500,16 @@ export function createRuntime(config) {
     requestMessagingReplayExcerpt,
     logDebug
   });
+  runtimeStartupReadiness.attachMessagingRuntime(messagingRuntime);
   const startupWarmup = createRuntimeStartupWarmup({
     quietMs: startupWarmupQuietMs,
     countActiveSessions: () => countActiveRuntimeSessions(manager.list()),
-    onReady: () => {
-      if (isReady) {
-        return;
-      }
-      messagingRuntime.markRuntimeReady();
-      isReady = true;
-      if (typeof startupWarmupResolve === "function") {
-        startupWarmupResolve();
-      }
-      startupWarmupResolve = null;
-      const startupWarmupState = startupWarmup.getState();
-      logDebug("runtime.ready", {
-        port: config.port,
-        sessionCount: manager.list().length,
-        startupWarmupEnabled: startupWarmupState.enabled,
-        startupWarmupQuietMs: startupWarmupState.quietMs
-      });
-    },
+    onReady: () => runtimeStartupReadiness.markReadyFromWarmup(),
     onDebug: (event, details) => {
       logDebug(event, details);
     }
   });
+  runtimeStartupReadiness.attachStartupWarmup(startupWarmup);
   const handleAcceptedWsConnection = createRuntimeWsConnectionHandler({
     sockets,
     metrics,
@@ -2170,7 +2156,7 @@ function tryCreateRestoredSession({
   }
 
   async function persistNow(reason = "manual") {
-    if (isStopping) {
+    if (runtimeStartupReadiness.getIsStopping()) {
       return;
     }
     if (persistTimer) {
@@ -2181,7 +2167,7 @@ function tryCreateRestoredSession({
   }
 
   function persistSoon() {
-    if (isStopping) {
+    if (runtimeStartupReadiness.getIsStopping()) {
       return;
     }
     if (persistTimer) {
@@ -2546,7 +2532,7 @@ function tryCreateRestoredSession({
     buildSecurityHeaders,
     buildTraceHeaders,
     auditLogger,
-    getIsReady: () => isReady,
+    getIsReady: runtimeStartupReadiness.getIsReady,
     startupWarmup,
     manager,
     unrestoredSessions,
@@ -2650,15 +2636,9 @@ function tryCreateRestoredSession({
   });
 
   async function start() {
-    isStopped = false;
-    isStopping = false;
-    isReady = false;
     await accessTokenVerifier.prewarm();
     messagingRuntime.prepareForRuntimeStart();
-    startupWarmup.prepareForStart();
-    startupWarmupReadyPromise = new Promise((resolve) => {
-      startupWarmupResolve = resolve;
-    });
+    runtimeStartupReadiness.prepareForStart();
     const restoredState = await runtimeStartupRestore.restorePersistedRuntimeState();
     persistedReplayOutputs = restoredState.persistedReplayOutputs;
 
@@ -2685,19 +2665,11 @@ function tryCreateRestoredSession({
     if (typeof config.onBeforeReady === "function") {
       await config.onBeforeReady();
     }
-    startupWarmup.releaseGate();
-    startupWarmup.reconcile();
-    await startupWarmupReadyPromise;
+    await runtimeStartupReadiness.releaseGateAndAwaitReadiness();
   }
 
   async function stopInternal() {
-    isStopping = true;
-    isReady = false;
-    startupWarmup.abort();
-    if (typeof startupWarmupResolve === "function") {
-      startupWarmupResolve();
-    }
-    startupWarmupResolve = null;
+    runtimeStartupReadiness.beginStop();
     clearInterval(heartbeat);
     clearInterval(guardrailTimer);
     if (persistTimer) {
@@ -2752,13 +2724,12 @@ function tryCreateRestoredSession({
       });
     }
 
-    isStopped = true;
-    isStopping = false;
+    runtimeStartupReadiness.markStopped();
     logDebug("runtime.stop.done", {});
   }
 
   async function stop() {
-    if (isStopped) {
+    if (runtimeStartupReadiness.getIsStopped()) {
       return;
     }
     if (stopPromise) {
