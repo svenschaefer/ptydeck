@@ -5,9 +5,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "./errors.js";
 import {
-  attachNodePtyAsyncWritePatch
-} from "./node-pty-write-retry.js";
-import {
   clearExpectedExitReason as clearSessionManagerExpectedExitReason,
   clearForegroundProcessRefreshTimer as clearSessionManagerForegroundProcessRefreshTimer,
   clearLaunchPostStartInputTimer as clearSessionManagerLaunchPostStartInputTimer,
@@ -27,6 +24,7 @@ import { createSessionManagerSessionRuntime } from "./session-manager-session-ru
 import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
 import { createSessionManagerReplayRuntime } from "./session-manager-replay-runtime.js";
 import { createSessionManagerTerminalRuntime } from "./session-manager-terminal-runtime.js";
+import { createSessionManagerPtyRuntime } from "./session-manager-pty-runtime.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
 import { createSessionManagerAppIdentityRuntime } from "./session-manager-app-identity-runtime.js";
 import { createSessionManagerMutationRuntime } from "./session-manager-mutation-runtime.js";
@@ -345,6 +343,32 @@ export class SessionManager {
       applySessionPatch,
       appIdentityRuntime: this.appIdentityRuntime
     });
+    this.ptyRuntime = createSessionManagerPtyRuntime({
+      nowFn: this.nowFn,
+      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
+      nodePtyAsyncWriteOptions: this.nodePtyAsyncWriteOptions,
+      emit: (eventName, payload) => this.events.emit(eventName, payload),
+      createTraceEnvelope: (seed, overrides = {}) => createTraceEnvelope(this.createTraceId, seed, overrides),
+      updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
+      observeStartupTerminalQueryFallback: (session, options = {}) => this.observeStartupTerminalQueryFallback(session, options),
+      observeSessionTerminalSignals: (session, chunk, options = {}) =>
+        this.observeSessionTerminalSignals(session, chunk, options),
+      observeSessionOutputHeuristics: (session, output, options = {}) =>
+        this.observeSessionOutputHeuristics(session, output, options),
+      captureSessionStreamChunk: this.captureSessionStreamChunk,
+      emitSessionUpdated: (session, options = {}) => this.emitSessionUpdated(session, options),
+      appendReplayOutput: (session, cleaned, promptBoundaries = []) =>
+        this.appendReplayOutput(session, cleaned, promptBoundaries),
+      observePendingLaunchPostStartInput: (session, options = {}) =>
+        this.observePendingLaunchPostStartInput(session, options),
+      markRemoteSessionConnected: (session, timestamp) => this.markRemoteSessionConnected(session, timestamp),
+      emitSessionActivityStarted: (session, timestamp) => this.emitSessionActivityStarted(session, timestamp),
+      scheduleSessionActivityCompletion: (session) => this.scheduleSessionActivityCompletion(session),
+      scheduleSessionForegroundProcessIdentityRefresh: (session, options = {}) =>
+        this.scheduleSessionForegroundProcessIdentityRefresh(session, options),
+      handleAsyncPtyWriteEvent: (session, event = {}) => this.handleAsyncPtyWriteEvent(session, event),
+      handlePtyExit: (session, exit) => this.handlePtyExit(session, exit)
+    });
   }
 
   updateSessionTraceSeed(session, trace, overrides = {}) {
@@ -432,141 +456,7 @@ export class SessionManager {
   }
 
   attachPtyProcess(session, { ptyProcess, shellAdapter, launchSpec }) {
-    session.ptyProcess = ptyProcess;
-    session.shellAdapter = shellAdapter;
-    session.cwdTrackingBuffer = "";
-    session.replayShellBlockTrackingSupported = shellAdapter?.capability?.shellBlockTrackingSupported === true;
-    this.scheduleSessionForegroundProcessIdentityRefresh(session, {
-      delayMs: this.foregroundProcessRefreshDelayMs
-    });
-    attachNodePtyAsyncWritePatch(ptyProcess, {
-      ...this.nodePtyAsyncWriteOptions,
-      onAsyncWriteEvent: (event) => {
-        this.handleAsyncPtyWriteEvent(session, event);
-      }
-    });
-    ptyProcess.onData((data) => {
-      let timestamp = null;
-      let trace = null;
-      const getTimestamp = () => {
-        if (!Number.isInteger(timestamp)) {
-          timestamp = this.nowFn();
-        }
-        return timestamp;
-      };
-      const getTrace = () => {
-        if (!trace) {
-          trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-            sessionId: session.id,
-            source: "pty"
-          });
-          this.updateSessionTraceSeed(session, trace, { source: "pty" });
-        }
-        return trace;
-      };
-      this.observeStartupTerminalQueryFallback(session, {
-        rawData: typeof data === "string" ? data : String(data ?? "")
-      });
-      const signalResult = this.observeSessionTerminalSignals(session, data, {
-        updatedAt: getTimestamp()
-      });
-      const streamResult = session.shellAdapter.consumeOutput(session, data);
-      const cleaned = typeof streamResult?.cleaned === "string" ? streamResult.cleaned : "";
-      const promptBoundaries = Array.isArray(streamResult?.promptBoundaries) ? streamResult.promptBoundaries : [];
-      const outputHintResult = cleaned
-        ? this.observeSessionOutputHeuristics(session, cleaned, {
-            updatedAt: getTimestamp()
-          })
-        : {
-            candidateMatched: false,
-            appIdentityChanged: false,
-            metaChanged: false
-          };
-      if (this.captureSessionStreamChunk) {
-        this.captureSessionStreamChunk({
-          session: session.meta,
-          rawData: typeof data === "string" ? data : "",
-          cleanedData: cleaned,
-          promptBoundaries,
-          terminalSignalKinds: Array.isArray(signalResult?.signals)
-            ? signalResult.signals
-                .map((entry) => (typeof entry?.kind === "string" ? entry.kind : ""))
-                .filter(Boolean)
-            : [],
-          trace: getTrace()
-        });
-      }
-      if (!cleaned && promptBoundaries.length > 0) {
-        if (signalResult.metaChanged) {
-          this.emitSessionUpdated(session, {
-            trace: getTrace(),
-            updatedAt: getTimestamp()
-          });
-        }
-        this.appendReplayOutput(session, "", promptBoundaries);
-        this.events.emit("session.data", {
-          sessionId: session.id,
-          data: "",
-          promptBoundaries,
-          trace: getTrace()
-        });
-        this.scheduleSessionForegroundProcessIdentityRefresh(session, {
-          delayMs: this.foregroundProcessRefreshDelayMs,
-          trace: getTrace()
-        });
-        return;
-      }
-      this.observePendingLaunchPostStartInput(session, {
-        rawData: typeof data === "string" ? data : "",
-        promptBoundaries
-      });
-      if (cleaned) {
-        const activityTimestamp = getTimestamp();
-        if (session.meta.kind === SESSION_KIND_SSH && session.meta.remoteRuntime?.connectivityState !== "connected") {
-          this.markRemoteSessionConnected(session, activityTimestamp);
-        }
-        session.lastActivityAt = activityTimestamp;
-        if (session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
-          this.emitSessionActivityStarted(session, activityTimestamp);
-        } else {
-          session.meta.updatedAt = activityTimestamp;
-        }
-        if (signalResult.metaChanged || outputHintResult.metaChanged) {
-          this.emitSessionUpdated(session, {
-            trace: getTrace(),
-            updatedAt: activityTimestamp
-          });
-        }
-        this.appendReplayOutput(session, cleaned, promptBoundaries);
-        this.scheduleSessionActivityCompletion(session);
-        this.events.emit("session.data", {
-          sessionId: session.id,
-          data: cleaned,
-          promptBoundaries,
-          trace: getTrace()
-        });
-        this.scheduleSessionForegroundProcessIdentityRefresh(session, {
-          delayMs: this.foregroundProcessRefreshDelayMs,
-          trace: getTrace()
-        });
-      } else if (signalResult.signals.length > 0) {
-        if (signalResult.metaChanged) {
-          this.emitSessionUpdated(session, {
-            trace: getTrace(),
-            updatedAt: getTimestamp()
-          });
-        }
-        this.scheduleSessionForegroundProcessIdentityRefresh(session, {
-          delayMs: this.foregroundProcessRefreshDelayMs,
-          trace: getTrace()
-        });
-      }
-    });
-
-    ptyProcess.onExit((exit) => {
-      this.handlePtyExit(session, exit);
-    });
-
+    return this.ptyRuntime.attachPtyProcess(session, { ptyProcess, shellAdapter, launchSpec });
   }
 
   dispatchLaunchPostStartInput(session) {
