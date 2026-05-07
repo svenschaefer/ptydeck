@@ -152,3 +152,55 @@ test("runtime session state fails closed for missing sessions while resolving un
     return true;
   });
 });
+
+test("runtime session state keeps blank-input and unrestored fallback branches deterministic", () => {
+  const state = createRuntimeSessionState({
+    manager: createManager(new Map()),
+    unrestoredSessions: new Map([["session-u", { id: "session-u", deckId: "", updatedAt: 3 }]]),
+    decks: new Map([
+      ["default", { id: "default" }],
+      ["ops", { id: "ops" }]
+    ]),
+    defaultDeckId: "default",
+    buildDefaultDeck: () => ({ id: "default" }),
+    sessionDeckAssignments: new Map(),
+    sessionQuickIdAssignments: new Map([
+      ["session-a", "A"],
+      ["session-b", "B"]
+    ]),
+    sessionQuickIdPool: ["A", "B"],
+    sessionQuickIdFallback: "?"
+  });
+
+  assert.equal(state.assignSessionQuickIdToken("", "A"), "?");
+  assert.equal(state.getSessionQuickIdToken("   "), "?");
+  assert.equal(state.setSessionDeckAssignment("", "ops"), "ops");
+  assert.equal(state.setSessionDeckAssignment("session-u", "missing"), "default");
+  assert.equal(state.resolveSessionDeckId("session-u"), "default");
+});
+
+test("runtime session state rethrows unexpected manager errors on active-session paths", () => {
+  const originalError = new Error("manager boom");
+  const state = createRuntimeSessionState({
+    manager: {
+      get() {
+        throw originalError;
+      }
+    },
+    unrestoredSessions: new Map(),
+    decks: new Map([
+      ["default", { id: "default" }],
+      ["ops", { id: "ops" }]
+    ]),
+    defaultDeckId: "default",
+    buildDefaultDeck: () => ({ id: "default" }),
+    sessionDeckAssignments: new Map(),
+    sessionQuickIdAssignments: new Map(),
+    sessionQuickIdPool: ["A", "B"],
+    sessionQuickIdFallback: "?"
+  });
+
+  assert.throws(() => state.ensureSessionExistsOrThrow("session-x"), /manager boom/);
+  assert.throws(() => state.setSessionDeckAssignment("session-x", "ops"), /manager boom/);
+  assert.throws(() => state.resolveSessionControlModel("session-x"), /manager boom/);
+});

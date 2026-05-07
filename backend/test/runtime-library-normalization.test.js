@@ -525,6 +525,72 @@ test("runtime library normalization keeps lenient split-layout fallback branches
   });
 });
 
+test("runtime library normalization keeps malformed weight and workspace-group fallbacks deterministic in lenient mode", () => {
+  const normalization = createHarness();
+
+  const lenientLayout = normalization.normalizeLayoutProfileLayout(
+    {
+      deckSplitLayouts: {
+        default: {
+          root: {
+            type: "column",
+            children: [
+              { type: "pane", paneId: "main" },
+              { type: "pane", paneId: "side" }
+            ],
+            weights: [1]
+          },
+          paneSessions: "invalid"
+        }
+      }
+    },
+    { strict: false }
+  );
+  assert.deepEqual(lenientLayout.deckSplitLayouts.default, {
+    root: {
+      type: "column",
+      children: [
+        { type: "pane", paneId: "main" },
+        { type: "pane", paneId: "side" }
+      ],
+      weights: [0.5, 0.5]
+    },
+    paneSessions: {
+      main: [],
+      side: []
+    }
+  });
+
+  const lenientWorkspace = normalization.normalizeWorkspacePresetWorkspace(
+    {
+      deckGroups: {
+        ops: {
+          activeGroupId: "missing",
+          groups: [
+            null,
+            { id: "bad id", name: "Deploy", sessionIds: ["session-2", 17, "missing"] },
+            { name: "", sessionIds: ["session-2"] },
+            { name: "Deploy", sessionIds: ["session-2"] }
+          ]
+        }
+      }
+    },
+    { strict: false }
+  );
+  assert.deepEqual(lenientWorkspace.deckGroups, {
+    ops: {
+      activeGroupId: "",
+      groups: [
+        {
+          id: "deploy",
+          name: "Deploy",
+          sessionIds: ["session-2"]
+        }
+      ]
+    }
+  });
+});
+
 test("runtime library normalization shapes workspace presets against known decks, sessions, and layouts", () => {
   const normalization = createHarness();
 

@@ -5,9 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "./errors.js";
 import {
-  attachNodePtyAsyncWritePatch,
-  clearNodePtyAsyncWriteMeta,
-  queueNodePtyAsyncWriteMeta
+  attachNodePtyAsyncWritePatch
 } from "./node-pty-write-retry.js";
 import {
   clearExpectedExitReason as clearSessionManagerExpectedExitReason,
@@ -28,9 +26,7 @@ import { createSessionManagerLaunchRuntime } from "./session-manager-launch-runt
 import { createSessionManagerSessionRuntime } from "./session-manager-session-runtime.js";
 import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
 import { createSessionManagerReplayRuntime } from "./session-manager-replay-runtime.js";
-import {
-  recordQuickSendUsageEntry
-} from "./session-quick-send-usage.js";
+import { createSessionManagerTerminalRuntime } from "./session-manager-terminal-runtime.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
 import { createSessionManagerAppIdentityRuntime } from "./session-manager-app-identity-runtime.js";
 import {
@@ -43,10 +39,8 @@ const SESSION_KIND_SSH = "ssh";
 const SESSION_MANAGER_DIRNAME = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SSH_ASKPASS_PATH = join(SESSION_MANAGER_DIRNAME, "../libexec/ssh-askpass.sh");
 const DEFAULT_SSH_KNOWN_HOSTS_PATH = join(SESSION_MANAGER_DIRNAME, "../data/ssh_known_hosts");
-const SESSION_STATE_RUNNING = "running";
 const SESSION_STATE_EXITED = "exited";
 const SESSION_ACTIVITY_STATE_ACTIVE = "active";
-const SESSION_ACTIVITY_STATE_INACTIVE = "inactive";
 const DEFAULT_SESSION_ACTIVITY_QUIET_MS = 1400;
 const DEFAULT_REMOTE_RECONNECT_STABLE_MS = 500;
 const DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS = 90;
@@ -264,6 +258,24 @@ export class SessionManager {
       getSessionById: (sessionId) => this.sessions.get(sessionId),
       removeSessionById: (sessionId) => this.sessions.delete(sessionId)
     });
+    this.terminalRuntime = createSessionManagerTerminalRuntime({
+      sessions: this.sessions,
+      getSessionOrThrow: (sessionId) => this.get(sessionId),
+      createTraceEnvelope: (seed, overrides = {}) => createTraceEnvelope(this.createTraceId, seed, overrides),
+      normalizeTraceSeed,
+      emit: (eventName, payload) => this.events.emit(eventName, payload),
+      nowFn: this.nowFn,
+      setTimeoutFn: this.setTimeoutFn,
+      sessionActivityQuietMs: this.sessionActivityQuietMs,
+      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
+      clearSessionActivityTimer: (session) => this.clearSessionActivityTimer(session),
+      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
+      scheduleLaunchPostStartInputDispatch: (session, reason, delayMs = 0) =>
+        this.scheduleLaunchPostStartInputDispatch(session, reason, delayMs),
+      buildReconnectUnavailableError: (session) => this.buildReconnectUnavailableError(session),
+      scheduleSessionForegroundProcessIdentityRefresh: (session, options = {}) =>
+        this.scheduleSessionForegroundProcessIdentityRefresh(session, options)
+    });
     this.startupRuntime = createSessionManagerStartupRuntime({
       nowFn: this.nowFn,
       setTimeoutFn: this.setTimeoutFn,
@@ -321,30 +333,8 @@ export class SessionManager {
     });
   }
 
-  emitSessionUpdated(session) {
-    if (!session?.meta) {
-      return;
-    }
-    this.events.emit("session.updated", {
-      session: session.meta,
-      trace: createTraceEnvelope(this.createTraceId, session.traceSeed, {
-        sessionId: session.id,
-        source: session.traceSeed?.source || "pty"
-      })
-    });
-  }
-
   updateSessionTraceSeed(session, trace, overrides = {}) {
-    if (!session) {
-      return null;
-    }
-    const nextTraceSeed = {
-      ...(normalizeTraceSeed(session.traceSeed) || {}),
-      ...(normalizeTraceSeed(trace) || {}),
-      ...(normalizeTraceSeed(overrides) || {})
-    };
-    session.traceSeed = normalizeTraceSeed(nextTraceSeed);
-    return session.traceSeed;
+    return this.terminalRuntime.updateSessionTraceSeed(session, trace, overrides);
   }
 
   clearSessionActivityTimer(session) {
@@ -384,62 +374,15 @@ export class SessionManager {
   }
 
   emitSessionActivityStarted(session, timestamp) {
-    session.meta.activityState = SESSION_ACTIVITY_STATE_ACTIVE;
-    session.meta.activityUpdatedAt = timestamp;
-    session.meta.activityCompletedAt = null;
-    session.meta.updatedAt = timestamp;
-    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-      sessionId: session.id,
-      source: "pty"
-    });
-    this.updateSessionTraceSeed(session, trace, { source: "pty" });
-    this.events.emit("session.activity.started", {
-      sessionId: session.id,
-      activityState: session.meta.activityState,
-      activityUpdatedAt: session.meta.activityUpdatedAt,
-      session: session.meta,
-      trace
-    });
+    return this.terminalRuntime.emitSessionActivityStarted(session, timestamp);
   }
 
   emitSessionActivityCompleted(session, timestamp) {
-    session.activityTimer = null;
-    if (!session || session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
-      return;
-    }
-    session.meta.activityState = SESSION_ACTIVITY_STATE_INACTIVE;
-    session.meta.activityUpdatedAt = timestamp;
-    session.meta.activityCompletedAt = timestamp;
-    session.meta.updatedAt = timestamp;
-    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-      sessionId: session.id,
-      source: "pty"
-    });
-    this.updateSessionTraceSeed(session, trace, { source: "pty" });
-    this.events.emit("session.activity.completed", {
-      sessionId: session.id,
-      activityState: session.meta.activityState,
-      activityUpdatedAt: session.meta.activityUpdatedAt,
-      activityCompletedAt: session.meta.activityCompletedAt,
-      session: session.meta,
-      trace
-    });
-    if (session.pendingLaunchPostStartInput?.observedPtyData === true) {
-      this.scheduleLaunchPostStartInputDispatch(session, "activity_completed");
-    }
+    return this.terminalRuntime.emitSessionActivityCompleted(session, timestamp);
   }
 
   scheduleSessionActivityCompletion(session) {
-    if (!session) {
-      return;
-    }
-    this.clearSessionActivityTimer(session);
-    session.activityTimer = this.setTimeoutFn(() => {
-      if (!this.sessions.has(session.id)) {
-        return;
-      }
-      this.emitSessionActivityCompleted(session, this.nowFn());
-    }, this.sessionActivityQuietMs);
+    return this.terminalRuntime.scheduleSessionActivityCompletion(session);
   }
 
   buildLaunchBundle({
@@ -633,27 +576,7 @@ export class SessionManager {
   }
 
   handleAsyncPtyWriteEvent(session, event = {}) {
-    if (!session) {
-      return;
-    }
-    const trace = createTraceEnvelope(this.createTraceId, event.trace || session.traceSeed, {
-      sessionId: session.id,
-      source: event.trace?.source || session.traceSeed?.source || "pty"
-    });
-    this.events.emit("session.input.write", {
-      sessionId: session.id,
-      phase: typeof event.phase === "string" && event.phase ? event.phase : "failed",
-      writeKind: typeof event.writeKind === "string" && event.writeKind ? event.writeKind : "direct",
-      bytes: Number.isInteger(event.bytes) ? event.bytes : 0,
-      ...(event.error ? { error: event.error } : {}),
-      ...(typeof event.code === "string" && event.code ? { code: event.code } : {}),
-      ...(typeof event.failureStage === "string" && event.failureStage ? { failureStage: event.failureStage } : {}),
-      ...(Number.isInteger(event.retryCount) ? { retryCount: event.retryCount } : {}),
-      ...(Number.isInteger(event.queueDroppedCount) ? { queueDroppedCount: event.queueDroppedCount } : {}),
-      ...(event.droppedByQueueFailure === true ? { droppedByQueueFailure: true } : {}),
-      ...(event.retryable === true ? { retryable: true } : {}),
-      trace
-    });
+    return this.terminalRuntime.handleAsyncPtyWriteEvent(session, event);
   }
 
   buildReconnectUnavailableError(session) {
@@ -719,20 +642,7 @@ export class SessionManager {
   }
 
   emitSessionUpdated(session, { trace = null, updatedAt = this.nowFn() } = {}) {
-    const updateTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-      sessionId: session.id,
-      source: trace?.source || session.traceSeed?.source || "runtime"
-    });
-    this.updateSessionTraceSeed(session, updateTrace, {
-      sessionId: session.id,
-      source: updateTrace.source || "runtime"
-    });
-    session.meta.updatedAt = updatedAt;
-    this.events.emit("session.updated", {
-      session: session.meta,
-      trace: updateTrace
-    });
-    return updateTrace;
+    return this.terminalRuntime.emitSessionUpdated(session, { trace, updatedAt });
   }
 
   applySessionAppIdentity(session, nextIdentity, { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn() } = {}) {
@@ -795,32 +705,7 @@ export class SessionManager {
   }
 
   transitionToRunning(session) {
-    if (!session || session.meta.state === SESSION_STATE_RUNNING) {
-      return session?.meta || null;
-    }
-    const timestamp = this.nowFn();
-    session.meta.state = SESSION_STATE_RUNNING;
-    session.meta.startedAt = Number.isInteger(session.meta.startedAt) ? session.meta.startedAt : timestamp;
-    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-      sessionId: session.id,
-      source: session.traceSeed?.source || "rest"
-    });
-    this.updateSessionTraceSeed(session, trace, { source: session.traceSeed?.source || "rest" });
-    this.events.emit("session.started", {
-      sessionId: session.id,
-      startedAt: session.meta.startedAt,
-      updatedAt: session.meta.updatedAt,
-      session: session.meta,
-      trace
-    });
-    this.events.emit("session.updated", {
-      session: session.meta,
-      trace: createTraceEnvelope(this.createTraceId, session.traceSeed, {
-        sessionId: session.id,
-        source: session.traceSeed?.source || "rest"
-      })
-    });
-    return session.meta;
+    return this.terminalRuntime.transitionToRunning(session);
   }
 
   create({
@@ -886,102 +771,15 @@ export class SessionManager {
   }
 
   sendInput(sessionId, data, options = {}) {
-    const session = this.get(sessionId);
-    if (!session.ptyProcess) {
-      throw this.buildReconnectUnavailableError(session);
-    }
-    this.updateSessionTraceSeed(session, options.trace, {
-      sessionId,
-      source: options.trace?.source || "rest"
-    });
-    const eventTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-      sessionId,
-      source: options.trace?.source || session.traceSeed?.source || "rest"
-    });
-    const writeKind = typeof options.writeKind === "string" && options.writeKind.trim() ? options.writeKind.trim() : "direct";
-    const bytes = Buffer.byteLength(String(data || ""), "utf8");
-    this.events.emit("session.input.write", {
-      sessionId,
-      phase: "attempt",
-      writeKind,
-      bytes,
-      trace: eventTrace
-    });
-    queueNodePtyAsyncWriteMeta(session.ptyProcess, {
-      sessionId,
-      writeKind,
-      bytes,
-      trace: eventTrace
-    });
-    try {
-      session.ptyProcess.write(data);
-    } catch (error) {
-      clearNodePtyAsyncWriteMeta(session.ptyProcess);
-      this.events.emit("session.input.write", {
-        sessionId,
-        phase: "failed",
-        writeKind,
-        bytes,
-        error: error instanceof Error ? error.message : String(error || "write failed"),
-        trace: eventTrace
-      });
-      throw error;
-    }
-    this.events.emit("session.input.write", {
-      sessionId,
-      phase: "ok",
-      writeKind,
-      bytes,
-      trace: eventTrace
-    });
-    const timestamp = this.nowFn();
-    if (options.customCommandUsage) {
-      session.meta.quickSendUsage = recordQuickSendUsageEntry(session.meta.quickSendUsage, options.customCommandUsage, {
-        usedAt: timestamp
-      });
-    }
-    session.lastActivityAt = timestamp;
-    session.meta.updatedAt = timestamp;
-    this.scheduleSessionForegroundProcessIdentityRefresh(session, {
-      delayMs: this.foregroundProcessRefreshDelayMs,
-      trace: options.trace || null
-    });
+    return this.terminalRuntime.sendInput(sessionId, data, options);
   }
 
   resize(sessionId, cols, rows, options = {}) {
-    const session = this.get(sessionId);
-    if (!session.ptyProcess) {
-      throw this.buildReconnectUnavailableError(session);
-    }
-    this.updateSessionTraceSeed(session, options.trace, {
-      sessionId,
-      source: options.trace?.source || "rest"
-    });
-    session.ptyProcess.resize(cols, rows);
-    const timestamp = this.nowFn();
-    session.lastActivityAt = timestamp;
-    session.meta.updatedAt = timestamp;
+    return this.terminalRuntime.resize(sessionId, cols, rows, options);
   }
 
   signal(sessionId, signal, options = {}) {
-    const session = this.get(sessionId);
-    if (!session.ptyProcess) {
-      throw this.buildReconnectUnavailableError(session);
-    }
-    this.updateSessionTraceSeed(session, options.trace, {
-      sessionId,
-      source: options.trace?.source || "rest"
-    });
-    this.clearExpectedExitReason(session);
-    session.expectedExitReason = signal || "signal";
-    session.expectedExitReasonTimer = this.setTimeoutFn(() => {
-      session.expectedExitReasonTimer = null;
-      session.expectedExitReason = "";
-    }, 250);
-    session.ptyProcess.kill(signal);
-    const timestamp = this.nowFn();
-    session.lastActivityAt = timestamp;
-    session.meta.updatedAt = timestamp;
+    return this.terminalRuntime.signal(sessionId, signal, options);
   }
 
   interrupt(sessionId, options = {}) {
