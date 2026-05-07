@@ -1,5 +1,5 @@
 import { cloneDeckSplitLayoutEntry, cloneDeckSplitLayoutMap } from "./split-layout-state.js";
-import { captureLayoutProfileSnapshot } from "./layout-workspace-runtime-state.js";
+import { captureLayoutProfileSnapshot } from "./layout-workspace-capture-state.js";
 import {
   normalizeLayoutControlPaneState,
   normalizeLayoutProfileCollection,

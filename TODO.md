@@ -14,17 +14,12 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-333` Owner `BE`: extract the next retained startup/session-resource authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
-- `QLT-334` Owner `BE`: harden retained normalization/state authority coverage across `backend/src/runtime-library-normalization.js`, `backend/src/runtime-session-resource-authority.js`, and adjacent runtime-library/session-state branches.
-- `QLT-335` Owner `BE`: isolate the next retained launch/reconnect/app-identity lifecycle seam from `backend/src/session-manager.js` and harden the remaining manager branch gaps.
-- `QLT-336` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
-- `QLT-337` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js`, `frontend/src/public/layout-profile-runtime-controller.js`, and `frontend/src/public/layout-workspace-runtime-state.js`.
-- `QLT-338` Owner `FE`: harden retained runtime/operator-interaction coverage across `frontend/src/public/connection-profile-draft-state.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and `frontend/src/public/layout-runtime-state.js`.
+- None.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role (active): own `QLT-336` through `QLT-338` and the corresponding frontend implementation and regression coverage.
-- `BE` ownership role (active): own `QLT-333` through `QLT-335` and the corresponding backend implementation and regression coverage.
+- `FE` ownership role is currently inactive.
+- `BE` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.

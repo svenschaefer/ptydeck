@@ -13,8 +13,14 @@ const appRuntimeBootstrapAssemblyPath = fileURLToPath(
 const appRuntimeInitializationAccessCompositionPath = fileURLToPath(
   new URL("../src/public/app-runtime-initialization-access-composition.js", import.meta.url)
 );
+const appRuntimeAccessControlAssemblyPath = fileURLToPath(
+  new URL("../src/public/app-runtime-access-control-assembly.js", import.meta.url)
+);
 const appRuntimeCompositionHelperAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-composition-helper-assembly.js", import.meta.url)
+);
+const layoutWorkspaceCaptureStatePath = fileURLToPath(
+  new URL("../src/public/layout-workspace-capture-state.js", import.meta.url)
 );
 const layoutWorkspaceRuntimeStatePath = fileURLToPath(
   new URL("../src/public/layout-workspace-runtime-state.js", import.meta.url)
@@ -84,8 +90,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
 
   const requiredDelegationMarkers = [
     "createAppLayoutDeckFacadeController",
-    "createAppRuntimeCompositionHelperAssembly",
-    "createAppRuntimeInitializationAccessComposition",
+    "createAppRuntimeAccessControlAssembly",
     "createAppRuntimeOperatorSupportAssembly",
     "createAppRuntimeRecoveryComposition",
     "createAppRuntimeSessionSurfaceAssembly",
@@ -97,7 +102,6 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createSessionStreamAuthorityController",
     "createSessionViewModel",
     "createLayoutRuntimeController",
-    "}).installTestHooks();",
     "initialize: () => appRuntimeInitializationController.initialize(),",
     "setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)"
   ];
@@ -149,6 +153,24 @@ test("runtime initialization/access composition owns the delegated ui-state and 
   }
 });
 
+test("runtime access control assembly owns the delegated initialization-access and helper-hook bridge contract", async () => {
+  const source = await readFile(appRuntimeAccessControlAssemblyPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createAppRuntimeCompositionHelperAssembly",
+    "createAppRuntimeInitializationAccessComposition",
+    "const accessComposition = createAppRuntimeInitializationAccessComposition(",
+    "createAppRuntimeCompositionHelperAssembly({",
+    "sessionControlRuntimeController,",
+    "}).installTestHooks();",
+    "return accessComposition;"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime access control marker ${marker}`);
+  }
+});
+
 test("runtime composition helper assembly owns the delegated test-hook and collaborator bridge contract", async () => {
   const source = await readFile(appRuntimeCompositionHelperAssemblyPath, "utf8");
 
@@ -169,16 +191,27 @@ test("runtime composition helper assembly owns the delegated test-hook and colla
 });
 
 test("layout workspace runtime state owns the delegated split-layout snapshot and workspace capture contract", async () => {
+  const captureSource = await readFile(layoutWorkspaceCaptureStatePath, "utf8");
   const source = await readFile(layoutWorkspaceRuntimeStatePath, "utf8");
 
-  const requiredDelegationMarkers = [
+  const requiredCaptureMarkers = [
     'import { normalizeLayoutControlPaneState } from "./layout-runtime-state.js";',
     'import { cloneDeckSplitLayoutMap } from "./split-layout-state.js";',
     "export function serializeSplitLayoutRoot(root) {",
     "export function cloneWorkspaceState(workspace) {",
-    "export function resolveWorkspaceDeckSessions(deckId, deckSessions, deckGroups) {",
     "export function captureCurrentWorkspace(options = {}) {",
     "export function captureLayoutProfileSnapshot(options = {}) {"
+  ];
+
+  for (const marker of requiredCaptureMarkers) {
+    assert.ok(captureSource.includes(marker), `expected layout workspace capture marker ${marker}`);
+  }
+
+  const requiredDelegationMarkers = [
+    'from "./layout-workspace-capture-state.js";',
+    "export function resolveWorkspaceDeckSessions(deckId, deckSessions, deckGroups) {",
+    "export function captureCurrentVisibleDeckSessions(options = {}) {",
+    "export function formatWorkspacePresetDetail(preset) {"
   ];
 
   for (const marker of requiredDelegationMarkers) {

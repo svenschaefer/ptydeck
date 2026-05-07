@@ -197,6 +197,52 @@ test("runtime session resource authority rejects unsupported or escaping file tr
   );
 });
 
+test("runtime session resource authority rejects missing roots, oversized downloads, and invalid upload payloads", async () => {
+  const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
+  await writeFile(join(transferRoot, "huge.bin"), Buffer.alloc(12, 0x61));
+
+  const missingRootHarness = createHarness({
+    manager: {
+      get: () => ({
+        id: "session-1",
+        meta: {
+          cwd: ""
+        }
+      })
+    }
+  });
+  await assert.rejects(
+    () => missingRootHarness.authority.buildSessionFileDownloadOrThrow("session-1", "file.txt"),
+    (error) => error instanceof ApiError && error.statusCode === 409 && error.error === "FileTransferUnavailable"
+  );
+
+  const hugeHarness = createHarness({
+    transferRoot,
+    sessionFileTransferMaxBytes: 8
+  });
+  await assert.rejects(
+    () => hugeHarness.authority.buildSessionFileDownloadOrThrow("session-1", "huge.bin"),
+    (error) => error instanceof ApiError && error.statusCode === 413 && error.error === "FileTransferTooLarge"
+  );
+
+  const invalidBase64Harness = createHarness({ transferRoot });
+  await assert.rejects(
+    () => invalidBase64Harness.authority.uploadSessionFileOrThrow("session-1", "upload.txt", ""),
+    (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
+  );
+});
+
+test("runtime session resource authority rejects directory targets during upload replacement", async () => {
+  const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
+  await mkdir(join(transferRoot, "nested"), { recursive: true });
+
+  const { authority } = createHarness({ transferRoot });
+  await assert.rejects(
+    () => authority.uploadSessionFileOrThrow("session-1", "nested", Buffer.from("x").toString("base64")),
+    (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
+  );
+});
+
 test("runtime session resource authority forwards restored session creation payloads to the manager", () => {
   const createCalls = [];
   const { authority } = createHarness({

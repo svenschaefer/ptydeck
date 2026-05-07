@@ -29,6 +29,7 @@ import { createSessionManagerReplayRuntime } from "./session-manager-replay-runt
 import { createSessionManagerTerminalRuntime } from "./session-manager-terminal-runtime.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
 import { createSessionManagerAppIdentityRuntime } from "./session-manager-app-identity-runtime.js";
+import { createSessionManagerMutationRuntime } from "./session-manager-mutation-runtime.js";
 import {
   applySessionPatch
 } from "./session-manager-lifecycle.js";
@@ -330,6 +331,19 @@ export class SessionManager {
       clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
       emitSessionCreated: (event) => this.events.emit("session.created", event),
       emitSessionClosed: (event) => this.events.emit("session.closed", event)
+    });
+    this.mutationRuntime = createSessionManagerMutationRuntime({
+      getSessionOrThrow: (sessionId) => this.get(sessionId),
+      nowFn: this.nowFn,
+      defaultShell: this.defaultShell,
+      remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
+      remoteReconnectDelayMs: this.remoteReconnectDelayMs,
+      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
+      clearRemoteReconnectTimers: (session) => this.clearRemoteReconnectTimers(session),
+      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
+      updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
+      applySessionPatch,
+      appIdentityRuntime: this.appIdentityRuntime
     });
   }
 
@@ -646,7 +660,7 @@ export class SessionManager {
   }
 
   applySessionAppIdentity(session, nextIdentity, { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn() } = {}) {
-    return this.appIdentityRuntime.applySessionAppIdentity(session, nextIdentity, {
+    return this.mutationRuntime.applySessionAppIdentity(session, nextIdentity, {
       emitUpdatedEvent,
       trace,
       updatedAt
@@ -658,7 +672,7 @@ export class SessionManager {
     candidateUpdates,
     { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn(), metaChanged = false } = {}
   ) {
-    return this.appIdentityRuntime.reconcileSessionAppIdentity(session, candidateUpdates, {
+    return this.mutationRuntime.reconcileSessionAppIdentity(session, candidateUpdates, {
       emitUpdatedEvent,
       trace,
       updatedAt,
@@ -667,38 +681,30 @@ export class SessionManager {
   }
 
   refreshSessionAppIdentity(sessionId, options = {}) {
-    const session = typeof sessionId === "string" ? this.get(sessionId) : sessionId;
-    return this.appIdentityRuntime.refreshSessionAppIdentity(session, options);
+    return this.mutationRuntime.refreshSessionAppIdentity(sessionId, options);
   }
 
   setSessionAppIdentity(sessionId, appIdentity, options = {}) {
-    const session = this.get(sessionId);
-    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
-    return this.applySessionAppIdentity(session, appIdentity, {
-      emitUpdatedEvent: options.emitUpdatedEvent !== false,
-      trace: options.trace || null,
-      updatedAt
-    });
+    return this.mutationRuntime.setSessionAppIdentity(sessionId, appIdentity, options);
   }
 
   refreshSessionForegroundProcessIdentity(sessionId, options = {}) {
-    const session = typeof sessionId === "string" ? this.get(sessionId) : sessionId;
-    return this.appIdentityRuntime.refreshSessionForegroundProcessIdentity(session, options);
+    return this.mutationRuntime.refreshSessionForegroundProcessIdentity(sessionId, options);
   }
 
   observeSessionTerminalSignals(session, chunk, options = {}) {
-    return this.appIdentityRuntime.observeSessionTerminalSignals(session, chunk, options);
+    return this.mutationRuntime.observeSessionTerminalSignals(session, chunk, options);
   }
 
   observeSessionOutputHeuristics(session, output, options = {}) {
-    return this.appIdentityRuntime.observeSessionOutputHeuristics(session, output, options);
+    return this.mutationRuntime.observeSessionOutputHeuristics(session, output, options);
   }
 
   scheduleSessionForegroundProcessIdentityRefresh(
     session,
     { delayMs = this.foregroundProcessRefreshDelayMs, trace = null } = {}
   ) {
-    return this.appIdentityRuntime.scheduleSessionForegroundProcessIdentityRefresh(session, {
+    return this.mutationRuntime.scheduleSessionForegroundProcessIdentityRefresh(session, {
       delayMs,
       trace
     });
@@ -795,28 +801,11 @@ export class SessionManager {
   }
 
   updateSession(sessionId, patch = {}, options = {}) {
-    const session = this.get(sessionId);
-    this.updateSessionTraceSeed(session, options.trace, {
-      sessionId,
-      source: options.trace?.source || "rest"
-    });
-    const { updatedAt } = applySessionPatch(session, patch, {
-      defaultShell: this.defaultShell,
-      remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-      remoteReconnectDelayMs: this.remoteReconnectDelayMs,
-      clearRemoteReconnectTimers: (currentSession) => this.clearRemoteReconnectTimers(currentSession),
-      clearExpectedExitReason: (currentSession) => this.clearExpectedExitReason(currentSession),
-      nowFn: this.nowFn
-    });
-    const refreshedIdentity = this.refreshSessionAppIdentity(session, {
-      updatedAt
-    });
-    session.meta.appIdentity = refreshedIdentity;
-    return session.meta;
+    return this.mutationRuntime.updateSession(sessionId, patch, options);
   }
 
   rename(sessionId, name) {
-    return this.updateSession(sessionId, { name });
+    return this.mutationRuntime.rename(sessionId, name);
   }
 
   restart(sessionId, options = {}) {

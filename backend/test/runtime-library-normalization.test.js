@@ -591,6 +591,53 @@ test("runtime library normalization keeps malformed weight and workspace-group f
   });
 });
 
+test("runtime library normalization rejects duplicate pane session placement and malformed pane assignment arrays in strict mode", () => {
+  const normalization = createHarness();
+
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckSplitLayouts: {
+          default: {
+            root: {
+              type: "row",
+              children: [
+                { type: "pane", paneId: "main" },
+                { type: "pane", paneId: "side" }
+              ]
+            },
+            paneSessions: {
+              main: ["session-1"],
+              side: ["session-1"]
+            }
+          }
+        }
+      }),
+    /cannot be assigned to multiple panes/i
+  );
+
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckSplitLayouts: {
+          default: {
+            root: {
+              type: "row",
+              children: [
+                { type: "pane", paneId: "main" },
+                { type: "pane", paneId: "side" }
+              ]
+            },
+            paneSessions: {
+              main: "session-1"
+            }
+          }
+        }
+      }),
+    /must be an array of session ids/i
+  );
+});
+
 test("runtime library normalization shapes workspace presets against known decks, sessions, and layouts", () => {
   const normalization = createHarness();
 

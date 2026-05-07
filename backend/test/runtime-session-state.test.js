@@ -204,3 +204,34 @@ test("runtime session state rethrows unexpected manager errors on active-session
   assert.throws(() => state.setSessionDeckAssignment("session-x", "ops"), /manager boom/);
   assert.throws(() => state.resolveSessionControlModel("session-x"), /manager boom/);
 });
+
+test("runtime session state rejects invalid quick-id swaps and preserves existing assignments", () => {
+  const sessionQuickIdAssignments = new Map([
+    ["session-1", "A"],
+    ["session-2", "B"]
+  ]);
+  const activeSessions = new Map([
+    ["session-1", { id: "session-1", updatedAt: 1 }],
+    ["session-2", { id: "session-2", updatedAt: 2 }]
+  ]);
+  const state = createRuntimeSessionState({
+    manager: createManager(activeSessions),
+    unrestoredSessions: new Map(),
+    decks: new Map([["default", { id: "default" }]]),
+    defaultDeckId: "default",
+    buildDefaultDeck: () => ({ id: "default" }),
+    sessionDeckAssignments: new Map(),
+    sessionQuickIdAssignments,
+    sessionQuickIdPool: ["A", "B"],
+    sessionQuickIdFallback: "?",
+    getApiSessionOrThrow(sessionId) {
+      return { id: sessionId, quickIdToken: sessionQuickIdAssignments.get(sessionId) };
+    }
+  });
+
+  assert.equal(state.assignSessionQuickIdToken("session-1", "B"), "A");
+  assert.throws(
+    () => state.swapSessionQuickIds("session-1", "session-1"),
+    /requires two different session ids/i
+  );
+});

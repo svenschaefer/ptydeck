@@ -1950,6 +1950,51 @@ test("session-terminal-runtime controller sends terminal cancel after Ctrl-C pro
   assert.equal(entry.terminal.focusCalls, 1);
 });
 
+test("session-terminal-runtime controller ignores repeated Ctrl-C prompts while an intent request is still pending", async () => {
+  const promptResolvers = [];
+  const promptCalls = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    canWriteClipboardText: () => true,
+    requestTerminalCtrlCAction: ({ session, selection }) =>
+      new Promise((resolve) => {
+        promptCalls.push([session.id, selection]);
+        promptResolvers.push(resolve);
+      })
+  });
+  const refs = createTerminalCardRefs("ctrl-c-pending");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "selected text";
+  const firstCtrlCEvent = createCtrlCEvent();
+  const secondCtrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(firstCtrlCEvent);
+  refs.mount.dispatchEvent(secondCtrlCEvent);
+  await Promise.resolve();
+
+  assert.equal(firstCtrlCEvent.defaultPrevented, true);
+  assert.equal(secondCtrlCEvent.defaultPrevented, true);
+  assert.deepEqual(promptCalls, [["s1", "selected text"]]);
+
+  promptResolvers.shift()?.("copy");
+  await Promise.resolve();
+  await Promise.resolve();
+});
+
 test("session-terminal-runtime controller resets the Ctrl-C prompt guard after an intent request rejects", async () => {
   const promptOutcomes = [new Error("Prompt failed."), "cancel"];
   const promptCalls = [];

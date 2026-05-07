@@ -5,18 +5,26 @@ import {
   buildBlankConnectionProfileLaunch,
   buildConnectionProfileLaunchFromSession,
   buildPersistedDraftLaunch,
+  cloneRemoteAuth,
+  cloneRemoteConnection,
+  cloneStringRecord,
+  cloneThemeProfile,
   cloneDraftLaunch,
   createDraftState,
   formatConnectionProfileReport,
   formatConnectionProfileSummary,
   formatStringRecord,
   formatTags,
+  getDefaultShellForKind,
+  getDefaultStartCwdForKind,
   getDeckOptionsForDraft,
   getDraftLaunchFromInputs,
   getDraftModeMessage,
   getThemePresetSelectOptions,
+  normalizeConnectionProfileCollection,
   normalizeConnectionProfileLaunch,
   normalizeConnectionProfileRecord,
+  normalizeTagList,
   normalizeThemePresetCollection,
   parseStringRecord,
   parseTags,
@@ -370,5 +378,187 @@ test("connection profile draft state captures reusable launches from sessions", 
       remoteConnection: { host: "carpo.uberspace.de", port: 22, username: "ixpqtwnk" },
       remoteAuth: { method: "privateKey", privateKeyPath: "~/.ssh/id_ed25519" }
     }
+  );
+});
+
+test("connection profile draft state covers fail-closed selectors, defaults, and ssh edge branches deterministically", () => {
+  assert.deepEqual(cloneStringRecord(null), {});
+  assert.deepEqual(cloneStringRecord({ " A ": "1", blank: 2, "": "x" }), { A: "1" });
+  assert.equal(cloneThemeProfile([]), undefined);
+  assert.equal(cloneThemeProfile({ blank: 1 }), undefined);
+  assert.deepEqual(cloneThemeProfile({ background: "#000000" }), { background: "#000000" });
+  assert.equal(cloneRemoteConnection({ host: "", port: 22 }), undefined);
+  assert.deepEqual(cloneRemoteConnection({ host: "host", port: "22", username: "" }), { host: "host", port: 22 });
+  assert.equal(cloneRemoteAuth({ method: "token" }), undefined);
+  assert.deepEqual(cloneRemoteAuth({ method: "keyboardInteractive" }), { method: "keyboardInteractive" });
+  assert.deepEqual(normalizeTagList("ops"), []);
+
+  assert.equal(normalizeConnectionProfileLaunch(null), null);
+  assert.equal(
+    normalizeConnectionProfileLaunch({
+      kind: "local",
+      deckId: "ops",
+      shell: "bash",
+      startCwd: "/srv/app",
+      themeProfile: DEFAULT_THEME
+    }).kind,
+    "local"
+  );
+  assert.equal(
+    normalizeConnectionProfileLaunch({
+      kind: "ssh",
+      deckId: "ops",
+      shell: "ssh",
+      startCwd: "~",
+      activeThemeProfile: DEFAULT_THEME
+    }),
+    null
+  );
+  assert.equal(normalizeConnectionProfileRecord({ id: "", name: "Broken", launch: {} }), null);
+
+  const normalizedProfiles = normalizeConnectionProfileCollection([
+    { id: "b", name: "Beta", launch: buildBlankConnectionProfileLaunch({ defaultThemeProfile: DEFAULT_THEME }) },
+    { id: "a", name: "Alpha", launch: buildBlankConnectionProfileLaunch({ defaultThemeProfile: DEFAULT_THEME }) },
+    { id: "a", name: "Duplicate", launch: buildBlankConnectionProfileLaunch({ defaultThemeProfile: DEFAULT_THEME }) },
+    null
+  ]);
+  assert.deepEqual(normalizedProfiles.map((profile) => profile.id), ["a", "b"]);
+  assert.deepEqual(resolveConnectionProfileToken(normalizedProfiles, ""), {
+    profile: null,
+    error: "Connection profile target is required."
+  });
+  assert.match(resolveConnectionProfileToken(normalizedProfiles, "missing").error, /Unknown connection profile/);
+  assert.match(
+    resolveConnectionProfileToken(
+      [
+        { id: "ops-a", name: "Ops A", launch: buildBlankConnectionProfileLaunch({ defaultThemeProfile: DEFAULT_THEME }) },
+        { id: "ops-b", name: "Ops B", launch: buildBlankConnectionProfileLaunch({ defaultThemeProfile: DEFAULT_THEME }) }
+      ],
+      "ops"
+    ).error,
+    /Ambiguous connection profile/
+  );
+
+  assert.equal(buildConnectionProfileLaunchFromSession(null), null);
+  assert.equal(buildConnectionProfileLaunchFromSession({ kind: "local", shell: "", cwd: "/" }), null);
+  assert.equal(formatConnectionProfileSummary(null), "");
+  assert.equal(formatConnectionProfileReport(null), "");
+
+  assert.equal(getDefaultShellForKind("ssh"), "ssh");
+  assert.equal(getDefaultShellForKind("local"), "bash");
+  assert.equal(getDefaultStartCwdForKind("ssh"), "~");
+  assert.equal(getDefaultStartCwdForKind("local"), "/");
+
+  const defaultClone = cloneDraftLaunch(
+    {
+      kind: "ssh",
+      deckId: "ops",
+      remoteConnection: { host: "carpo.uberspace.de", port: 99999, username: "" },
+      remoteAuth: { method: "token" }
+    },
+    {
+      defaultDeckId: "default",
+      defaultThemeProfile: DEFAULT_THEME
+    }
+  );
+  assert.equal(defaultClone.shell, "ssh");
+  assert.equal(defaultClone.startCwd, "~");
+  assert.equal(defaultClone.remoteConnection?.port, 22);
+  assert.equal(defaultClone.remoteAuth?.method, "privateKey");
+  assert.equal(defaultClone.remoteAuth?.privateKeyPath, "~/.ssh/id_ed25519");
+
+  assert.equal(getDraftModeMessage(null), "");
+  assert.equal(getDraftModeMessage({ mode: "session", launch: { kind: "ssh" } }), "Loaded the active session into a new unsaved draft.");
+  assert.equal(
+    getDraftModeMessage({ mode: "blank", launch: { kind: "local" } }),
+    "Editing a new unsaved local connection profile."
+  );
+  assert.deepEqual(
+    getDeckOptionsForDraft(
+      { launch: { deckId: "ops" } },
+      {
+        defaultDeckId: "default",
+        getDecks: () => [{ id: "default", name: "Default" }, { id: "default", name: "Duplicate" }]
+      }
+    ).map((entry) => entry.value),
+    ["default", "ops"]
+  );
+  assert.deepEqual(
+    getThemePresetSelectOptions(THEME_PRESETS, "custom-selected").map((entry) => entry.value),
+    ["night", "day", "__custom__", "custom-selected"]
+  );
+  assert.deepEqual(resolveThemeProfileFromSelection(THEME_PRESETS, "", null, DEFAULT_THEME), DEFAULT_THEME);
+  assert.deepEqual(resolveThemeProfileFromSelection(THEME_PRESETS, "missing", null, DEFAULT_THEME), DEFAULT_THEME);
+
+  const draftLaunch = getDraftLaunchFromInputs({
+    hasGuidedDraftControls: false,
+    rawDraftLaunch: JSON.stringify({
+      kind: "ssh",
+      deckId: "ops",
+      shell: "ssh",
+      startCwd: "~",
+      activeThemeProfile: DEFAULT_THEME,
+      inactiveThemeProfile: DEFAULT_THEME
+    }),
+    defaultDeckId: "default",
+    defaultThemeProfile: DEFAULT_THEME
+  });
+  assert.equal(draftLaunch.kind, "ssh");
+  assert.equal(
+    getDraftLaunchFromInputs({
+      hasGuidedDraftControls: true,
+      draftState: createDraftState({}, { defaultDeckId: "default", defaultThemeProfile: DEFAULT_THEME }),
+      defaultDeckId: "default",
+      defaultThemeProfile: DEFAULT_THEME,
+      themePresets: THEME_PRESETS,
+      kindValue: "local",
+      deckValue: "default",
+      shellValue: "bash",
+      startCwdValue: "/",
+      startCommandValue: "",
+      envText: "",
+      tagsText: "",
+      activeThemeSelection: "",
+      inactiveThemeSelection: "",
+      remotePortValue: "not-a-port"
+    }).remoteConnection,
+    undefined
+  );
+
+  assert.throws(
+    () =>
+      buildPersistedDraftLaunch(
+        {
+          kind: "ssh",
+          shell: "ssh",
+          startCwd: "~",
+          activeThemeProfile: DEFAULT_THEME,
+          inactiveThemeProfile: DEFAULT_THEME,
+          remoteConnection: { host: "carpo.uberspace.de", port: 22 },
+          remoteAuth: { method: "token" }
+        },
+        {
+          defaultDeckId: "default",
+          defaultThemeProfile: DEFAULT_THEME
+        }
+      ),
+    /SSH auth method must be password, privateKey, or keyboardInteractive\./
+  );
+  assert.throws(
+    () =>
+      buildPersistedDraftLaunch(
+        {
+          kind: "local",
+          shell: "bash",
+          startCwd: "/",
+          activeThemeProfile: null,
+          inactiveThemeProfile: null
+        },
+        {
+          defaultDeckId: "default",
+          defaultThemeProfile: null
+        }
+      ),
+    /Connection profile draft is incomplete\./
   );
 });

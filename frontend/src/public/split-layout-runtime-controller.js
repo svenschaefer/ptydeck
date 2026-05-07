@@ -12,7 +12,7 @@ import {
   collectSplitLayoutPaneIds,
   normalizeSplitLayoutWeights
 } from "./split-layout-state.js";
-import { serializeSplitLayoutRoot } from "./layout-workspace-runtime-state.js";
+import { serializeSplitLayoutRoot } from "./layout-workspace-capture-state.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
