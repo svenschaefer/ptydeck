@@ -9,7 +9,6 @@ import {
   clearNodePtyAsyncWriteMeta,
   queueNodePtyAsyncWriteMeta
 } from "./node-pty-write-retry.js";
-import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.js";
 import {
   clearExpectedExitReason as clearSessionManagerExpectedExitReason,
   clearForegroundProcessRefreshTimer as clearSessionManagerForegroundProcessRefreshTimer,
@@ -28,16 +27,14 @@ import {
 import { createSessionManagerLaunchRuntime } from "./session-manager-launch-runtime.js";
 import { createSessionManagerSessionRuntime } from "./session-manager-session-runtime.js";
 import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
+import { createSessionManagerReplayRuntime } from "./session-manager-replay-runtime.js";
 import {
   recordQuickSendUsageEntry
 } from "./session-quick-send-usage.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
 import { createSessionManagerAppIdentityRuntime } from "./session-manager-app-identity-runtime.js";
 import {
-  applySessionPatch,
-  buildReplayRetentionResult,
-  buildReplayRetentionState,
-  normalizeReplayShellBlocks
+  applySessionPatch
 } from "./session-manager-lifecycle.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
@@ -122,18 +119,6 @@ function createTraceEnvelope(createTraceId, seed, overrides = {}) {
       ? { source: normalizedOverrides?.source || normalizedSeed?.source }
       : {})
   };
-}
-
-function normalizePromptBoundaries(promptBoundaries, chunkLength) {
-  const maxLength = Number.isInteger(chunkLength) && chunkLength >= 0 ? chunkLength : 0;
-  return (Array.isArray(promptBoundaries) ? promptBoundaries : [])
-    .map((entry) => (Number.isInteger(entry) && entry >= 0 && entry <= maxLength ? entry : null))
-    .filter((entry) => entry !== null)
-    .sort((left, right) => left - right);
-}
-
-function getTextLength(value) {
-  return typeof value === "string" ? value.length : 0;
 }
 
 function countCursorPositionQueries(rawData) {
@@ -293,6 +278,9 @@ export class SessionManager {
       startupPostInputFallbackMs: this.startupPostInputFallbackMs,
       startupTerminalQueryFallbackWindowMs: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
       startupTerminalQueryFallbackMaxResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES
+    });
+    this.replayRuntime = createSessionManagerReplayRuntime({
+      sessionReplayMemoryMaxChars: this.sessionReplayMemoryMaxChars
     });
     this.appIdentityRuntime = createSessionManagerAppIdentityRuntime({
       nowFn: this.nowFn,
@@ -689,103 +677,37 @@ export class SessionManager {
   }
 
   buildReplayRetentionResult(value, maxChars = this.sessionReplayMemoryMaxChars) {
-    return buildReplayRetentionResult(value, maxChars);
+    return this.replayRuntime.buildReplayRetentionResult(value, maxChars);
   }
 
   buildReplayRetentionState(value, shellBlocks = [], currentShellBlockStart = null, maxChars = this.sessionReplayMemoryMaxChars) {
-    return buildReplayRetentionState(value, shellBlocks, currentShellBlockStart, maxChars);
+    return this.replayRuntime.buildReplayRetentionState(value, shellBlocks, currentShellBlockStart, maxChars);
   }
 
   appendReplayOutput(session, cleaned, promptBoundaries = []) {
-    const chunk = typeof cleaned === "string" ? cleaned : "";
-    const normalizedPromptBoundaries = normalizePromptBoundaries(promptBoundaries, chunk.length);
-    const combinedOutput = `${session.outputBuffer || ""}${chunk}`;
-    const absolutePromptBoundaries = normalizedPromptBoundaries.map((entry) => getTextLength(session.outputBuffer) + entry);
-    const nextShellBlocks = normalizeReplayShellBlocks(session.replayShellBlocks, getTextLength(session.outputBuffer));
-    let currentShellBlockStart = Number.isInteger(session.currentShellBlockStart) ? session.currentShellBlockStart : null;
-    for (const boundary of absolutePromptBoundaries) {
-      if (Number.isInteger(currentShellBlockStart) && boundary > currentShellBlockStart) {
-        nextShellBlocks.push({ start: currentShellBlockStart, end: boundary });
-      }
-      currentShellBlockStart = boundary;
-    }
-    const replayState = this.buildReplayRetentionState(
-      combinedOutput,
-      nextShellBlocks,
-      currentShellBlockStart,
-      this.sessionReplayMemoryMaxChars
-    );
-    session.outputBuffer = replayState.value;
-    session.outputTruncated = session.outputTruncated === true || replayState.truncated === true;
-    session.replayShellBlocks = replayState.shellBlocks;
-    session.currentShellBlockStart = replayState.currentShellBlockStart;
+    return this.replayRuntime.appendReplayOutput(session, cleaned, promptBoundaries);
   }
 
   trimReplayOutput(value, maxChars = this.sessionReplayMemoryMaxChars) {
-    return this.buildReplayRetentionResult(value, maxChars).value;
+    return this.replayRuntime.trimReplayOutput(value, maxChars);
   }
 
   getSnapshot({ outputMaxChars, includeTruncationMetadata = false, includeEmptyOutputs = false } = {}) {
-    const effectiveOutputMaxChars =
-      Number.isInteger(outputMaxChars) && outputMaxChars >= 0
-        ? Math.min(outputMaxChars, this.sessionReplayMemoryMaxChars)
-        : this.sessionReplayMemoryMaxChars;
-    const sessions = [];
-    const outputs = [];
-    for (const session of this.sessions.values()) {
-      sessions.push(session.meta);
-      const retainedReplayOutput = this.buildReplayRetentionResult(session.outputBuffer, effectiveOutputMaxChars);
-      const replayOutputTruncated = session.outputTruncated === true || retainedReplayOutput.truncated === true;
-      if (retainedReplayOutput.value || (includeEmptyOutputs && replayOutputTruncated)) {
-        outputs.push({
-          sessionId: session.id,
-          data: retainedReplayOutput.value,
-          ...(includeTruncationMetadata ? { truncated: replayOutputTruncated } : {})
-        });
-      }
-    }
-    return { sessions, outputs };
+    return this.replayRuntime.getSnapshot(this.sessions.values(), {
+      outputMaxChars,
+      includeTruncationMetadata,
+      includeEmptyOutputs
+    });
   }
 
   getReplayExport(sessionId) {
     const session = this.get(sessionId);
-    return {
-      sessionId: session.id,
-      data: session.outputBuffer,
-      retainedChars: session.outputBuffer.length,
-      retentionLimitChars: this.sessionReplayMemoryMaxChars,
-      truncated: session.outputTruncated === true
-    };
+    return this.replayRuntime.getReplayExport(session);
   }
 
   getReplayExcerpt(sessionId, selectorText) {
     const session = this.get(sessionId);
-    const selector = parseReplaySliceSelector(selectorText);
-    if (!selector) {
-      throw new ApiError(400, "ValidationError", "Field 'slice' must match 'l:N', 'c:N', or 'sp:N'.");
-    }
-    const excerpt = buildReplayExcerpt({
-      selector: selector.selector,
-      text: session.outputBuffer,
-      shellBlocks: session.replayShellBlocks,
-      shellBlocksSupported: session.replayShellBlockTrackingSupported === true
-    });
-    if (!excerpt) {
-      throw new ApiError(500, "ReplayExcerptUnavailable", "Replay excerpt could not be generated.");
-    }
-    if (excerpt.unavailableReason === "shell_blocks_unavailable") {
-      throw new ApiError(
-        409,
-        "ReplayExcerptUnsupported",
-        `Selector '${selector.selector}' is unavailable for session '${sessionId}'. Use 'l:N' or 'c:N'.`
-      );
-    }
-    return {
-      ...excerpt,
-      sourceRetainedChars: session.outputBuffer.length,
-      sourceRetentionLimitChars: this.sessionReplayMemoryMaxChars,
-      sourceTruncated: session.outputTruncated === true
-    };
+    return this.replayRuntime.getReplayExcerpt(sessionId, session, selectorText);
   }
 
   get(sessionId) {
