@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-07 (`v0.4.0-H180` is now fully closed and there are no active tasks in `TODO.md` / `ROADMAP.md`. The backend runtime now also delegates start/stop orchestration into `backend/src/runtime-lifecycle.js` in addition to API session shaping and messaging/session authority in `backend/src/runtime-session-messaging-authority.js`, manager-session lifecycle-to-messaging/broadcast/warmup/persistence bridging in `backend/src/runtime-session-event-authority.js`, replay export/excerpt shaping plus session file-transfer guard rails and restore-create forwarding in `backend/src/runtime-session-resource-authority.js`, custom-command and deck catalog shaping in `backend/src/runtime-catalog-authority.js`, startup-readiness state in `backend/src/runtime-startup-readiness.js`, session-control client/session authority in `backend/src/runtime-session-control-authority.js`, share/spectator request-access and metrics helpers in `backend/src/runtime-access-policy.js` and `backend/src/runtime-metrics.js`, deck/session-state shaping in `backend/src/runtime-session-state.js`, persisted startup/restore authority in `backend/src/runtime-startup-restore.js`, share/layout/connection/workspace authority in `backend/src/runtime-library-authority.js`, retained catalog/state normalization in `backend/src/runtime-library-normalization.js`, and SSH trust lifecycle handling in `backend/src/runtime-ssh-trust.js`. The backend session manager still delegates PTY attachment and live stream handling into `backend/src/session-manager-pty-runtime.js` alongside mutation handling in `backend/src/session-manager-mutation-runtime.js`, trace/activity/input/resize/signal orchestration in `backend/src/session-manager-terminal-runtime.js`, trace-envelope and startup terminal-query helper shaping in `backend/src/session-manager-trace-runtime.js`, create/restart/close/guardrail orchestration in `backend/src/session-manager-session-runtime.js`, cleanup in `backend/src/session-manager-cleanup.js`, SSH remote-runtime state shaping in `backend/src/session-manager-remote-runtime.js`, startup/post-start input lifecycle in `backend/src/session-manager-startup-runtime.js`, create/update/restart lifecycle shaping in `backend/src/session-manager-lifecycle.js`, replay-output append/export/excerpt handling in `backend/src/session-manager-replay-runtime.js`, app-identity refresh and output-heuristic arbitration in `backend/src/session-manager-app-identity-runtime.js`, and SSH launch/reconnect orchestration in `backend/src/session-manager-launch-runtime.js`. Direct local PowerShell sessions remain first-class local launch aliases, trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets, SSH launches still keep secret-backed auth on one masked action-dialog seam plus trusted-host-key pinning and absolute managed known-hosts handling, multiline shell sends still normalize internal separators to the configured terminator for shell-family sessions, and the frontend runtime composition now also delegates layout foundation assembly into `frontend/src/public/app-runtime-layout-foundation-assembly.js`, access-control composition into `frontend/src/public/app-runtime-access-control-composition.js`, and stateful split-layout merge/mutation orchestration into `frontend/src/public/layout-split-layout-runtime-model.js`.)
+Last updated: 2026-05-07 (`v0.4.0-H180` is fully closed, `v0.4.0-H181` is now active, and the backend runtime now also delegates start/stop orchestration into `backend/src/runtime-lifecycle.js` in addition to API session shaping and messaging/session authority in `backend/src/runtime-session-messaging-authority.js`, manager-session lifecycle-to-messaging/broadcast/warmup/persistence bridging in `backend/src/runtime-session-event-authority.js`, replay export/excerpt shaping plus session file-transfer guard rails and restore-create forwarding in `backend/src/runtime-session-resource-authority.js`, custom-command and deck catalog shaping in `backend/src/runtime-catalog-authority.js`, startup-readiness state in `backend/src/runtime-startup-readiness.js`, session-control client/session authority in `backend/src/runtime-session-control-authority.js`, share/spectator request-access and metrics helpers in `backend/src/runtime-access-policy.js` and `backend/src/runtime-metrics.js`, deck/session-state shaping in `backend/src/runtime-session-state.js`, persisted startup/restore authority in `backend/src/runtime-startup-restore.js`, share/layout/connection/workspace authority in `backend/src/runtime-library-authority.js`, retained catalog/state normalization in `backend/src/runtime-library-normalization.js`, and SSH trust lifecycle handling in `backend/src/runtime-ssh-trust.js`. The backend session manager still delegates PTY attachment and live stream handling into `backend/src/session-manager-pty-runtime.js` alongside mutation handling in `backend/src/session-manager-mutation-runtime.js`, trace/activity/input/resize/signal orchestration in `backend/src/session-manager-terminal-runtime.js`, trace-envelope and startup terminal-query helper shaping in `backend/src/session-manager-trace-runtime.js`, create/restart/close/guardrail orchestration in `backend/src/session-manager-session-runtime.js`, cleanup in `backend/src/session-manager-cleanup.js`, SSH remote-runtime state shaping in `backend/src/session-manager-remote-runtime.js`, startup/post-start input lifecycle in `backend/src/session-manager-startup-runtime.js`, create/update/restart lifecycle shaping in `backend/src/session-manager-lifecycle.js`, replay-output append/export/excerpt handling in `backend/src/session-manager-replay-runtime.js`, app-identity refresh and output-heuristic arbitration in `backend/src/session-manager-app-identity-runtime.js`, and SSH launch/reconnect orchestration in `backend/src/session-manager-launch-runtime.js`. Direct local PowerShell sessions remain first-class local launch aliases, trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets, SSH launches still keep secret-backed auth on one masked action-dialog seam plus trusted-host-key pinning and absolute managed known-hosts handling, multiline shell sends still normalize internal separators to the configured terminator for shell-family sessions, and the frontend runtime composition now also delegates layout foundation assembly into `frontend/src/public/app-runtime-layout-foundation-assembly.js`, access-control composition into `frontend/src/public/app-runtime-access-control-composition.js`, and stateful split-layout merge/mutation orchestration into `frontend/src/public/layout-split-layout-runtime-model.js`.)
 
 ## Direct Local PowerShell Session Baseline
 
@@ -17,10 +17,10 @@ Last updated: 2026-05-07 (`v0.4.0-H180` is now fully closed and there are no act
 
 ## Repo-Wide Quality Review - 2026-05-07
 
-Fresh repo-wide evidence on the current tree after the full `H180` closeout:
+Fresh repo-wide evidence on the current tree after the full `H180` closeout and `H181` promotion:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
-- backend coverage: `97.43%` line / `90.84%` branch / `88.14%` funcs
+- backend coverage: `97.44%` line / `90.86%` branch / `88.14%` funcs
 - frontend coverage: `97.67%` line / `90.96%` branch / `82.32%` funcs
 
 Current lane health:
@@ -32,28 +32,29 @@ Current lane health:
 Current highest retained hotspots:
 
 - backend:
-  - `backend/src/runtime.js`: `2037` lines, `87.73%` line / `81.64%` branch, still the largest retained backend authority surface
-  - `backend/src/runtime-library-normalization.js`: `1724` lines, `90.95%` line / `86.35%` branch
-  - `backend/src/session-manager.js`: `644` lines, `94.25%` line / `88.00%` branch
-  - `backend/src/runtime-session-resource-authority.js`: `372` lines, `95.43%` line / `89.08%` branch
-  - `backend/src/runtime-session-messaging-authority.js`: `330` lines, `96.06%` line / `68.12%` branch
-  - `backend/src/runtime-session-event-authority.js`: `210` lines, `98.10%` line / `81.58%` branch
-  - `backend/src/runtime-lifecycle.js`: `100.00%` line / `100.00%` branch
+  - `backend/src/runtime.js`: `2037` lines, `87.48%` line / `81.72%` branch, still the largest retained backend authority surface
   - `backend/src/runtime-library-normalization.js`: `1724` lines, `91.94%` line / `86.92%` branch
-  - `backend/src/session-manager-trace-runtime.js`: `100.00%` line / `94.29%` branch
+  - `backend/src/session-manager.js`: `644` lines, `94.25%` line / `88.00%` branch
+  - `backend/src/runtime-session-messaging-authority.js`: `330` lines, `96.06%` line / `68.12%` branch
+  - `backend/src/runtime-session-resource-authority.js`: `372` lines, `95.97%` line / `89.83%` branch
+  - `backend/src/runtime-session-event-authority.js`: `210` lines, `98.10%` line / `81.58%` branch
 - frontend:
   - `frontend/src/public/app-runtime-composition-controller.js`: `1272` lines, still the largest retained frontend runtime-composition monolith after the latest helper extractions
   - `frontend/src/public/split-layout-runtime-controller.js`: `488` lines, `95.08%` line / `81.41%` branch
   - `frontend/src/public/layout-profile-runtime-controller.js`: `510` lines, `93.92%` line / `88.55%` branch
   - `frontend/src/public/connection-profile-draft-state.js`: `680` lines, `97.35%` line / `81.34%` branch
   - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `824` lines, `93.45%` line / `87.34%` branch
-  - `frontend/src/public/layout-split-layout-runtime-model.js`: `101` lines, `100.00%` line / `96.30%` branch
-  - `frontend/src/public/layout-runtime-state.js`: `260` lines, `97.31%` line / `90.98%` branch
   - `frontend/src/public/layout-workspace-runtime-state.js`: `141` lines, `98.58%` line / `76.56%` branch
+  - `frontend/src/public/layout-split-layout-runtime-state.js`: `144` lines, `97.22%` line / `81.91%` branch
 
 Current active tasks:
 
-- none
+- `QLT-351` Owner `BE`: extract the next retained startup/session-dispatch authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
+- `QLT-352` Owner `BE`: harden retained normalization/state authority coverage across `backend/src/runtime-library-normalization.js`, `backend/src/runtime-session-messaging-authority.js`, and `backend/src/runtime-session-resource-authority.js`.
+- `QLT-353` Owner `BE`: isolate the next retained launch/reconnect/app-identity lifecycle seam from `backend/src/session-manager.js` and harden the remaining manager branch gaps.
+- `QLT-354` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
+- `QLT-355` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js`, `frontend/src/public/layout-profile-runtime-controller.js`, and `frontend/src/public/layout-workspace-runtime-state.js`.
+- `QLT-356` Owner `FE`: harden retained runtime/operator-interaction coverage across `frontend/src/public/connection-profile-draft-state.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and `frontend/src/public/layout-split-layout-runtime-state.js`.
 
 Not promoted from the same review:
 
