@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -121,6 +121,44 @@ test("runtime session resource authority shapes replay excerpts deterministicall
   });
 });
 
+test("runtime session resource authority prefers live replay exports and rethrows unexpected replay failures", () => {
+  const { authority } = createHarness({
+    manager: {
+      getReplayExport: () => ({
+        data: "live tail",
+        retainedChars: 9,
+        retentionLimitChars: 96,
+        truncated: false
+      })
+    }
+  });
+
+  assert.deepEqual(authority.buildSessionReplayExportOrThrow("session-1"), {
+    sessionId: "session-1",
+    sessionState: "running",
+    scope: "retained_replay_tail",
+    format: "text",
+    contentType: "text/plain; charset=utf-8",
+    fileName: "ptydeck-session-session-1-replay.txt",
+    data: "live tail",
+    retainedChars: 9,
+    retentionLimitChars: 96,
+    truncated: false
+  });
+
+  const throwingHarness = createHarness({
+    manager: {
+      getReplayExport() {
+        throw new Error("boom");
+      }
+    }
+  });
+  assert.throws(
+    () => throwingHarness.authority.buildSessionReplayExportOrThrow("session-1"),
+    /boom/
+  );
+});
+
 test("runtime session resource authority downloads and uploads files within the session root", async () => {
   const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
   await mkdir(join(transferRoot, "nested"), { recursive: true });
@@ -197,6 +235,48 @@ test("runtime session resource authority rejects unsupported or escaping file tr
   );
 });
 
+test("runtime session resource authority rejects retained path and filesystem guard rails", async () => {
+  const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
+  await mkdir(join(transferRoot, "nested"), { recursive: true });
+  await writeFile(join(transferRoot, "nested", "file.txt"), "hello");
+
+  const harness = createHarness({ transferRoot });
+  for (const invalidPath of ["", "/abs.txt", "C:\\temp\\file.txt", "../escape.txt", "nested/", "x".repeat(513)]) {
+    await assert.rejects(
+      () => harness.authority.uploadSessionFileOrThrow("session-1", invalidPath, Buffer.from("x").toString("base64")),
+      (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
+    );
+  }
+
+  const missingSessionHarness = createHarness({
+    manager: {
+      get() {
+        throw new ApiError(404, "SessionNotFound", "missing");
+      }
+    }
+  });
+  await assert.rejects(
+    () => missingSessionHarness.authority.buildSessionFileDownloadOrThrow("session-1", "file.txt"),
+    (error) => error instanceof ApiError && error.statusCode === 409 && error.error === "FileTransferUnavailable"
+  );
+
+  const missingRootHarness = createHarness({
+    transferRoot,
+    manager: {
+      get: () => ({
+        id: "session-1",
+        meta: {
+          cwd: join(transferRoot, "missing-root")
+        }
+      })
+    }
+  });
+  await assert.rejects(
+    () => missingRootHarness.authority.buildSessionFileDownloadOrThrow("session-1", "file.txt"),
+    (error) => error instanceof ApiError && error.statusCode === 409 && error.error === "FileTransferUnavailable"
+  );
+});
+
 test("runtime session resource authority rejects missing roots, oversized downloads, and invalid upload payloads", async () => {
   const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
   await writeFile(join(transferRoot, "huge.bin"), Buffer.alloc(12, 0x61));
@@ -230,6 +310,11 @@ test("runtime session resource authority rejects missing roots, oversized downlo
     () => invalidBase64Harness.authority.uploadSessionFileOrThrow("session-1", "upload.txt", ""),
     (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
   );
+
+  await assert.rejects(
+    () => hugeHarness.authority.uploadSessionFileOrThrow("session-1", "upload.txt", Buffer.alloc(32, 0x61).toString("base64")),
+    (error) => error instanceof ApiError && error.statusCode === 413 && error.error === "FileTransferTooLarge"
+  );
 });
 
 test("runtime session resource authority rejects directory targets during upload replacement", async () => {
@@ -239,6 +324,26 @@ test("runtime session resource authority rejects directory targets during upload
   const { authority } = createHarness({ transferRoot });
   await assert.rejects(
     () => authority.uploadSessionFileOrThrow("session-1", "nested", Buffer.from("x").toString("base64")),
+    (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
+  );
+});
+
+test("runtime session resource authority rejects targets that resolve outside the transfer root", async () => {
+  const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
+  const outsideRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-outside-"));
+  await mkdir(join(transferRoot, "nested"), { recursive: true });
+  await writeFile(join(outsideRoot, "outside.txt"), "outside");
+
+  const { authority } = createHarness({ transferRoot });
+  await symlink(join(outsideRoot, "outside.txt"), join(transferRoot, "nested", "download-link.txt"));
+  await symlink(join(outsideRoot, "outside.txt"), join(transferRoot, "nested", "upload-link.txt"));
+
+  await assert.rejects(
+    () => authority.buildSessionFileDownloadOrThrow("session-1", "nested/download-link.txt"),
+    (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
+  );
+  await assert.rejects(
+    () => authority.uploadSessionFileOrThrow("session-1", "nested/upload-link.txt", Buffer.from("hello").toString("base64")),
     (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
   );
 });

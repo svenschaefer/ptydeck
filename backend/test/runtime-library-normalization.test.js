@@ -912,6 +912,32 @@ test("runtime library normalization validates share-link failures and slug-like 
   );
 });
 
+test("runtime library normalization validates retained strict share-link guard rails", () => {
+  const normalization = createHarness();
+
+  assert.throws(
+    () => normalization.normalizeShareLinkEntity([], null),
+    /Body must be an object/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeShareLinkEntity({
+        targetType: "session",
+        targetId: "   "
+      }, null),
+    /Field 'targetId' must be a non-empty string/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeShareLinkEntity({
+        targetType: "session",
+        targetId: "session-1",
+        expiresInSeconds: 30.5
+      }, null),
+    /expiresInSeconds/i
+  );
+});
+
 test("runtime library normalization covers retained scalar guard rails and entity fallbacks deterministically", () => {
   const normalization = createHarness();
 
@@ -1004,6 +1030,120 @@ test("runtime library normalization covers retained scalar guard rails and entit
       { strict: false }
     ),
     null
+  );
+});
+
+test("runtime library normalization validates retained split-layout and workspace-group strict branches", () => {
+  const normalization = createHarness();
+
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckSplitLayouts: {
+          default: {
+            root: {
+              type: "bogus"
+            }
+          }
+        }
+      }),
+    /must be one of row, column, or pane/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckSplitLayouts: {
+          default: {
+            root: {
+              type: "row",
+              children: "broken"
+            }
+          }
+        }
+      }),
+    /children' must be an array/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckSplitLayouts: {
+          default: {
+            root: {
+              type: "row",
+              children: [{ type: "pane", paneId: "main" }]
+            }
+          }
+        }
+      }),
+    /at least two valid child nodes/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckSplitLayouts: {
+          default: {
+            root: {
+              type: "row",
+              children: [
+                { type: "pane", paneId: "main" },
+                { type: "pane", paneId: "side" }
+              ]
+            },
+            paneSessions: {
+              unknown: ["session-1"]
+            }
+          }
+        }
+      }),
+    /unknown pane id/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout(
+        {
+          deckSplitLayouts: {
+            default: {
+              root: {
+                type: "row",
+                children: [
+                  { type: "pane", paneId: "main" },
+                  { type: "pane", paneId: "side" }
+                ]
+              },
+              paneSessions: {
+                main: ["session-2"]
+              }
+            }
+          }
+        },
+        {
+          hasKnownSession: (sessionId) => sessionId === "session-2",
+          resolveSessionDeckId: () => "ops"
+        }
+      ),
+    /split-layout pane assignment/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckGroups: {
+          ops: {
+            groups: [{ name: null, sessionIds: [] }]
+          }
+        }
+      }),
+    /groups\.\*\.name' must be a string/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeWorkspacePresetWorkspace({
+        deckGroups: {
+          ops: {
+            groups: [{ name: "x".repeat(65), sessionIds: [] }]
+          }
+        }
+      }),
+    /exceeds maximum length/i
   );
 });
 
