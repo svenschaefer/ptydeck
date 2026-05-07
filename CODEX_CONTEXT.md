@@ -1,14 +1,14 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-06 (`v0.4.0-H174` is now fully closed and there is no active or queued wave in `TODO.md` / `ROADMAP.md`; `QLT-308` restored a green frontend integration and coverage baseline by making the FE test lane deterministic under single-concurrency execution, `QLT-309` through `QLT-311` closed the backend block, and `QLT-312` through `QLT-314` closed the frontend block; the backend runtime now delegates session-control client/session authority into `backend/src/runtime-session-control-authority.js`, share/spectator request-access and metrics helpers into `backend/src/runtime-access-policy.js` and `backend/src/runtime-metrics.js`, deck/session-state shaping into `backend/src/runtime-session-state.js`, persisted startup/restore authority into `backend/src/runtime-startup-restore.js`, share/layout/connection/workspace authority into `backend/src/runtime-library-authority.js`, retained catalog/state normalization into `backend/src/runtime-library-normalization.js`, and SSH trust lifecycle handling into `backend/src/runtime-ssh-trust.js`; the backend session manager now delegates cleanup into `backend/src/session-manager-cleanup.js`, SSH remote-runtime state shaping into `backend/src/session-manager-remote-runtime.js`, startup/post-start input lifecycle into `backend/src/session-manager-startup-runtime.js`, create/update/restart lifecycle state shaping and replay retention into `backend/src/session-manager-lifecycle.js`, app-identity refresh and output-heuristic arbitration into `backend/src/session-manager-app-identity-runtime.js`, and SSH launch/reconnect orchestration into `backend/src/session-manager-launch-runtime.js`, while the server-authoritative quick-send usage helper is covered directly in `backend/test/session-quick-send-usage.test.js`; trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches still pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, and extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`; multiline terminal sends still distinguish shell-family sessions from coding-agent/unknown sessions so the frontend can normalize internal line separators to the configured terminator for shell-targeted `Send`, custom-command, and quick-send flows instead of always forcing raw `LF` inside multiline payloads; the frontend runtime composition now also delegates initialization/error/reclaim state plus session-access composition into `frontend/src/public/app-runtime-initialization-access-composition.js`, deck/session-grid action orchestration into `frontend/src/public/app-runtime-session-grid-actions.js`, and the existing trusted-local handoff/layout, bootstrap wiring, runtime-event recovery, operator-support assembly, and startup/workflow/palette/initialization seams out of `frontend/src/public/app-runtime-composition-controller.js`; `frontend/src/public/command-executor.js` now also delegates retained runtime/router helpers into `frontend/src/public/command-executor-runtime-router.js`; `frontend/src/public/connection-profile-runtime-controller.js` now also delegates saved-profile selection, draft/trust presentation state, guarded operator fallbacks, and retained presentation/lifecycle/action assembly into `frontend/src/public/connection-profile-runtime-presentation.js` and `frontend/src/public/connection-profile-runtime-assembly.js`; `frontend/src/public/workspace-preset-runtime-controller.js` now also delegates workspace snapshot/group/layout orchestration into `frontend/src/public/workspace-preset-runtime-state.js`; retained operator-interaction regressions now explicitly cover command-palette selection clamping and results-shell fallbacks, slash-workflow target-required failure paths, workspace-preset button-shell error mapping, and session-terminal disposal against targets without `removeEventListener`)
+Last updated: 2026-05-07 (`v0.4.0-H175` is now active in `TODO.md` / `ROADMAP.md`; fresh repo-wide quality review evidence is current for root, backend, and frontend coverage lanes; the next promoted work focuses on the largest retained backend runtime/session authority monoliths plus the largest remaining frontend runtime/layout/operator orchestration seams. The backend runtime still delegates session-control client/session authority into `backend/src/runtime-session-control-authority.js`, share/spectator request-access and metrics helpers into `backend/src/runtime-access-policy.js` and `backend/src/runtime-metrics.js`, deck/session-state shaping into `backend/src/runtime-session-state.js`, persisted startup/restore authority into `backend/src/runtime-startup-restore.js`, share/layout/connection/workspace authority into `backend/src/runtime-library-authority.js`, retained catalog/state normalization into `backend/src/runtime-library-normalization.js`, and SSH trust lifecycle handling into `backend/src/runtime-ssh-trust.js`; the backend session manager still delegates cleanup into `backend/src/session-manager-cleanup.js`, SSH remote-runtime state shaping into `backend/src/session-manager-remote-runtime.js`, startup/post-start input lifecycle into `backend/src/session-manager-startup-runtime.js`, create/update/restart lifecycle state shaping and replay retention into `backend/src/session-manager-lifecycle.js`, app-identity refresh and output-heuristic arbitration into `backend/src/session-manager-app-identity-runtime.js`, and SSH launch/reconnect orchestration into `backend/src/session-manager-launch-runtime.js`, while the server-authoritative quick-send usage helper is covered directly in `backend/test/session-quick-send-usage.test.js`; trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets; SSH launches still pin `HostKeyAlgorithms` to the trusted host-key types for the selected target, pass an absolute managed `UserKnownHostsFile` path into spawned `ssh` processes, preserve canonical padded host-key base64 so the rendered managed `ssh_known_hosts` file stays parseable by OpenSSH, keep secret-backed auth on one masked action-dialog seam, expose slash-command host-key lifecycle management through `/ssh hostkey ...`, surface first-connect and rotation trust guidance directly in `Connections`, and extend one-shot `/ssh ...` parity with `--deck`, `--cwd`, and `--command`; multiline terminal sends still distinguish shell-family sessions from coding-agent/unknown sessions so the frontend can normalize internal line separators to the configured terminator for shell-targeted `Send`, custom-command, and quick-send flows instead of always forcing raw `LF` inside multiline payloads; the frontend runtime composition now also delegates initialization/error/reclaim state plus session-access composition into `frontend/src/public/app-runtime-initialization-access-composition.js`, deck/session-grid action orchestration into `frontend/src/public/app-runtime-session-grid-actions.js`, and the existing trusted-local handoff/layout, bootstrap wiring, runtime-event recovery, operator-support assembly, and startup/workflow/palette/initialization seams out of `frontend/src/public/app-runtime-composition-controller.js`; `frontend/src/public/command-executor.js` now also delegates retained runtime/router helpers into `frontend/src/public/command-executor-runtime-router.js`; `frontend/src/public/connection-profile-runtime-controller.js` now also delegates saved-profile selection, draft/trust presentation state, guarded operator fallbacks, and retained presentation/lifecycle/action assembly into `frontend/src/public/connection-profile-runtime-presentation.js` and `frontend/src/public/connection-profile-runtime-assembly.js`; `frontend/src/public/workspace-preset-runtime-controller.js` now also delegates workspace snapshot/group/layout orchestration into `frontend/src/public/workspace-preset-runtime-state.js`; retained operator-interaction regressions now explicitly cover command-palette selection clamping and results-shell fallbacks, slash-workflow target-required failure paths, workspace-preset button-shell error mapping, and session-terminal disposal against targets without `removeEventListener`)
 
-## Repo-Wide Quality Review - 2026-05-06
+## Repo-Wide Quality Review - 2026-05-07
 
 Fresh repo-wide evidence on the current tree:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
-- backend coverage: `96.49%` line / `89.98%` branch / `89.16%` funcs
-- frontend coverage: `97.56%` line / `90.41%` branch / `82.52%` funcs
+- backend coverage: `96.51%` line / `89.96%` branch / `89.22%` funcs
+- frontend coverage: `97.55%` line / `90.41%` branch / `82.52%` funcs
 
 Current lane health:
 
@@ -16,53 +16,37 @@ Current lane health:
 - `npm --prefix frontend run test` is green on the current tree.
 - `npm --prefix frontend run test:coverage` is green on the current tree.
 
-`QLT-308` closeout note:
+Current promoted hotspots:
 
-- The earlier red FE baseline was isolated to the default concurrent frontend test lane, not to a newly reproducible shipped runtime defect.
-- The failing `frontend/test/app.test.js` cases passed consistently in isolated and deterministic runs.
-- The frontend test lane is now intentionally single-concurrency by default:
-  - `frontend/package.json` runs `node --test --test-concurrency=1`
-  - `frontend/scripts/run-coverage-tests.mjs` forwards explicit `--test-*` Node runner args
-  - `scripts/lib/coverage-report.mjs` now accepts optional per-workspace Node test args so FE coverage can use the same deterministic mode without changing root/backend runners
+- backend:
+  - `backend/src/runtime.js`: `3011` lines, `84.52%` line / `77.43%` branch
+  - `backend/src/runtime-library-normalization.js`: `1724` lines, `82.19%` line / `76.88%` branch
+  - `backend/src/session-manager.js`: `1186` lines, `95.70%` line / `76.29%` branch
+  - `backend/src/runtime-session-control-authority.js`: `445` lines, `86.74%` line / `73.48%` branch
+- frontend:
+  - `frontend/src/public/app-runtime-composition-controller.js`: `1635` lines, still the largest retained frontend runtime-composition monolith
+  - `frontend/src/public/workspace-preset-runtime-state.js`: `980` lines, `94.80%` line / `82.14%` branch
+  - `frontend/src/public/split-layout-runtime-controller.js`: `895` lines, `91.62%` line / `77.64%` branch
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `824` lines, `92.35%` line / `85.23%` branch
+  - `frontend/src/public/layout-profile-runtime-controller.js`: `732` lines, `92.62%` line / `85.14%` branch
+  - `frontend/src/public/stream-interpretation-plugin-engine.js`: `212` lines, `89.15%` line / `80.26%` branch
 
-Completed `v0.4.0-H174` backend slices:
+Promoted tasks:
 
-- `QLT-309`
-  - `backend/src/runtime.js` now delegates persisted startup/restore authority into `backend/src/runtime-startup-restore.js`.
-  - direct seam coverage now lives in `backend/test/runtime-startup-restore.test.js`.
-- `QLT-310`
-  - retained catalog/state normalization coverage is tighter through `backend/test/runtime-library-normalization.test.js` and `backend/test/runtime-library-authority.test.js`.
-  - validated hotspot snapshot:
-    - `backend/src/runtime-library-authority.js`: `96.95%` line / `87.88%` branch
-    - `backend/src/runtime-library-normalization.js`: `82.19%` line / `76.88%` branch
-- `QLT-311`
-  - retained launch/reconnect and quick-send persistence coverage is tighter through `backend/test/session-manager-launch-runtime.test.js` and `backend/test/session-quick-send-usage.test.js`.
-  - validated hotspot snapshot:
-    - `backend/src/session-manager-launch-runtime.js`: `100.00%` line / `64.47%` branch
-    - `backend/src/session-quick-send-usage.js`: `100.00%` line / `92.45%` branch
-
-Completed `v0.4.0-H174` frontend slices:
-
-- `QLT-312`
-  - `frontend/src/public/app-runtime-composition-controller.js` now delegates retained deck/session-grid action orchestration into `frontend/src/public/app-runtime-session-grid-actions.js`.
-  - direct seam coverage now lives in `frontend/test/app-runtime-session-grid-actions.test.js`.
-- `QLT-313`
-  - `frontend/src/public/connection-profile-runtime-controller.js` now delegates retained presentation/lifecycle/action composition into `frontend/src/public/connection-profile-runtime-assembly.js`.
-  - direct seam coverage now lives in `frontend/test/connection-profile-runtime-assembly.test.js`.
-- `QLT-314`
-  - retained operator/workspace interaction coverage is tighter through `frontend/test/command-palette-runtime-controller.test.js`, `frontend/test/slash-workflow-runtime-controller.test.js`, and `frontend/test/workspace-preset-runtime-controller.test.js`.
-  - validated hotspot snapshot:
-    - `frontend/src/public/command-palette-runtime-controller.js`: `98.04%` line / `82.89%` branch
-    - `frontend/src/public/slash-workflow-runtime-controller.js`: `91.75%` line / `82.28%` branch
-    - `frontend/src/public/workspace-preset-runtime-controller.js`: `99.20%` line / `92.05%` branch
-    - `frontend/src/public/connection-profile-runtime-controller.js`: `100.00%` line / `90.57%` branch
+- `QLT-315` Owner `BE`: extract the next retained startup/ready/catalog authority seam from `backend/src/runtime.js`
+- `QLT-316` Owner `BE`: harden retained normalization and control-authority coverage across `backend/src/runtime-library-normalization.js` and `backend/src/runtime-session-control-authority.js`
+- `QLT-317` Owner `BE`: isolate the next launch/reconnect/restore helper seam from `backend/src/session-manager.js`
+- `QLT-318` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js`
+- `QLT-319` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js` and `frontend/src/public/layout-profile-runtime-controller.js`
+- `QLT-320` Owner `FE`: harden retained runtime/operator-interaction coverage across `frontend/src/public/workspace-preset-runtime-state.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and `frontend/src/public/stream-interpretation-plugin-engine.js`
 
 Not promoted from the same review:
 
 - `scripts/analyze-pty-write-eintr.mjs`
 - `scripts/analyze-startup-timeline.mjs`
+- transport-only messaging follow-up work from `TODO-OUTLOOK.md`
 
-They remain intentionally deferred because they are retained diagnostics, not live product/runtime authority paths.
+They remain intentionally deferred because the diagnostics are not live product/runtime authority paths and the messaging third-attempt chain still depends on separate deferred product decisions.
 
 ## Current Product Truth
 
