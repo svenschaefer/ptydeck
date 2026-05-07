@@ -562,3 +562,62 @@ test("connection profile draft state covers fail-closed selectors, defaults, and
     /Connection profile draft is incomplete\./
   );
 });
+
+test("connection profile draft state rejects blank env keys and additional persisted ssh validation gaps", () => {
+  assert.deepEqual(parseStringRecord(" =ignored\nVALID=value"), {
+    VALID: "value"
+  });
+
+  assert.throws(
+    () =>
+      buildPersistedDraftLaunch(
+        {
+          kind: "local",
+          deckId: "ops",
+          shell: "bash",
+          startCwd: "",
+          startCommand: "",
+          env: {},
+          tags: [],
+          activeThemeProfile: DEFAULT_THEME,
+          inactiveThemeProfile: ALT_THEME
+        },
+        {
+          defaultDeckId: "default",
+          defaultThemeProfile: DEFAULT_THEME
+        }
+      ),
+    /Start directory is required\./
+  );
+
+  assert.throws(
+    () =>
+      buildPersistedDraftLaunch(
+        {
+          kind: "ssh",
+          deckId: "ops",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "",
+          env: {},
+          tags: [],
+          activeThemeProfile: DEFAULT_THEME,
+          inactiveThemeProfile: ALT_THEME,
+          remoteConnection: {
+            host: "carpo.uberspace.de",
+            port: "70000",
+            username: "ixpqtwnk"
+          },
+          remoteAuth: {
+            method: "privateKey",
+            privateKeyPath: "~/.ssh/id_ed25519"
+          }
+        },
+        {
+          defaultDeckId: "default",
+          defaultThemeProfile: DEFAULT_THEME
+        }
+      ),
+    /SSH port must be an integer between 1 and 65535\./
+  );
+});

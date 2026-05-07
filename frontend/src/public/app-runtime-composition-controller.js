@@ -1,16 +1,14 @@
-import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { createAppRuntimeAccessControlAssembly } from "./app-runtime-access-control-assembly.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeFoundation } from "./app-runtime-foundation.js";
+import { createAppRuntimeLayoutFoundationAssembly } from "./app-runtime-layout-foundation-assembly.js";
 import { createAppRuntimeOperatorControllerAssembly } from "./app-runtime-operator-controller-assembly.js";
 import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-support-assembly.js";
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
 import { createAppRuntimeSessionSurfaceAssembly } from "./app-runtime-session-surface-assembly.js";
 import { createAppRuntimeSessionGridActions } from "./app-runtime-session-grid-actions.js";
 import { createAppRuntimeStartupComposition } from "./app-runtime-startup-composition.js";
-import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
-import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
@@ -30,7 +28,6 @@ import { createSessionStreamAuthorityController } from "./session-stream-authori
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { SYSTEM_SLASH_COMMANDS } from "./system-slash-commands.js";
 import { createActionDialogController } from "./ui/action-dialog-controller.js";
-import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { normalizeControlText } from "./session-control-runtime-state.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
@@ -375,8 +372,10 @@ const TERMINAL_THEME_PRESET_MAP = new Map(TERMINAL_THEME_PRESETS.map((entry) => 
 const TERMINAL_THEME_MODE_SET = new Set(["custom", ...TERMINAL_THEME_PRESETS.map((entry) => entry.id)]);
 let layoutRuntimeController = null;
 let connectionProfileRuntimeController = null;
-let terminalSettings = null;
-let sessionInputSettings = {};
+const layoutFoundationStateRef = {
+  terminalSettings: null,
+  sessionInputSettings: {}
+};
 const sessionThemeDrafts = new Map();
 const wsStateRef = { current: null };
 let wsRuntimeController = null;
@@ -453,16 +452,47 @@ const {
   getAppRuntimeStateController: () => appRuntimeStateController,
   getAppSessionRuntimeFacadeController: () => appSessionRuntimeFacadeController
 });
-appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
+({
+  appSessionRuntimeFacadeController,
+  layoutRuntimeController,
+  deckRuntimeController,
+  appLayoutDeckFacadeController
+} = createAppRuntimeLayoutFoundationAssembly({
+  windowRef: window,
   store,
   defaultDeckId: DEFAULT_DECK_ID,
-  getSessionViewModel: () => sessionViewModel,
-  getSessionRuntimeController: () => sessionRuntimeController,
-  getAppLayoutDeckFacadeController: () => appLayoutDeckFacadeController,
+  defaultTerminalCols: DEFAULT_TERMINAL_COLS,
+  defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
+  activeDeckStorageKey: ACTIVE_DECK_STORAGE_KEY,
+  settingsStorageKey: SETTINGS_STORAGE_KEY,
+  sessionInputSettingsStorageKey: SESSION_INPUT_SETTINGS_STORAGE_KEY,
+  sessionFilterStorageKey: SESSION_FILTER_STORAGE_KEY,
+  sendTerminatorModeSet: SEND_TERMINATOR_MODE_SET,
+  cardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
+  terminalFontSize: TERMINAL_FONT_SIZE,
+  terminalLineHeight: TERMINAL_LINE_HEIGHT,
+  stateRef: layoutFoundationStateRef,
   refreshTerminalViewport,
   syncTerminalScrollArea,
-  windowRef: window
-});
+  getSessionViewModel: () => sessionViewModel,
+  getSessionRuntimeController: () => sessionRuntimeController,
+  getLayoutSettingsController: () => layoutSettingsController,
+  getAppCommandUiFacadeController: () => appCommandUiFacadeController,
+  getDeckSidebarController: () => deckSidebarController,
+  getSessionTerminalResizeController: () => sessionTerminalResizeController,
+  getSessionSettingsDialogController: () => sessionSettingsDialogController,
+  getDeckActionsController: () => deckActionsController,
+  getAppRuntimeStateController: () => appRuntimeStateController,
+  settingsApplyBtn,
+  settingsColsEl,
+  settingsRowsEl,
+  sidebarToggleBtn,
+  sidebarLauncherBtn,
+  terminalSearchToggleBtn,
+  settingsPanelToggleBtn,
+  layoutProfileToggleBtn,
+  api
+}));
 const uiState = {
   loading: true,
   error: "",
@@ -652,82 +682,6 @@ const maybeAutoRepairOriginHandoffControl =
   appRuntimeAccessControlAssembly.maybeAutoRepairOriginHandoffControl;
 const handleCommandFeedbackAction = appRuntimeAccessControlAssembly.handleCommandFeedbackAction;
 
-layoutRuntimeController = createLayoutRuntimeController({
-  windowRef: window,
-  settingsStorageKey: SETTINGS_STORAGE_KEY,
-  sessionInputSettingsStorageKey: SESSION_INPUT_SETTINGS_STORAGE_KEY,
-  sessionFilterStorageKey: SESSION_FILTER_STORAGE_KEY,
-  defaultTerminalCols: DEFAULT_TERMINAL_COLS,
-  defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
-  sendTerminatorModeSet: SEND_TERMINATOR_MODE_SET,
-  cardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
-  getLayoutSettingsController: () => layoutSettingsController,
-  getTerminalSettings: () => terminalSettings,
-  setTerminalSettings: (nextSettings) => {
-    terminalSettings = nextSettings;
-  },
-  getSessionInputSettings: () => sessionInputSettings,
-  setSessionInputSettings: (nextSettings) => {
-    sessionInputSettings = nextSettings;
-  },
-  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
-  api,
-  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
-  applySettingsToAllTerminals: (options) => appLayoutDeckFacadeController?.applySettingsToAllTerminals(options),
-  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
-  render: () => appCommandUiFacadeController?.render(),
-  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
-  setError: (message) => appCommandUiFacadeController?.setError(message),
-  getErrorMessage: (err, fallback) => appCommandUiFacadeController?.getErrorMessage(err, fallback) || fallback,
-  settingsApplyBtn,
-  settingsColsEl,
-  settingsRowsEl,
-  sidebarToggleBtn,
-  sidebarLauncherBtn,
-  terminalSearchToggleBtn,
-  settingsPanelToggleBtn,
-  layoutProfileToggleBtn
-});
-terminalSettings = layoutRuntimeController.loadTerminalSettings();
-sessionInputSettings = layoutRuntimeController.loadSessionInputSettings();
-
-deckRuntimeController = createDeckRuntimeController({
-  store,
-  windowRef: window,
-  activeDeckStorageKey: ACTIVE_DECK_STORAGE_KEY,
-  defaultDeckId: DEFAULT_DECK_ID,
-  defaultTerminalCols: DEFAULT_TERMINAL_COLS,
-  defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
-  clampInt: (value, fallback, min, max) => appLayoutDeckFacadeController?.clampInt(value, fallback, min, max) ?? fallback,
-  getTerminalSettings: () => terminalSettings,
-  setTerminalSettings: (nextSettings) => {
-    terminalSettings = nextSettings;
-  },
-  persistTerminalSettings: () => appLayoutDeckFacadeController?.saveTerminalSettings(),
-  syncSettingsUi: () => appLayoutDeckFacadeController?.syncSettingsUi(),
-  applySettingsToAllTerminals: (options) => appLayoutDeckFacadeController?.applySettingsToAllTerminals(options),
-  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
-  scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options),
-  getDeckSidebarController: () => deckSidebarController,
-  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
-  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId)
-});
-
-appLayoutDeckFacadeController = createAppLayoutDeckFacadeController({
-  store,
-  getLayoutRuntimeController: () => layoutRuntimeController,
-  getDeckRuntimeController: () => deckRuntimeController,
-  getSessionTerminalResizeController: () => sessionTerminalResizeController,
-  getSessionSettingsDialogController: () => sessionSettingsDialogController,
-  getDeckActionsController: () => deckActionsController,
-  getTerminalSettings: () => terminalSettings,
-  defaultTerminalCols: DEFAULT_TERMINAL_COLS,
-  defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
-  terminalFontSize: TERMINAL_FONT_SIZE,
-  terminalLineHeight: TERMINAL_LINE_HEIGHT,
-  clearUiError: () => appRuntimeStateController?.clearError()
-});
-
 ({
   controlPaneRuntimeController,
   layoutProfileRuntimeController,
@@ -843,7 +797,7 @@ appLayoutDeckFacadeController = createAppLayoutDeckFacadeController({
   sessionUiFacadeController,
   splitLayoutRuntimeController,
   commandTargetRuntimeController,
-  getTerminalSettings: () => terminalSettings,
+  getTerminalSettings: () => layoutFoundationStateRef.terminalSettings,
   terminalThemePresets: TERMINAL_THEME_PRESETS,
   defaultTerminalTheme: DEFAULT_TERMINAL_THEME,
   defaultTerminalCols: DEFAULT_TERMINAL_COLS,
@@ -1218,7 +1172,7 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   isTerminalAtBottom,
   refreshTerminalViewport,
   syncTerminalScrollArea,
-  getTerminalSettings: () => terminalSettings,
+  getTerminalSettings: () => layoutFoundationStateRef.terminalSettings,
   debugLog
 }));
 ({
@@ -1244,7 +1198,7 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   commandInput,
   terminals,
   terminalObservers,
-  getTerminalSettings: () => terminalSettings,
+  getTerminalSettings: () => layoutFoundationStateRef.terminalSettings,
   recordTrace: (entry) => traceDebugController.record("ws.event", entry),
   defaultDeckId: DEFAULT_DECK_ID,
   delayedSubmitMs: DELAYED_SUBMIT_MS,

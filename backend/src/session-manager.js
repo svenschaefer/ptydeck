@@ -19,6 +19,7 @@ import {
   DEFAULT_REMOTE_RECONNECT_DELAY_MS,
   DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
 } from "./session-manager-remote-runtime.js";
+import { createSessionManagerTraceRuntime } from "./session-manager-trace-runtime.js";
 import { createSessionManagerLaunchRuntime } from "./session-manager-launch-runtime.js";
 import { createSessionManagerSessionRuntime } from "./session-manager-session-runtime.js";
 import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
@@ -46,86 +47,6 @@ const DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS = 90;
 const DEFAULT_STARTUP_POST_INPUT_FALLBACK_MS = 1500;
 const DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS = 15000;
 const DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES = 4;
-const TRACE_TOKEN_MAX_LENGTH = 128;
-
-function normalizeTraceToken(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  const normalized = value.trim();
-  if (!normalized || normalized.length > TRACE_TOKEN_MAX_LENGTH) {
-    return "";
-  }
-  return normalized;
-}
-
-function normalizeTraceSeed(trace) {
-  if (!trace || typeof trace !== "object" || Array.isArray(trace)) {
-    return null;
-  }
-  const traceId = normalizeTraceToken(trace.traceId);
-  const correlationId = normalizeTraceToken(trace.correlationId);
-  const requestId = normalizeTraceToken(trace.requestId);
-  const connectionId = normalizeTraceToken(trace.connectionId);
-  const sessionId = normalizeTraceToken(trace.sessionId);
-  const deckId = normalizeTraceToken(trace.deckId);
-  const source = normalizeTraceToken(trace.source);
-  const normalized = {
-    ...(traceId ? { traceId } : {}),
-    ...(correlationId ? { correlationId } : {}),
-    ...(requestId ? { requestId } : {}),
-    ...(connectionId ? { connectionId } : {}),
-    ...(sessionId ? { sessionId } : {}),
-    ...(deckId ? { deckId } : {}),
-    ...(source ? { source } : {})
-  };
-  return Object.keys(normalized).length ? normalized : null;
-}
-
-function createTraceEnvelope(createTraceId, seed, overrides = {}) {
-  const normalizedSeed = normalizeTraceSeed(seed);
-  const normalizedOverrides = normalizeTraceSeed(overrides);
-  const traceId = typeof createTraceId === "function" ? normalizeTraceToken(createTraceId()) : "";
-  const correlationId =
-    normalizedOverrides?.correlationId ||
-    normalizedSeed?.correlationId ||
-    traceId ||
-    normalizeTraceToken(randomUUID());
-  const parentTraceId = normalizedOverrides?.traceId || normalizedSeed?.traceId || "";
-  return {
-    traceId: traceId || normalizeTraceToken(randomUUID()),
-    correlationId,
-    ...(parentTraceId ? { parentTraceId } : {}),
-    ...(normalizedOverrides?.requestId || normalizedSeed?.requestId
-      ? { requestId: normalizedOverrides?.requestId || normalizedSeed?.requestId }
-      : {}),
-    ...(normalizedOverrides?.connectionId || normalizedSeed?.connectionId
-      ? { connectionId: normalizedOverrides?.connectionId || normalizedSeed?.connectionId }
-      : {}),
-    ...(normalizedOverrides?.sessionId || normalizedSeed?.sessionId
-      ? { sessionId: normalizedOverrides?.sessionId || normalizedSeed?.sessionId }
-      : {}),
-    ...(normalizedOverrides?.deckId || normalizedSeed?.deckId
-      ? { deckId: normalizedOverrides?.deckId || normalizedSeed?.deckId }
-      : {}),
-    ...(normalizedOverrides?.source || normalizedSeed?.source
-      ? { source: normalizedOverrides?.source || normalizedSeed?.source }
-      : {})
-  };
-}
-
-function countCursorPositionQueries(rawData) {
-  if (typeof rawData !== "string" || rawData.length === 0) {
-    return 0;
-  }
-  return (rawData.match(/\u001b\[6n/g) || []).length;
-}
-
-function buildCursorPositionReport(row = 1, col = 1) {
-  const normalizedRow = Number.isInteger(row) && row > 0 ? row : 1;
-  const normalizedCol = Number.isInteger(col) && col > 0 ? col : 1;
-  return `\u001b[${normalizedRow};${normalizedCol}R`;
-}
 
 export class SessionManager {
   constructor({
@@ -189,6 +110,9 @@ export class SessionManager {
         ? remoteReconnectStableMs
         : DEFAULT_REMOTE_RECONNECT_STABLE_MS;
     this.createTraceId = typeof createTraceId === "function" ? createTraceId : randomUUID;
+    this.traceRuntime = createSessionManagerTraceRuntime({
+      createTraceId: this.createTraceId
+    });
     this.nowFn = typeof nowFn === "function" ? nowFn : Date.now;
     this.setTimeoutFn = typeof setTimeoutFn === "function" ? setTimeoutFn : setTimeout;
     this.clearTimeoutFn = typeof clearTimeoutFn === "function" ? clearTimeoutFn : clearTimeout;
@@ -239,7 +163,7 @@ export class SessionManager {
       attachPtyProcess: (session, launchBundle) => this.attachPtyProcess(session, launchBundle),
       emitSessionUpdated: (session) => this.emitSessionUpdated(session),
       emitSessionExit: (session, { exitCode, exitSignal, exitTimestamp }) => {
-        const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+        const trace = this.traceRuntime.createTraceEnvelope(session.traceSeed, {
           sessionId: session.id,
           source: session.traceSeed?.source || "pty"
         });
@@ -260,8 +184,8 @@ export class SessionManager {
     this.terminalRuntime = createSessionManagerTerminalRuntime({
       sessions: this.sessions,
       getSessionOrThrow: (sessionId) => this.get(sessionId),
-      createTraceEnvelope: (seed, overrides = {}) => createTraceEnvelope(this.createTraceId, seed, overrides),
-      normalizeTraceSeed,
+      createTraceEnvelope: (seed, overrides = {}) => this.traceRuntime.createTraceEnvelope(seed, overrides),
+      normalizeTraceSeed: this.traceRuntime.normalizeTraceSeed,
       emit: (eventName, payload) => this.events.emit(eventName, payload),
       nowFn: this.nowFn,
       setTimeoutFn: this.setTimeoutFn,
@@ -283,9 +207,9 @@ export class SessionManager {
       clearLaunchPostStartInputTimer: (session) => this.clearLaunchPostStartInputTimer(session),
       clearStartupTerminalQueryFallback: (session) => this.clearStartupTerminalQueryFallback(session),
       sendInput: (sessionId, data, options) => this.sendInput(sessionId, data, options),
-      normalizeTraceSeed,
-      countCursorPositionQueries,
-      buildCursorPositionReport,
+      normalizeTraceSeed: this.traceRuntime.normalizeTraceSeed,
+      countCursorPositionQueries: this.traceRuntime.countCursorPositionQueries,
+      buildCursorPositionReport: this.traceRuntime.buildCursorPositionReport,
       startupPostInputFallbackMs: this.startupPostInputFallbackMs,
       startupTerminalQueryFallbackWindowMs: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
       startupTerminalQueryFallbackMaxResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES
@@ -312,11 +236,11 @@ export class SessionManager {
       remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
       remoteReconnectDelayMs: this.remoteReconnectDelayMs,
       nowFn: this.nowFn,
-      normalizeTraceSeed,
+      normalizeTraceSeed: this.traceRuntime.normalizeTraceSeed,
       buildLaunchBundle: (options) => this.buildLaunchBundle(options),
       createInitialIdentityRuntime: (identityInput, options) =>
         this.appIdentityRuntime.createInitialIdentityRuntime(identityInput, options),
-      createTraceEnvelope: (seed, overrides = {}) => createTraceEnvelope(this.createTraceId, seed, overrides),
+      createTraceEnvelope: (seed, overrides = {}) => this.traceRuntime.createTraceEnvelope(seed, overrides),
       updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
       transitionToRunning: (session) => this.transitionToRunning(session),
       attachPtyProcess: (session, launchBundle) => this.attachPtyProcess(session, launchBundle),
@@ -348,7 +272,7 @@ export class SessionManager {
       foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
       nodePtyAsyncWriteOptions: this.nodePtyAsyncWriteOptions,
       emit: (eventName, payload) => this.events.emit(eventName, payload),
-      createTraceEnvelope: (seed, overrides = {}) => createTraceEnvelope(this.createTraceId, seed, overrides),
+      createTraceEnvelope: (seed, overrides = {}) => this.traceRuntime.createTraceEnvelope(seed, overrides),
       updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
       observeStartupTerminalQueryFallback: (session, options = {}) => this.observeStartupTerminalQueryFallback(session, options),
       observeSessionTerminalSignals: (session, chunk, options = {}) =>

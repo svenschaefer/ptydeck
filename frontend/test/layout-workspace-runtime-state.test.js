@@ -156,3 +156,17 @@ test("layout workspace runtime state filters visible deck sessions and preserves
   );
   assert.equal(serializeSplitLayoutRoot({ type: "pane", paneId: "main" }), JSON.stringify({ type: "pane", paneId: "main" }));
 });
+
+test("layout workspace runtime state falls back to ordered deck sessions when the active group reference is stale", () => {
+  const orderedSessions = [{ id: "s-1" }, { id: "s-2" }];
+
+  assert.deepEqual(
+    resolveWorkspaceDeckSessions("ops", orderedSessions, {
+      ops: {
+        activeGroupId: "missing",
+        groups: [{ id: "focus", name: "Focus", sessionIds: ["s-2"] }]
+      }
+    }),
+    orderedSessions
+  );
+});

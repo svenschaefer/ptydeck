@@ -16,6 +16,9 @@ const appRuntimeInitializationAccessCompositionPath = fileURLToPath(
 const appRuntimeAccessControlAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-access-control-assembly.js", import.meta.url)
 );
+const appRuntimeLayoutFoundationAssemblyPath = fileURLToPath(
+  new URL("../src/public/app-runtime-layout-foundation-assembly.js", import.meta.url)
+);
 const appRuntimeCompositionHelperAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-composition-helper-assembly.js", import.meta.url)
 );
@@ -89,25 +92,43 @@ test("runtime composition controller owns the delegated runtime assembly contrac
   const source = await readFile(appRuntimeCompositionPath, "utf8");
 
   const requiredDelegationMarkers = [
-    "createAppLayoutDeckFacadeController",
     "createAppRuntimeAccessControlAssembly",
+    "createAppRuntimeLayoutFoundationAssembly",
     "createAppRuntimeOperatorSupportAssembly",
     "createAppRuntimeRecoveryComposition",
     "createAppRuntimeSessionSurfaceAssembly",
     "createAppRuntimeSessionGridActions",
     "createAppRuntimeStartupComposition",
-    "createAppSessionRuntimeFacadeController",
-    "createDeckRuntimeController",
     "createSessionRuntimeController",
     "createSessionStreamAuthorityController",
     "createSessionViewModel",
-    "createLayoutRuntimeController",
     "initialize: () => appRuntimeInitializationController.initialize(),",
     "setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)"
   ];
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+});
+
+test("runtime layout foundation assembly owns the delegated session facade, layout, and deck runtime contract", async () => {
+  const source = await readFile(appRuntimeLayoutFoundationAssemblyPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "createAppSessionRuntimeFacadeController",
+    "createLayoutRuntimeController",
+    "createDeckRuntimeController",
+    "createAppLayoutDeckFacadeController",
+    "const stateRef = resolveStateRef(options.stateRef);",
+    "stateRef.terminalSettings = layoutRuntimeController.loadTerminalSettings();",
+    "stateRef.sessionInputSettings = layoutRuntimeController.loadSessionInputSettings();",
+    "getSessionViewModel: () => options.getSessionViewModel?.() || null,",
+    "getAppCommandUiFacadeController?.()?.render?.()",
+    "clearUiError: () => options.getAppRuntimeStateController?.()?.clearError?.()"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime layout foundation marker ${marker}`);
   }
 });
 

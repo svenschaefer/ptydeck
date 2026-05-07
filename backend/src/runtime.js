@@ -17,6 +17,7 @@ import { createRuntimeHttpHelpers } from "./runtime-http-helpers.js";
 import { createRuntimeHttpRequestHandler } from "./runtime-http-request-handler.js";
 import { createRuntimeLibraryAuthority } from "./runtime-library-authority.js";
 import { createRuntimeLibraryNormalization } from "./runtime-library-normalization.js";
+import { createRuntimeLifecycle } from "./runtime-lifecycle.js";
 import { createRuntimeAccessPolicy } from "./runtime-access-policy.js";
 import { createRuntimeMetrics } from "./runtime-metrics.js";
 import { createRuntimeResourceDispatch } from "./runtime-resource-dispatch.js";
@@ -1971,98 +1972,39 @@ export function createRuntime(config) {
     defaultShell: config.shell
   });
 
-  async function start() {
-    await accessTokenVerifier.prewarm();
-    messagingRuntime.prepareForRuntimeStart();
-    runtimeStartupReadiness.prepareForStart();
-    const restoredState = await runtimeStartupRestore.restorePersistedRuntimeState();
-    persistedReplayOutputs = restoredState.persistedReplayOutputs;
-
-    await new Promise((resolve) => {
-      server.listen(config.port, resolve);
-    });
-    await messagingRuntime.start();
-    for (const session of manager.list()) {
-      try {
-        await messagingRuntime.ensureSessionTarget(toApiSession(session, session.state), {
-          source: "runtime.start"
-        });
-      } catch (error) {
-        logDebug(
-          "messaging.target.ensure_failed",
-          {
-            sessionId: session?.id || null,
-            error: error instanceof Error ? error.message : String(error || "Unknown messaging target setup failure.")
-          },
-          { source: "runtime.start", sessionId: session?.id || "" }
-        );
+  const runtimeLifecycle = createRuntimeLifecycle({
+    accessTokenVerifier,
+    messagingRuntime,
+    runtimeStartupReadiness,
+    runtimeStartupRestore,
+    setPersistedReplayOutputs: (value) => {
+      persistedReplayOutputs = value;
+    },
+    server,
+    manager,
+    toApiSession,
+    logDebug,
+    config,
+    persistence,
+    snapshotRuntimeState,
+    sockets,
+    wsServer,
+    clearHeartbeat: () => {
+      clearInterval(heartbeat);
+    },
+    clearGuardrailTimer: () => {
+      clearInterval(guardrailTimer);
+    },
+    clearPersistTimer: () => {
+      if (persistTimer) {
+        clearTimeout(persistTimer);
+        persistTimer = null;
       }
-    }
-    if (typeof config.onBeforeReady === "function") {
-      await config.onBeforeReady();
-    }
-    await runtimeStartupReadiness.releaseGateAndAwaitReadiness();
-  }
-
-  async function stopInternal() {
-    runtimeStartupReadiness.beginStop();
-    clearInterval(heartbeat);
-    clearInterval(guardrailTimer);
-    if (persistTimer) {
-      clearTimeout(persistTimer);
-      persistTimer = null;
-    }
-    sessionControlAttachmentRegistry.clearPruneTimer();
-    await messagingRuntime.stop();
-
-    for (const ws of sockets) {
-      ws.closeReasonHint = "server_shutdown";
-      ws.terminate();
-    }
-    sockets.clear();
-    wsServer.close();
-    for (const sessionId of listSessionIdsForAuth(null)) {
-      reconcileSessionControllerForSession(sessionId);
-    }
-
-    const persistedSnapshot = snapshotRuntimeState();
-    logDebug("runtime.stop.start", {
-      sessionCount: persistedSnapshot.sessions.length,
-      customCommandCount: persistedSnapshot.customCommands.length,
-      deckCount: persistedSnapshot.decks.length,
-      socketCount: sockets.size
-    });
-
-    for (const session of manager.list()) {
-      try {
-        manager.delete(session.id);
-      } catch {
-        // Ignore cleanup errors.
-      }
-    }
-
-    await persistence.saveState(persistedSnapshot);
-    logDebug("runtime.stop.persisted", {
-      persistedSessionCount: persistedSnapshot.sessions.length,
-      persistedCustomCommandCount: persistedSnapshot.customCommands.length,
-      persistedDeckCount: persistedSnapshot.decks.length
-    });
-
-    if (server.listening) {
-      await new Promise((resolve) => {
-        server.close(resolve);
-        if (typeof server.closeIdleConnections === "function") {
-          server.closeIdleConnections();
-        }
-        if (typeof server.closeAllConnections === "function") {
-          server.closeAllConnections();
-        }
-      });
-    }
-
-    runtimeStartupReadiness.markStopped();
-    logDebug("runtime.stop.done", {});
-  }
+    },
+    sessionControlAttachmentRegistry,
+    listSessionIdsForAuth,
+    reconcileSessionControllerForSession
+  });
 
   async function stop() {
     if (runtimeStartupReadiness.getIsStopped()) {
@@ -2071,7 +2013,7 @@ export function createRuntime(config) {
     if (stopPromise) {
       return stopPromise;
     }
-    stopPromise = stopInternal().finally(() => {
+    stopPromise = runtimeLifecycle.stopInternal().finally(() => {
       stopPromise = null;
     });
     return stopPromise;
@@ -2088,7 +2030,7 @@ export function createRuntime(config) {
   return {
     manager,
     server,
-    start,
+    start: runtimeLifecycle.start,
     stop,
     getAddress
   };

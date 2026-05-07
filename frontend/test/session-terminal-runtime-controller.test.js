@@ -2755,3 +2755,53 @@ test("session-terminal-runtime controller reruns resize from observer callbacks 
   assert.ok(resizeCalls.length >= 2);
   assert.equal(entry.terminal.focusCalls >= 1, true);
 });
+
+test("session-terminal-runtime controller no-ops on non-paste beforeinput events and non-middle auxclick", () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => {}
+  });
+  const refs = createTerminalCardRefs("non-paste-noop");
+
+  controller.mountSessionTerminalCard({
+    session: { id: "s1", mouseForwardingMode: "off" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste(sessionId, text) {
+      pasted.push([sessionId, text]);
+    },
+    applyResizeForSession() {}
+  });
+
+  const beforeInputEvent = {
+    type: "beforeinput",
+    inputType: "insertText",
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    }
+  };
+  const auxClickEvent = createMouseEvent("auxclick", 0);
+
+  refs.mount.helperTextarea.dispatchEvent(beforeInputEvent);
+  refs.mount.dispatchEvent(auxClickEvent);
+
+  assert.equal(beforeInputEvent.defaultPrevented, false);
+  assert.equal(auxClickEvent.defaultPrevented, false);
+  assert.deepEqual(pasted, []);
+});

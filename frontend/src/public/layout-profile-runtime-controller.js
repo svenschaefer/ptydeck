@@ -1,4 +1,4 @@
-import { cloneDeckSplitLayoutEntry, cloneDeckSplitLayoutMap } from "./split-layout-state.js";
+import { mergeDeckSplitLayoutSnapshot } from "./layout-split-layout-runtime-state.js";
 import { captureLayoutProfileSnapshot } from "./layout-workspace-capture-state.js";
 import {
   normalizeLayoutControlPaneState,
@@ -303,17 +303,12 @@ export function createLayoutProfileRuntimeController(options = {}) {
       setControlPaneState(normalizeLayoutControlPaneState(normalizedLayout));
     }
     if (typeof setDeckSplitLayouts === "function") {
-      if (scope === "all") {
-        setDeckSplitLayouts(normalizedLayout.deckSplitLayouts);
-      } else if (targetActiveDeckId) {
-        const currentLayouts = cloneDeckSplitLayoutMap(typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : {});
-        if (normalizedLayout.deckSplitLayouts[targetActiveDeckId]) {
-          currentLayouts[targetActiveDeckId] = cloneDeckSplitLayoutEntry(normalizedLayout.deckSplitLayouts[targetActiveDeckId]);
-        } else {
-          delete currentLayouts[targetActiveDeckId];
-        }
-        setDeckSplitLayouts(currentLayouts);
-      }
+      setDeckSplitLayouts(
+        mergeDeckSplitLayoutSnapshot(typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : {}, normalizedLayout.deckSplitLayouts, {
+          scope,
+          targetDeckId: targetActiveDeckId
+        })
+      );
     }
     if (currentDecks.some((deck) => normalizeText(deck?.id) === targetActiveDeckId)) {
       setActiveDeck(targetActiveDeckId);

@@ -157,6 +157,25 @@ test("runtime session resource authority prefers live replay exports and rethrow
     () => throwingHarness.authority.buildSessionReplayExportOrThrow("session-1"),
     /boom/
   );
+
+  const emptyFallbackHarness = createHarness({
+    manager: {
+      getReplayExport: () => null,
+      sessionReplayMemoryMaxChars: 2048
+    }
+  });
+  assert.deepEqual(emptyFallbackHarness.authority.buildSessionReplayExportOrThrow("session-1"), {
+    sessionId: "session-1",
+    sessionState: "running",
+    scope: "retained_replay_tail",
+    format: "text",
+    contentType: "text/plain; charset=utf-8",
+    fileName: "ptydeck-session-session-1-replay.txt",
+    data: "",
+    retainedChars: 0,
+    retentionLimitChars: 2048,
+    truncated: false
+  });
 });
 
 test("runtime session resource authority downloads and uploads files within the session root", async () => {
@@ -312,9 +331,36 @@ test("runtime session resource authority rejects missing roots, oversized downlo
   );
 
   await assert.rejects(
+    () => invalidBase64Harness.authority.buildSessionFileDownloadOrThrow("session-1", "missing.txt"),
+    (error) => error instanceof ApiError && error.statusCode === 404 && error.error === "FileNotFound"
+  );
+
+  await assert.rejects(
     () => hugeHarness.authority.uploadSessionFileOrThrow("session-1", "upload.txt", Buffer.alloc(32, 0x61).toString("base64")),
     (error) => error instanceof ApiError && error.statusCode === 413 && error.error === "FileTransferTooLarge"
   );
+});
+
+test("runtime session resource authority falls back to startCwd and expands home-rooted transfer paths deterministically", async () => {
+  const homeRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-home-"));
+  await mkdir(join(homeRoot, "project"), { recursive: true });
+  await writeFile(join(homeRoot, "project", "notes.txt"), "hello-home");
+
+  const { authority } = createHarness({
+    manager: {
+      get: () => ({
+        id: "session-1",
+        meta: {
+          cwd: "",
+          startCwd: homeRoot
+        }
+      })
+    }
+  });
+
+  const download = await authority.buildSessionFileDownloadOrThrow("session-1", "project/notes.txt");
+  assert.equal(download.path, "project/notes.txt");
+  assert.equal(Buffer.from(download.contentBase64, "base64").toString("utf8"), "hello-home");
 });
 
 test("runtime session resource authority rejects directory targets during upload replacement", async () => {

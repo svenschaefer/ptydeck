@@ -14,14 +14,14 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-342` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
-- `QLT-343` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js`, `frontend/src/public/layout-profile-runtime-controller.js`, and `frontend/src/public/layout-runtime-state.js`.
-- `QLT-344` Owner `FE`: harden retained runtime/operator-interaction coverage across `frontend/src/public/connection-profile-draft-state.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and `frontend/src/public/layout-workspace-runtime-state.js`.
+- `QLT-348` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
+- `QLT-349` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js`, `frontend/src/public/layout-profile-runtime-controller.js`, and `frontend/src/public/layout-split-layout-runtime-state.js`.
+- `QLT-350` Owner `FE`: harden retained runtime/operator-interaction coverage across `frontend/src/public/layout-workspace-runtime-state.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and `frontend/src/public/layout-runtime-state.js`.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role (active): own `QLT-342` through `QLT-344` and the corresponding frontend implementation and regression coverage.
+- `FE` ownership role (active): own `QLT-348` through `QLT-350` and the corresponding frontend implementation and regression coverage.
 - `BE` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.

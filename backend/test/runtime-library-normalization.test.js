@@ -1162,6 +1162,32 @@ test("runtime library normalization covers strict layout and workspace guard rai
     () => normalization.normalizeLayoutProfileLayout({ deckTerminalSettings: [] }),
     /layout\.deckTerminalSettings/i
   );
+  assert.throws(
+    () => normalization.normalizeLayoutProfileLayout({ controlPanePosition: "center" }),
+    /layout\.controlPanePosition/i
+  );
+  assert.throws(
+    () => normalization.normalizeLayoutProfileLayout({ controlPaneSize: 9999 }),
+    /layout\.controlPaneSize/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckTerminalSettings: {
+          default: { cols: 10, rows: 40 }
+        }
+      }),
+    /deckTerminalSettings\.\*\.cols/i
+  );
+  assert.throws(
+    () =>
+      normalization.normalizeLayoutProfileLayout({
+        deckTerminalSettings: {
+          default: { cols: 80, rows: 200 }
+        }
+      }),
+    /deckTerminalSettings\.\*\.rows/i
+  );
 
   assert.throws(
     () => normalization.normalizeWorkspacePresetWorkspace([]),
@@ -1178,6 +1204,14 @@ test("runtime library normalization covers strict layout and workspace guard rai
   assert.throws(
     () => normalization.normalizeWorkspacePresetWorkspace({ deckGroups: [] }),
     /workspace\.deckGroups' must be an object/i
+  );
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace({ controlPanePosition: "center" }),
+    /workspace\.controlPanePosition/i
+  );
+  assert.throws(
+    () => normalization.normalizeWorkspacePresetWorkspace({ controlPaneSize: 0 }),
+    /workspace\.controlPaneSize/i
   );
   assert.throws(
     () =>

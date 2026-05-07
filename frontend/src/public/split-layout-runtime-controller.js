@@ -1,25 +1,18 @@
 import {
-  buildSplitLayoutPaneId,
-  computeSplitLayoutPairWeights,
-  getSplitLayoutNodeByPath,
-  removeSplitLayoutPaneFromNode,
-  replaceSplitLayoutPaneWithSplit
-} from "./layout-runtime-state.js";
-import {
-  cloneDeckSplitLayoutEntry,
-  cloneDeckSplitLayoutMap,
-  cloneSplitLayoutNode,
-  collectSplitLayoutPaneIds,
-  normalizeSplitLayoutWeights
-} from "./split-layout-state.js";
+  assignSessionToDeckSplitLayoutPane,
+  ensureDeckSplitLayoutEntry,
+  getDeckSplitLayoutEntry,
+  normalizeDeckSplitLayoutMap,
+  removeDeckSplitLayoutPane,
+  setDeckSplitLayoutContainerWeightRatio,
+  splitDeckSplitLayoutPane
+} from "./layout-split-layout-runtime-state.js";
+import { getSplitLayoutNodeByPath } from "./layout-runtime-state.js";
+import { collectSplitLayoutPaneIds, normalizeSplitLayoutWeights } from "./split-layout-state.js";
 import { serializeSplitLayoutRoot } from "./layout-workspace-capture-state.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
-}
-
-function normalizeLower(value) {
-  return normalizeText(value).toLowerCase();
 }
 
 function setDataValue(element, key, value) {
@@ -173,174 +166,69 @@ export function createSplitLayoutRuntimeController(options = {}) {
   }
 
   function captureDeckSplitLayouts() {
-    return cloneDeckSplitLayoutMap(deckSplitLayouts, { fallbackToDefault: true });
+    return normalizeDeckSplitLayoutMap(deckSplitLayouts, { fallbackToDefault: true });
   }
 
   function replaceDeckSplitLayouts(nextLayouts) {
-    deckSplitLayouts = cloneDeckSplitLayoutMap(nextLayouts, { fallbackToDefault: true });
+    deckSplitLayouts = normalizeDeckSplitLayoutMap(nextLayouts, { fallbackToDefault: true });
     renderedDeckId = "";
     renderedSignature = "";
   }
 
   function getDeckSplitLayout(deckId) {
-    return cloneDeckSplitLayoutEntry(deckSplitLayouts[normalizeText(deckId) || defaultDeckId], { fallbackToDefault: true });
+    return getDeckSplitLayoutEntry(deckSplitLayouts, deckId, { defaultDeckId });
   }
 
   function ensureDeckLayoutEntry(deckId, sessionIds = []) {
-    const normalizedDeckId = normalizeText(deckId) || defaultDeckId;
-    const orderedSessionIds = [];
-    const knownSessionIds = new Set();
-    for (const rawSessionId of Array.isArray(sessionIds) ? sessionIds : []) {
-      const sessionId = normalizeText(rawSessionId);
-      if (!sessionId || knownSessionIds.has(sessionId)) {
-        continue;
-      }
-      knownSessionIds.add(sessionId);
-      orderedSessionIds.push(sessionId);
-    }
-    const entry = cloneDeckSplitLayoutEntry(deckSplitLayouts[normalizedDeckId], { fallbackToDefault: true });
-    const paneIds = collectSplitLayoutPaneIds(entry.root);
-    const nextPaneSessions = Object.fromEntries(paneIds.map((paneId) => [paneId, []]));
-    const existingAssignments = new Map();
-    for (const paneId of paneIds) {
-      for (const rawSessionId of entry.paneSessions[paneId] || []) {
-        const sessionId = normalizeText(rawSessionId);
-        if (!sessionId || !knownSessionIds.has(sessionId) || existingAssignments.has(sessionId)) {
-          continue;
-        }
-        existingAssignments.set(sessionId, paneId);
-      }
-    }
-    const fallbackPaneId = paneIds[0] || "main";
-    for (const sessionId of orderedSessionIds) {
-      const paneId = existingAssignments.get(sessionId) || fallbackPaneId;
-      nextPaneSessions[paneId] = nextPaneSessions[paneId] || [];
-      nextPaneSessions[paneId].push(sessionId);
-    }
-    const nextEntry = {
-      root: entry.root,
-      paneSessions: nextPaneSessions
-    };
-    deckSplitLayouts[normalizedDeckId] = nextEntry;
-    return nextEntry;
-  }
-
-  function mutateDeckLayout(deckId, mutator) {
-    const normalizedDeckId = normalizeText(deckId) || defaultDeckId;
-    const entry = cloneDeckSplitLayoutEntry(deckSplitLayouts[normalizedDeckId], { fallbackToDefault: true });
-    const nextEntry = typeof mutator === "function" ? mutator(entry) || entry : entry;
-    deckSplitLayouts[normalizedDeckId] = cloneDeckSplitLayoutEntry(nextEntry, { fallbackToDefault: true });
-    renderedDeckId = "";
-    renderedSignature = "";
-    return cloneDeckSplitLayoutEntry(deckSplitLayouts[normalizedDeckId], { fallbackToDefault: true });
+    const result = ensureDeckSplitLayoutEntry(deckSplitLayouts, deckId, sessionIds, { defaultDeckId });
+    deckSplitLayouts = result.deckSplitLayouts;
+    return result.entry;
   }
 
   function assignSessionToPane(deckId, paneId, sessionId) {
-    const normalizedPaneId = normalizeLower(paneId);
-    const normalizedSessionId = normalizeText(sessionId);
-    if (!normalizedPaneId || !normalizedSessionId) {
+    const result = assignSessionToDeckSplitLayoutPane(deckSplitLayouts, deckId, paneId, sessionId, { defaultDeckId });
+    if (!result) {
       return null;
     }
-    return mutateDeckLayout(deckId, (entry) => {
-      const paneIds = new Set(collectSplitLayoutPaneIds(entry.root));
-      if (!paneIds.has(normalizedPaneId)) {
-        return entry;
-      }
-      for (const currentPaneId of Object.keys(entry.paneSessions)) {
-        entry.paneSessions[currentPaneId] = (entry.paneSessions[currentPaneId] || []).filter((candidate) => candidate !== normalizedSessionId);
-      }
-      entry.paneSessions[normalizedPaneId] = entry.paneSessions[normalizedPaneId] || [];
-      if (!entry.paneSessions[normalizedPaneId].includes(normalizedSessionId)) {
-        entry.paneSessions[normalizedPaneId].push(normalizedSessionId);
-      }
-      return entry;
-    });
+    deckSplitLayouts = result.deckSplitLayouts;
+    renderedDeckId = "";
+    renderedSignature = "";
+    return result.entry;
   }
 
   function splitPane(deckId, paneId, orientation) {
-    const normalizedPaneId = normalizeLower(paneId);
-    const normalizedOrientation = normalizeLower(orientation);
-    if (!normalizedPaneId || (normalizedOrientation !== "row" && normalizedOrientation !== "column")) {
+    const result = splitDeckSplitLayoutPane(deckSplitLayouts, deckId, paneId, orientation, { defaultDeckId });
+    if (!result) {
       return null;
     }
-    return mutateDeckLayout(deckId, (entry) => {
-      const existingPaneIds = new Set(collectSplitLayoutPaneIds(entry.root));
-      if (!existingPaneIds.has(normalizedPaneId)) {
-        return entry;
-      }
-      const nextPaneId = buildSplitLayoutPaneId(
-        normalizedPaneId,
-        normalizedOrientation === "row" ? "right" : "lower",
-        existingPaneIds
-      );
-      const result = replaceSplitLayoutPaneWithSplit(entry.root, normalizedPaneId, normalizedOrientation, nextPaneId);
-      if (!result.changed) {
-        return entry;
-      }
-      entry.root = result.node;
-      entry.paneSessions[nextPaneId] = entry.paneSessions[nextPaneId] || [];
-      return entry;
-    });
+    deckSplitLayouts = result.deckSplitLayouts;
+    renderedDeckId = "";
+    renderedSignature = "";
+    return result.entry;
   }
 
   function removePane(deckId, paneId) {
-    const normalizedPaneId = normalizeLower(paneId);
-    if (!normalizedPaneId) {
+    const result = removeDeckSplitLayoutPane(deckSplitLayouts, deckId, paneId, { defaultDeckId });
+    if (!result) {
       return null;
     }
-    return mutateDeckLayout(deckId, (entry) => {
-      const allPaneIds = collectSplitLayoutPaneIds(entry.root);
-      if (allPaneIds.length <= 1 || !allPaneIds.includes(normalizedPaneId)) {
-        return entry;
-      }
-      const removedSessionIds = [];
-      for (const sessionId of entry.paneSessions[normalizedPaneId] || []) {
-        removedSessionIds.push(sessionId);
-      }
-      const result = removeSplitLayoutPaneFromNode(entry.root, normalizedPaneId);
-      entry.root = result.node || { type: "pane", paneId: "main" };
-      const remainingPaneIds = new Set(collectSplitLayoutPaneIds(entry.root));
-      const nextPaneSessions = Object.fromEntries(Array.from(remainingPaneIds, (id) => [id, []]));
-      for (const [currentPaneId, sessionIds] of Object.entries(entry.paneSessions)) {
-        if (!remainingPaneIds.has(currentPaneId)) {
-          continue;
-        }
-        nextPaneSessions[currentPaneId] = Array.isArray(sessionIds) ? sessionIds.slice() : [];
-      }
-      const fallbackPaneId = collectSplitLayoutPaneIds(entry.root)[0] || "main";
-      const seen = new Set(nextPaneSessions[fallbackPaneId] || []);
-      for (const sessionId of removedSessionIds) {
-        if (seen.has(sessionId)) {
-          continue;
-        }
-        seen.add(sessionId);
-        nextPaneSessions[fallbackPaneId].push(sessionId);
-      }
-      entry.paneSessions = nextPaneSessions;
-      return entry;
-    });
+    deckSplitLayouts = result.deckSplitLayouts;
+    renderedDeckId = "";
+    renderedSignature = "";
+    return result.entry;
   }
 
   function setContainerWeightRatio(deckId, path, handleIndex, ratio) {
-    const normalizedDeckId = normalizeText(deckId) || defaultDeckId;
-    const index = Number(handleIndex);
-    const normalizedRatio = Number(ratio);
-    if (!Number.isInteger(index) || !Number.isFinite(normalizedRatio)) {
+    const result = setDeckSplitLayoutContainerWeightRatio(deckSplitLayouts, deckId, path, handleIndex, ratio, {
+      defaultDeckId
+    });
+    if (!result) {
       return null;
     }
-    const nextEntry = mutateDeckLayout(normalizedDeckId, (entry) => {
-      const node = getSplitLayoutNodeByPath(entry.root, path);
-      if (!node || (node.type !== "row" && node.type !== "column") || index < 0 || index >= node.children.length - 1) {
-        return entry;
-      }
-      node.weights = computeSplitLayoutPairWeights(
-        normalizeSplitLayoutWeights(node.weights, node.children.length),
-        index,
-        normalizedRatio
-      );
-      return entry;
-    });
-    return nextEntry;
+    deckSplitLayouts = result.deckSplitLayouts;
+    renderedDeckId = "";
+    renderedSignature = "";
+    return result.entry;
   }
 
   function clearChildren(element) {
@@ -640,7 +528,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
     }
     syncChildOrder(getCardParkingContainer(), stashNodes);
 
-    return cloneDeckSplitLayoutEntry(entry, { fallbackToDefault: true });
+    return entry;
   }
 
   return {
