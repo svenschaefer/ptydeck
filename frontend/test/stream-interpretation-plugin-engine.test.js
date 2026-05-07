@@ -158,3 +158,50 @@ test("stream interpretation plugin engine fails closed for invalid registrations
     errors: []
   });
 });
+
+test("stream interpretation plugin engine hardens direct batch results, primitive payloads, and inert plugin returns", () => {
+  const engine = createStreamInterpretationPluginEngine({
+    plugins: [
+      {
+        id: "direct-batch",
+        interpret: () => ({
+          sessionId: "s-3",
+          actions: [
+            { type: "markSessionAttention", active: true },
+            null,
+            { type: "pushSessionNotification", notification: "primitive-notification" },
+            { type: "upsertSessionArtifact", artifact: "primitive-artifact" }
+          ]
+        })
+      },
+      {
+        id: "empty-batch",
+        interpret: () => ({
+          sessionId: "s-4",
+          actions: [{ type: "unknown", value: "ignored" }]
+        })
+      },
+      {
+        id: "inert-result",
+        interpret: () => "ignored"
+      }
+    ]
+  });
+
+  assert.deepEqual(
+    engine.interpretRuntimeEvent({ type: "session.data", sessionId: "s-3", data: "ok" }),
+    {
+      batches: [
+        {
+          sessionId: "s-3",
+          actions: [
+            { type: "markSessionAttention", active: true },
+            { type: "pushSessionNotification", notification: "primitive-notification" },
+            { type: "upsertSessionArtifact", artifact: "primitive-artifact" }
+          ]
+        }
+      ],
+      errors: []
+    }
+  );
+});

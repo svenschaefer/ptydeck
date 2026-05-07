@@ -1,4 +1,10 @@
 import { cloneDeckSplitLayoutEntry, cloneDeckSplitLayoutMap } from "./split-layout-state.js";
+import {
+  normalizeLayoutControlPaneState,
+  normalizeLayoutProfileCollection,
+  normalizeLayoutProfileRecord,
+  resolveLayoutProfileToken
+} from "./layout-runtime-state.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -34,122 +40,7 @@ function clearChildren(element) {
   }
 }
 
-function cloneDeckTerminalSettings(settings) {
-  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(settings)
-      .map(([deckId, value]) => {
-        const normalizedDeckId = normalizeText(deckId);
-        const cols = Number.parseInt(String(value?.cols ?? ""), 10);
-        const rows = Number.parseInt(String(value?.rows ?? ""), 10);
-        if (!normalizedDeckId || !Number.isInteger(cols) || !Number.isInteger(rows)) {
-          return null;
-        }
-        return [normalizedDeckId, { cols, rows }];
-      })
-      .filter(Boolean)
-  );
-}
-
-function normalizeControlPanePosition(value) {
-  const normalized = normalizeLower(value);
-  return ["top", "bottom", "left", "right"].includes(normalized) ? normalized : "bottom";
-}
-
-function normalizeControlPaneSize(value) {
-  const normalized = Number.parseInt(String(value ?? ""), 10);
-  if (Number.isInteger(normalized) && normalized >= 120 && normalized <= 960) {
-    return normalized;
-  }
-  return 185;
-}
-
-function normalizeControlPaneState(source) {
-  const value = source && typeof source === "object" && !Array.isArray(source) ? source : {};
-  return {
-    controlPaneVisible: value.controlPaneVisible !== false,
-    controlPanePosition: normalizeControlPanePosition(value.controlPanePosition),
-    controlPaneSize: normalizeControlPaneSize(value.controlPaneSize)
-  };
-}
-
-export function normalizeLayoutProfileRecord(profile) {
-  if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
-    return null;
-  }
-  const id = normalizeText(profile.id);
-  const name = normalizeText(profile.name);
-  const layout = profile.layout && typeof profile.layout === "object" && !Array.isArray(profile.layout) ? profile.layout : {};
-  if (!id || !name) {
-    return null;
-  }
-  return {
-    id,
-    name,
-    createdAt: Number.isInteger(profile.createdAt) ? profile.createdAt : 0,
-    updatedAt: Number.isInteger(profile.updatedAt) ? profile.updatedAt : 0,
-    layout: {
-      activeDeckId: normalizeText(layout.activeDeckId) || "default",
-      sidebarVisible: layout.sidebarVisible !== false,
-      sessionFilterText: normalizeText(layout.sessionFilterText),
-      ...normalizeControlPaneState(layout),
-      deckTerminalSettings: cloneDeckTerminalSettings(layout.deckTerminalSettings),
-      deckSplitLayouts: cloneDeckSplitLayoutMap(layout.deckSplitLayouts)
-    }
-  };
-}
-
-function normalizeLayoutProfileCollection(profiles) {
-  const next = [];
-  const seen = new Set();
-  for (const profile of Array.isArray(profiles) ? profiles : []) {
-    const normalized = normalizeLayoutProfileRecord(profile);
-    if (!normalized || seen.has(normalized.id)) {
-      continue;
-    }
-    seen.add(normalized.id);
-    next.push(normalized);
-  }
-  next.sort((left, right) => {
-    const nameCompare = left.name.localeCompare(right.name, "en-US", { sensitivity: "base" });
-    if (nameCompare !== 0) {
-      return nameCompare;
-    }
-    return left.id.localeCompare(right.id, "en-US", { sensitivity: "base" });
-  });
-  return next;
-}
-
-export function resolveLayoutProfileToken(profiles, token) {
-  const normalizedToken = normalizeLower(token);
-  if (!normalizedToken) {
-    return { profile: null, error: "Layout profile target is required." };
-  }
-  const entries = normalizeLayoutProfileCollection(profiles);
-  const exactId = entries.find((entry) => entry.id.toLowerCase() === normalizedToken);
-  if (exactId) {
-    return { profile: exactId, error: "" };
-  }
-  const exactName = entries.find((entry) => entry.name.toLowerCase() === normalizedToken);
-  if (exactName) {
-    return { profile: exactName, error: "" };
-  }
-  const matches = entries.filter(
-    (entry) => entry.id.toLowerCase().startsWith(normalizedToken) || entry.name.toLowerCase().startsWith(normalizedToken)
-  );
-  if (matches.length === 1) {
-    return { profile: matches[0], error: "" };
-  }
-  if (matches.length === 0) {
-    return { profile: null, error: `Unknown layout profile: ${token}` };
-  }
-  return {
-    profile: null,
-    error: `Ambiguous layout profile '${token}': ${matches.map((entry) => entry.id).join(", ")}`
-  };
-}
+export { normalizeLayoutProfileRecord, resolveLayoutProfileToken } from "./layout-runtime-state.js";
 
 export function createLayoutProfileRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
@@ -339,7 +230,7 @@ export function createLayoutProfileRuntimeController(options = {}) {
       activeDeckId: normalizeText(getActiveDeckId()) || "default",
       sidebarVisible: getSidebarVisible() !== false,
       sessionFilterText: normalizeText(getSessionFilterText()),
-      ...normalizeControlPaneState(
+      ...normalizeLayoutControlPaneState(
         typeof getControlPaneState === "function" ? getControlPaneState() : selectedProfile?.layout
       ),
       deckTerminalSettings,
@@ -425,7 +316,7 @@ export function createLayoutProfileRuntimeController(options = {}) {
     setSidebarVisible(normalizedLayout.sidebarVisible);
     setSessionFilterText(normalizedLayout.sessionFilterText);
     if (typeof setControlPaneState === "function") {
-      setControlPaneState(normalizeControlPaneState(normalizedLayout));
+      setControlPaneState(normalizeLayoutControlPaneState(normalizedLayout));
     }
     if (typeof setDeckSplitLayouts === "function") {
       if (scope === "all") {

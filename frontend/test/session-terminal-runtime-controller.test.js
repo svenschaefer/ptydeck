@@ -1702,6 +1702,46 @@ test("session-terminal-runtime controller forwards bootstrap-safe terminal contr
   assert.deepEqual(terminalWrites, [["s1", "\u001b[1;1R"]]);
 });
 
+test("session-terminal-runtime controller suppresses empty bootstrap input before operator arming", () => {
+  const calls = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    refreshTerminalViewport: () => {},
+    syncTerminalScrollArea: () => {},
+    debugLog: (event, payload) => calls.push(`${event}:${payload?.sessionId || ""}:${payload?.count || 0}`),
+    navigatorRef: {
+      clipboard: {
+        writeText: async () => {},
+        readText: async () => ""
+      }
+    }
+  });
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs: createTerminalCardRefs("bootstrap-empty"),
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onSessionMounted: () => {},
+    onTerminalData: (sessionId, data) => calls.push(`data:${sessionId}:${data}`),
+    afterEntryRegistered: () => {},
+    onFirstTerminalMounted: () => {},
+    applyResizeForSession: () => {}
+  });
+
+  entry.terminal.emitData("");
+
+  assert.deepEqual(calls, ["terminal.created:s1:0", "terminal.input.bootstrap_suppressed:s1:1"]);
+});
+
 test("session-terminal-runtime controller focuses but does not arm terminal input forwarding from focus button interaction", () => {
   const terminalWrites = [];
   const refs = createTerminalCardRefs("focus-button-intent");

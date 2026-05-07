@@ -1,4 +1,11 @@
 import {
+  buildSplitLayoutPaneId,
+  computeSplitLayoutPairWeights,
+  getSplitLayoutNodeByPath,
+  removeSplitLayoutPaneFromNode,
+  replaceSplitLayoutPaneWithSplit
+} from "./layout-runtime-state.js";
+import {
   cloneDeckSplitLayoutEntry,
   cloneDeckSplitLayoutMap,
   cloneSplitLayoutNode,
@@ -12,17 +19,6 @@ function normalizeText(value) {
 
 function normalizeLower(value) {
   return normalizeText(value).toLowerCase();
-}
-
-function getNodeByPath(node, path = []) {
-  let current = node || null;
-  for (const segment of Array.isArray(path) ? path : []) {
-    if (!current || !Array.isArray(current.children) || !Number.isInteger(segment) || segment < 0 || segment >= current.children.length) {
-      return null;
-    }
-    current = current.children[segment];
-  }
-  return current;
 }
 
 function serializeLayoutRoot(root) {
@@ -93,106 +89,6 @@ function applyChildWeights(childElements, weights) {
     const weight = Number(weights[index] || 0) || 0;
     childEl.style.flex = `${weight} ${weight} 0px`;
   }
-}
-
-function buildPaneId(basePaneId, suffix, existingPaneIds) {
-  const root = normalizeLower(basePaneId) || "pane";
-  let candidateIndex = 2;
-  let candidate = `${root}-${suffix}`;
-  if (!existingPaneIds.has(candidate)) {
-    return candidate;
-  }
-  while (existingPaneIds.has(`${candidate}-${candidateIndex}`)) {
-    candidateIndex += 1;
-  }
-  return `${candidate}-${candidateIndex}`;
-}
-
-function replacePaneWithSplit(node, paneId, orientation, nextPaneId) {
-  if (!node || typeof node !== "object" || Array.isArray(node)) {
-    return { node, changed: false };
-  }
-  if (node.type === "pane") {
-    if (node.paneId !== paneId) {
-      return { node, changed: false };
-    }
-    return {
-      changed: true,
-      node: {
-        type: orientation,
-        children: [
-          { type: "pane", paneId },
-          { type: "pane", paneId: nextPaneId }
-        ],
-        weights: [0.5, 0.5]
-      }
-    };
-  }
-  const children = [];
-  let changed = false;
-  for (const child of Array.isArray(node.children) ? node.children : []) {
-    const result = replacePaneWithSplit(child, paneId, orientation, nextPaneId);
-    children.push(result.node);
-    if (result.changed) {
-      changed = true;
-    }
-  }
-  return {
-    changed,
-    node: {
-      type: node.type,
-      children,
-      weights: normalizeSplitLayoutWeights(node.weights, children.length)
-    }
-  };
-}
-
-function removePaneFromNode(node, paneId) {
-  if (!node || typeof node !== "object" || Array.isArray(node)) {
-    return { node: null, removedPaneIds: [] };
-  }
-  if (node.type === "pane") {
-    if (node.paneId !== paneId) {
-      return { node, removedPaneIds: [] };
-    }
-    return { node: null, removedPaneIds: [paneId] };
-  }
-
-  const nextChildren = [];
-  const nextWeights = [];
-  const removedPaneIds = [];
-  for (let index = 0; index < node.children.length; index += 1) {
-    const result = removePaneFromNode(node.children[index], paneId);
-    removedPaneIds.push(...result.removedPaneIds);
-    if (result.node) {
-      nextChildren.push(result.node);
-      nextWeights.push(Array.isArray(node.weights) ? node.weights[index] : 1);
-    }
-  }
-
-  if (nextChildren.length === 0) {
-    return { node: null, removedPaneIds };
-  }
-  if (nextChildren.length === 1) {
-    return { node: nextChildren[0], removedPaneIds };
-  }
-  return {
-    node: {
-      type: node.type,
-      children: nextChildren,
-      weights: normalizeSplitLayoutWeights(nextWeights, nextChildren.length)
-    },
-    removedPaneIds
-  };
-}
-
-function computePairWeights(weights, handleIndex, ratio) {
-  const nextWeights = weights.slice();
-  const pairTotal = nextWeights[handleIndex] + nextWeights[handleIndex + 1];
-  const clampedRatio = Math.min(0.9, Math.max(0.1, ratio));
-  nextWeights[handleIndex] = Number((pairTotal * clampedRatio).toFixed(6));
-  nextWeights[handleIndex + 1] = Number((pairTotal * (1 - clampedRatio)).toFixed(6));
-  return normalizeSplitLayoutWeights(nextWeights, nextWeights.length);
 }
 
 export function createSplitLayoutRuntimeController(options = {}) {
@@ -375,8 +271,12 @@ export function createSplitLayoutRuntimeController(options = {}) {
       if (!existingPaneIds.has(normalizedPaneId)) {
         return entry;
       }
-      const nextPaneId = buildPaneId(normalizedPaneId, normalizedOrientation === "row" ? "right" : "lower", existingPaneIds);
-      const result = replacePaneWithSplit(entry.root, normalizedPaneId, normalizedOrientation, nextPaneId);
+      const nextPaneId = buildSplitLayoutPaneId(
+        normalizedPaneId,
+        normalizedOrientation === "row" ? "right" : "lower",
+        existingPaneIds
+      );
+      const result = replaceSplitLayoutPaneWithSplit(entry.root, normalizedPaneId, normalizedOrientation, nextPaneId);
       if (!result.changed) {
         return entry;
       }
@@ -400,7 +300,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
       for (const sessionId of entry.paneSessions[normalizedPaneId] || []) {
         removedSessionIds.push(sessionId);
       }
-      const result = removePaneFromNode(entry.root, normalizedPaneId);
+      const result = removeSplitLayoutPaneFromNode(entry.root, normalizedPaneId);
       entry.root = result.node || { type: "pane", paneId: "main" };
       const remainingPaneIds = new Set(collectSplitLayoutPaneIds(entry.root));
       const nextPaneSessions = Object.fromEntries(Array.from(remainingPaneIds, (id) => [id, []]));
@@ -432,11 +332,11 @@ export function createSplitLayoutRuntimeController(options = {}) {
       return null;
     }
     const nextEntry = mutateDeckLayout(normalizedDeckId, (entry) => {
-      const node = getNodeByPath(entry.root, path);
+      const node = getSplitLayoutNodeByPath(entry.root, path);
       if (!node || (node.type !== "row" && node.type !== "column") || index < 0 || index >= node.children.length - 1) {
         return entry;
       }
-      node.weights = computePairWeights(
+      node.weights = computeSplitLayoutPairWeights(
         normalizeSplitLayoutWeights(node.weights, node.children.length),
         index,
         normalizedRatio
@@ -487,7 +387,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
         return;
       }
       const entry = deckSplitLayouts[normalizeText(deckId) || defaultDeckId];
-      const node = getNodeByPath(entry?.root, path);
+      const node = getSplitLayoutNodeByPath(entry?.root, path);
       if (!node || !Array.isArray(node.children)) {
         return;
       }
@@ -502,7 +402,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
         const pointerCoord = orientation === "row" ? moveEvent.clientX : moveEvent.clientY;
         const fraction = ((pointerCoord - startOffset) / totalSize - pairStart) / pairTotal;
         const nextEntry = setContainerWeightRatio(deckId, path, handleIndex, fraction);
-        const nextNode = getNodeByPath(nextEntry?.root, path);
+        const nextNode = getSplitLayoutNodeByPath(nextEntry?.root, path);
         if (nextNode) {
           const containerRef = containerRefs.get(`${normalizeText(deckId)}:${JSON.stringify(path)}`);
           if (containerRef) {

@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createWorkspacePresetRuntimeState } from "../src/public/workspace-preset-runtime-state.js";
+import {
+  createWorkspacePresetRuntimeState,
+  formatWorkspacePresetDetail,
+  normalizeWorkspacePresetRecord,
+  resolveWorkspaceGroupToken,
+  resolveWorkspacePresetToken
+} from "../src/public/workspace-preset-runtime-state.js";
 
 class FakeElement {
   constructor(tagName = "div") {
@@ -399,4 +405,61 @@ test("workspace preset runtime state hardens preset CRUD, selector fallbacks, an
     state.captureCurrentVisibleDeckSessions("ops").map((session) => session.id),
     ["s3", "s2"]
   );
+});
+
+test("workspace preset runtime state hardens direct preset and group normalization helpers", () => {
+  assert.equal(normalizeWorkspacePresetRecord(null), null);
+  assert.equal(
+    normalizeWorkspacePresetRecord({
+      id: "ops",
+      name: "",
+      workspace: {}
+    }),
+    null
+  );
+
+  const presets = [
+    {
+      id: "ops-a",
+      name: "Ops Alpha",
+      createdAt: 1,
+      updatedAt: 2,
+      workspace: {
+        activeDeckId: "ops",
+        layoutProfileId: "",
+        controlPaneVisible: true,
+        controlPanePosition: "right",
+        controlPaneSize: 320
+      }
+    },
+    {
+      id: "ops-b",
+      name: "Ops Beta",
+      createdAt: 2,
+      updatedAt: 3,
+      workspace: {
+        activeDeckId: "ops",
+        layoutProfileId: "focus",
+        controlPaneVisible: false,
+        controlPanePosition: "left",
+        controlPaneSize: 280
+      }
+    }
+  ];
+
+  assert.match(resolveWorkspacePresetToken(presets, "").error, /required/);
+  assert.equal(resolveWorkspacePresetToken(presets, "Ops Alpha").preset?.id, "ops-a");
+  assert.match(resolveWorkspacePresetToken(presets, "ops").error, /Ambiguous workspace preset 'ops'/);
+  assert.match(resolveWorkspacePresetToken(presets, "missing").error, /Unknown workspace preset/);
+
+  const groups = [
+    { id: "ops-a", name: "Ops Alpha" },
+    { id: "ops-b", name: "Ops Beta" }
+  ];
+  assert.match(resolveWorkspaceGroupToken(groups, "").error, /required/);
+  assert.equal(resolveWorkspaceGroupToken(groups, "Ops Beta").group?.id, "ops-b");
+  assert.match(resolveWorkspaceGroupToken(groups, "ops").error, /Ambiguous workspace group 'ops'/);
+  assert.match(resolveWorkspaceGroupToken(groups, "missing").error, /Unknown workspace group/);
+
+  assert.equal(formatWorkspacePresetDetail(null), "No saved workspace preset selected.");
 });
