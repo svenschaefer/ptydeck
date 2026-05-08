@@ -15,6 +15,18 @@ Last updated: 2026-05-08 (`v0.4.0-H181` is fully closed, the fresh repo-wide rev
   - fallback: retain last known cwd
 - This means direct PowerShell sessions are first-class launch targets, but they intentionally reuse the same unsupported-shell observation fallback that already existed for non-bash local shells rather than pretending prompt-derived cwd tracking is available.
 
+## Custom Command Scope Contract
+
+- The slash-command definition form `/custom scope:<scope> <name> <content>` remains valid for non-session scopes such as `scope:global`.
+- The frontend admin save path must omit `sessionId` entirely for non-session-scoped custom-command upserts instead of serializing `sessionId: null`.
+- Backend validation in `backend/src/validation.js` intentionally remains strict:
+  - `sessionId` is allowed only when present as a string
+  - stray `null` values are rejected with `Field 'sessionId' must be a string.`
+- The current product contract is therefore:
+  - `scope:session` => send a real string `sessionId`
+  - `scope:global` / `scope:project` => do not send `sessionId` at all
+- Regression coverage for this FE/BE contract now lives in `frontend/test/command-executor-custom-admin-handlers.test.js`.
+
 ## Repo-Wide Quality Review - 2026-05-08
 
 Fresh repo-wide evidence on the post-`H181` review tree that promoted `v0.4.0-H182`:

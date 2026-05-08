@@ -239,3 +239,50 @@ test("custom admin handlers persist session-scoped definitions through the extra
     }
   ]);
 });
+
+test("custom admin handlers omit sessionId for non-session scoped definitions", async () => {
+  const saveCalls = [];
+  const handlers = createHandlers({
+    api: {
+      async upsertCustomCommand(name, payload) {
+        saveCalls.push([name, payload]);
+        return { id: "custom-1", name, ...payload };
+      }
+    },
+    parseCustomDefinition: () => ({
+      ok: true,
+      name: "whatnext",
+      content: "D.h. wer muss jetzt was als nächstes in welcher Reihenfolge machen?",
+      kind: "plain",
+      scope: "global",
+      sessionSelector: "",
+      templateVariables: [],
+      mode: "inline"
+    })
+  });
+
+  const feedback = await handlers.executeStructuredCommand({
+    command: "custom",
+    args: ["scope:global", "whatnext", "D.h.", "wer", "muss"],
+    interpreted: {
+      raw: "/custom scope:global whatnext D.h. wer muss jetzt was als nächstes in welcher Reihenfolge machen?"
+    },
+    sessions: [],
+    decks: [{ id: "default", name: "Default" }],
+    activeSessionId: ""
+  });
+
+  assert.equal(feedback, "Saved custom command /whatnext (inline · global).");
+  assert.deepEqual(saveCalls, [
+    [
+      "whatnext",
+      {
+        content: "D.h. wer muss jetzt was als nächstes in welcher Reihenfolge machen?",
+        kind: "plain",
+        templateVariables: [],
+        scope: "global",
+        sessionId: undefined
+      }
+    ]
+  ]);
+});

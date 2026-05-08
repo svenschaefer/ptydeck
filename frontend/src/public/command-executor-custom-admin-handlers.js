@@ -290,7 +290,7 @@ export function createCommandExecutorCustomAdminHandlers(options = {}) {
     if (!parsed.ok) {
       return `Custom command definition error: ${parsed.error}`;
     }
-    let sessionId = null;
+    let sessionId = undefined;
     if (parsed.scope === "session") {
       const resolvedSession = resolveSingleSessionForCommand(
         parsed.sessionSelector,
