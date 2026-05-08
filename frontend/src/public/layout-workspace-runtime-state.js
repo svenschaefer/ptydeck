@@ -1,24 +1,26 @@
 import {
   captureCurrentWorkspace,
   captureLayoutProfileSnapshot,
+  captureCurrentVisibleDeckSessions,
   cloneWorkspaceDeckGroups,
   cloneWorkspaceState,
   normalizeControlPaneState,
   normalizeText,
+  resolveWorkspaceDeckSessions,
   serializeSplitLayoutRoot
-} from "./layout-workspace-capture-state.js";
-
-const normalizeLower = (value) => normalizeText(value).toLowerCase();
+} from "./layout-workspace-orchestration-state.js";
 
 export {
   captureCurrentWorkspace,
   captureLayoutProfileSnapshot,
+  captureCurrentVisibleDeckSessions,
   cloneWorkspaceDeckGroups,
   cloneWorkspaceState,
   normalizeControlPaneState,
   normalizeText,
+  resolveWorkspaceDeckSessions,
   serializeSplitLayoutRoot
-} from "./layout-workspace-capture-state.js";
+} from "./layout-workspace-orchestration-state.js";
 
 export function normalizeWorkspacePresetRecord(preset) {
   if (!preset || typeof preset !== "object" || Array.isArray(preset)) {
@@ -82,60 +84,4 @@ export function formatWorkspacePresetDetail(preset) {
       ? `It restores saved split panes on ${splitLayoutDeckCount} deck(s).`
       : "It does not restore any split-pane layout."
   ].join("\n");
-}
-
-export function resolveWorkspaceDeckSessions(deckId, deckSessions, deckGroups) {
-  const normalizedDeckId = normalizeText(deckId);
-  const orderedDeckSessions = Array.isArray(deckSessions) ? deckSessions.slice() : [];
-  if (!normalizedDeckId) {
-    return orderedDeckSessions;
-  }
-  const deckGroupState = cloneWorkspaceDeckGroups(deckGroups?.[normalizedDeckId]);
-  if (!deckGroupState.activeGroupId) {
-    return orderedDeckSessions;
-  }
-  const activeGroup = deckGroupState.groups.find((group) => group.id === deckGroupState.activeGroupId) || null;
-  if (!activeGroup) {
-    return orderedDeckSessions;
-  }
-  const byId = new Map(orderedDeckSessions.map((session) => [session.id, session]));
-  const resolved = [];
-  for (const sessionId of activeGroup.sessionIds) {
-    const session = byId.get(sessionId);
-    if (session) {
-      resolved.push(session);
-    }
-  }
-  return resolved;
-}
-
-export function captureCurrentVisibleDeckSessions(options = {}) {
-  const {
-    deckId = "",
-    getActiveDeckId = () => "",
-    getSessions = () => [],
-    sortSessionsByQuickId = (sessions) => (Array.isArray(sessions) ? sessions.slice() : []),
-    resolveSessionDeckId = (session) => session?.deckId || "",
-    deckGroups = {},
-    getSessionFilterText = () => "",
-    resolveFilterSelectors = null
-  } = options;
-  const normalizedDeckId = normalizeText(deckId) || normalizeText(getActiveDeckId()) || "default";
-  const sessions = sortSessionsByQuickId(getSessions()).filter(
-    (session) => resolveSessionDeckId(session) === normalizedDeckId
-  );
-  const groupedSessions = resolveWorkspaceDeckSessions(normalizedDeckId, sessions, deckGroups);
-  const sessionFilterText =
-    normalizedDeckId === normalizeText(getActiveDeckId()) ? normalizeText(getSessionFilterText()) : "";
-  if (!sessionFilterText || typeof resolveFilterSelectors !== "function") {
-    return groupedSessions;
-  }
-  const resolved = resolveFilterSelectors(sessionFilterText, groupedSessions, {
-    scopeMode: "active-deck",
-    activeDeckId: normalizedDeckId
-  });
-  if (resolved && Array.isArray(resolved.sessions)) {
-    return resolved.sessions;
-  }
-  return groupedSessions;
 }

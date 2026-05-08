@@ -427,6 +427,8 @@ test("connection profile draft state covers fail-closed selectors, defaults, and
     profile: null,
     error: "Connection profile target is required."
   });
+  assert.equal(resolveConnectionProfileToken(normalizedProfiles, "a").profile?.id, "a");
+  assert.equal(resolveConnectionProfileToken(normalizedProfiles, "Al").profile?.id, "a");
   assert.match(resolveConnectionProfileToken(normalizedProfiles, "missing").error, /Unknown connection profile/);
   assert.match(
     resolveConnectionProfileToken(
@@ -567,6 +569,35 @@ test("connection profile draft state rejects blank env keys and additional persi
   assert.deepEqual(parseStringRecord(" =ignored\nVALID=value"), {
     VALID: "value"
   });
+  assert.deepEqual(
+    buildBlankConnectionProfileLaunch({
+      defaultThemeProfile: null,
+      themeProfile: null,
+      deckId: "ops",
+      kind: "local"
+    }).activeThemeProfile,
+    {
+      background: "#0a0d12",
+      foreground: "#d8dee9",
+      cursor: "#8ec07c",
+      black: "#0a0d12",
+      red: "#fb4934",
+      green: "#8ec07c",
+      yellow: "#fabd2f",
+      blue: "#83a598",
+      magenta: "#b48ead",
+      cyan: "#8fbcbb",
+      white: "#d8dee9",
+      brightBlack: "#4b5563",
+      brightRed: "#ff6b5a",
+      brightGreen: "#a5d68a",
+      brightYellow: "#ffd36a",
+      brightBlue: "#98b6cc",
+      brightMagenta: "#c8a7d8",
+      brightCyan: "#a9d9d6",
+      brightWhite: "#f5f7fa"
+    }
+  );
 
   assert.throws(
     () =>

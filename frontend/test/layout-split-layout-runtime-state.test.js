@@ -188,3 +188,43 @@ test("layout split-layout runtime state merges snapshot layouts fail-closed for 
     }
   });
 });
+
+test("layout split-layout runtime state leaves invalid pane and container mutations unchanged", () => {
+  const currentLayouts = {
+    ops: {
+      root: {
+        type: "row",
+        children: [
+          { type: "pane", paneId: "left" },
+          { type: "pane", paneId: "right" }
+        ],
+        weights: [0.5, 0.5]
+      },
+      paneSessions: {
+        left: ["s-1"],
+        right: ["s-2"]
+      }
+    }
+  };
+
+  assert.deepEqual(
+    assignSessionToDeckSplitLayoutPane(currentLayouts, "ops", "missing", "s-3")?.entry,
+    currentLayouts.ops
+  );
+  assert.deepEqual(
+    splitDeckSplitLayoutPane(currentLayouts, "ops", "missing", "row")?.entry,
+    currentLayouts.ops
+  );
+  assert.deepEqual(
+    removeDeckSplitLayoutPane(currentLayouts, "ops", "missing")?.entry,
+    currentLayouts.ops
+  );
+  assert.deepEqual(
+    setDeckSplitLayoutContainerWeightRatio(currentLayouts, "ops", [99], 0, 0.5)?.entry,
+    currentLayouts.ops
+  );
+  assert.deepEqual(
+    mergeDeckSplitLayoutSnapshot(currentLayouts, { docs: currentLayouts.ops }, { scope: "deck", targetDeckId: "" }),
+    currentLayouts
+  );
+});

@@ -2630,6 +2630,58 @@ test("session-terminal-runtime controller suppresses auxclick paste locally and 
   assert.deepEqual(terminalWrites, [["s2", "\u001b[M"]]);
 });
 
+test("session-terminal-runtime controller leaves forwarding auxclick untouched and still focuses the terminal on local context menu", () => {
+  const forwardingController = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    getSessionById: () => ({ id: "s1", mouseForwardingMode: "application" })
+  });
+  const forwardingRefs = createTerminalCardRefs("auxclick-forwarding");
+  const forwardingEntry = forwardingController.mountSessionTerminalCard({
+    session: { id: "s1", mouseForwardingMode: "application" },
+    refs: forwardingRefs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  const forwardingAuxClickEvent = createMouseEvent("auxclick", 1);
+  forwardingRefs.mount.dispatchEvent(forwardingAuxClickEvent);
+  assert.equal(forwardingAuxClickEvent.defaultPrevented, false);
+  assert.equal(forwardingAuxClickEvent.propagationStopped, false);
+  assert.equal(forwardingEntry.terminal.focusCalls, 0);
+
+  const localController = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const localRefs = createTerminalCardRefs("contextmenu-local");
+  const localEntry = localController.mountSessionTerminalCard({
+    session: { id: "s2" },
+    refs: localRefs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  localRefs.mount.dispatchEvent({ type: "contextmenu" });
+  assert.equal(localEntry.terminal.focusCalls, 1);
+});
+
 test("session-terminal-runtime controller releases active scrollbar drag during clipboard-binding disposal", () => {
   const windowRef = new FakeWindowEventTarget();
   const controller = createSessionTerminalRuntimeController({

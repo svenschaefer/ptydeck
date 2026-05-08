@@ -1,7 +1,7 @@
 import { createLayoutSplitLayoutRuntimeModel } from "./layout-split-layout-runtime-model.js";
 import { getSplitLayoutNodeByPath } from "./layout-runtime-state.js";
 import { collectSplitLayoutPaneIds, normalizeSplitLayoutWeights } from "./split-layout-state.js";
-import { serializeSplitLayoutRoot } from "./layout-workspace-capture-state.js";
+import { serializeSplitLayoutRoot } from "./layout-workspace-orchestration-state.js";
 
 function normalizeText(value) {
   return String(value || "").trim();

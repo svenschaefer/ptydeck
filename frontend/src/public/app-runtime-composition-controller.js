@@ -7,7 +7,7 @@ import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
 import { createAppRuntimeSessionSurfaceAssembly } from "./app-runtime-session-surface-assembly.js";
 import { createAppRuntimeSessionGridActions } from "./app-runtime-session-grid-actions.js";
-import { createAppRuntimeStartupComposition } from "./app-runtime-startup-composition.js";
+import { createAppRuntimeStartupHelperAssembly } from "./app-runtime-startup-helper-assembly.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
@@ -1180,7 +1180,7 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   slashWorkflowRuntimeController,
   commandPaletteRuntimeController,
   appRuntimeInitializationController
-} = createAppRuntimeStartupComposition({
+} = createAppRuntimeStartupHelperAssembly({
   store,
   api,
   config,
@@ -1190,8 +1190,8 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   commandInput,
   terminals,
   terminalObservers,
-  getTerminalSettings: () => layoutFoundationStateRef.terminalSettings,
-  recordTrace: (entry) => traceDebugController.record("ws.event", entry),
+  layoutFoundationStateRef,
+  traceDebugController,
   defaultDeckId: DEFAULT_DECK_ID,
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   systemSlashCommands: SYSTEM_SLASH_COMMANDS,
@@ -1251,15 +1251,11 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   commandPaletteEmptyEl,
   commandPaletteCloseBtn,
   maybeRedirectToCanonicalOrigin,
-  consumeOriginHandoffSourceFromWindow: () => sessionControlRuntimeController.consumeOriginHandoffSourceFromWindow(),
-  ensureStartupBackup: () => startupBackupRuntimeController.ensureStartupBackup(),
-  getTrustedLocalClientIdentity: () => trustedLocalClientRuntimeController.getClientIdentity?.() || null,
-  ensureTrustedLocalClientIdentity: () => trustedLocalClientRuntimeController.ensureClientIdentity(),
-  setRuntimeClientIdentityCreatedOnThisOrigin: (value) =>
-    sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(value),
-  setTrustedLocalClientLabel: (label) => sessionControlRuntimeController.setTrustedLocalClientLabel(label),
+  sessionControlRuntimeController,
+  trustedLocalClientRuntimeController,
+  startupBackupRuntimeController,
   setRuntimeClientId,
-  applyInitializationError: (message) => appCommandUiFacadeController?.setError?.(message),
+  appCommandUiFacadeController,
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
   devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS

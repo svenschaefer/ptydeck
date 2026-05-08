@@ -1,11 +1,12 @@
-import { mergeDeckSplitLayoutSnapshot } from "./layout-split-layout-runtime-state.js";
-import { captureLayoutProfileSnapshot } from "./layout-workspace-capture-state.js";
 import {
-  normalizeLayoutControlPaneState,
   normalizeLayoutProfileCollection,
   normalizeLayoutProfileRecord,
   resolveLayoutProfileToken
 } from "./layout-runtime-state.js";
+import {
+  applyLayoutProfileSnapshot,
+  captureLayoutProfileSnapshot
+} from "./layout-workspace-orchestration-state.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -266,69 +267,23 @@ export function createLayoutProfileRuntimeController(options = {}) {
   }
 
   async function applyLayoutSnapshot(layout, options = {}) {
-    const normalizedLayout = normalizeLayoutProfileRecord({
-      id: "__device-layout__",
-      name: "Device Layout",
-      createdAt: 0,
-      updatedAt: 0,
-      layout
-    })?.layout;
-    if (!normalizedLayout) {
-      throw new Error("Invalid layout snapshot.");
-    }
-    const scope = normalizeLower(options.scope) || "all";
-    const currentDecks = getDecks();
-    const requestedTargetDeckId = normalizeText(options.targetDeckId);
-    const targetActiveDeckId =
-      requestedTargetDeckId ||
-      normalizedLayout.activeDeckId;
-    const deckIdsToApply =
-      scope === "all"
-        ? currentDecks
-            .map((deck) => normalizeText(deck?.id))
-            .filter(Boolean)
-        : [targetActiveDeckId].filter(Boolean);
-    for (const deckId of deckIdsToApply) {
-      const nextGeometry = normalizedLayout.deckTerminalSettings[deckId];
-      if (!deckId || !nextGeometry) {
-        continue;
-      }
-      const currentGeometry = getDeckTerminalGeometry(deckId);
-      if (currentGeometry?.cols === nextGeometry.cols && currentGeometry?.rows === nextGeometry.rows) {
-        continue;
-      }
-      await updateDeckGeometry(deckId, nextGeometry, targetActiveDeckId);
-    }
-    setSidebarVisible(normalizedLayout.sidebarVisible);
-    setSessionFilterText(normalizedLayout.sessionFilterText);
-    if (typeof setControlPaneState === "function") {
-      setControlPaneState(normalizeLayoutControlPaneState(normalizedLayout));
-    }
-    if (typeof mergeDeckSplitLayouts === "function") {
-      mergeDeckSplitLayouts(normalizedLayout.deckSplitLayouts, {
-        scope,
-        targetDeckId: targetActiveDeckId
-      });
-    } else if (typeof setDeckSplitLayouts === "function") {
-      setDeckSplitLayouts(
-        mergeDeckSplitLayoutSnapshot(
-          typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : {},
-          normalizedLayout.deckSplitLayouts,
-          {
-            scope,
-            targetDeckId: targetActiveDeckId
-          }
-        )
-      );
-    }
-    if (currentDecks.some((deck) => normalizeText(deck?.id) === targetActiveDeckId)) {
-      setActiveDeck(targetActiveDeckId);
-    }
-    requestRender();
-    render();
-    return targetActiveDeckId
-      ? `Applied layout snapshot for deck [${targetActiveDeckId}].`
-      : "Applied layout snapshot.";
+    return applyLayoutProfileSnapshot({
+      layout,
+      scope: options.scope,
+      targetDeckId: options.targetDeckId,
+      getDecks,
+      getDeckTerminalGeometry,
+      updateDeckGeometry,
+      setSidebarVisible,
+      setSessionFilterText,
+      setControlPaneState,
+      mergeDeckSplitLayouts,
+      setDeckSplitLayouts,
+      getDeckSplitLayouts,
+      setActiveDeck,
+      requestRender,
+      render
+    });
   }
 
   async function createProfileFromCurrentLayout(name) {

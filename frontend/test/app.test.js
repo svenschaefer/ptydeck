@@ -1566,7 +1566,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await import("../src/public/app.js?app-test");
   await tick();
   assert.equal(fixture.elements.statusMessage.textContent, "Loading sessions...");
-  await sleep(320);
+  await waitFor(() => {
+    const createListeners = fixture.elements.createSession.listeners.get("click") || [];
+    return (
+      listSessionsCalls === 1 &&
+      createListeners.length > 0 &&
+      fixture.elements.statusMessage.textContent !== "Loading sessions..."
+    );
+  }, { timeoutMs: 1200 });
   assert.equal(listSessionsCalls, 1);
 
   fixture.elements.workspaceManagerOpen.click();
@@ -1578,14 +1585,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.workspaceManagerDialog.open, false);
 
   fixture.elements.createSession.click();
-  await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to create session.");
+  await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to create session.", { timeoutMs: 1200 });
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to create session.");
 
   const card = listTerminalCards(fixture.elements.terminalGrid)[0];
   assert.ok(card, "expected terminal card to exist");
   const closeBtn = card.querySelector(".session-close");
   closeBtn.click();
-  await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to delete session.");
+  await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to delete session.", { timeoutMs: 1200 });
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to delete session.");
 
   fixture.elements.commandInput.value = "pwd";
@@ -3697,8 +3704,13 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "No matches in active terminal.");
   assert.equal(MockTerminal.instances.filter((terminal) => terminal.selected).length, 0);
-  let sessionButton = findDeckSessionButton(fixture.elements.deckTabs, "ops", "s-2");
-  let indicator = sessionButton?.querySelector(".deck-session-activity-indicator");
+  let sessionButton = null;
+  let indicator = null;
+  await waitFor(() => {
+    sessionButton = findDeckSessionButton(fixture.elements.deckTabs, "ops", "s-2");
+    indicator = sessionButton?.querySelector(".deck-session-activity-indicator") ?? null;
+    return Boolean(indicator) && indicator.hidden === false && indicator.classList.contains("live") === true;
+  }, { timeoutMs: 1200 });
   assert.ok(sessionButton);
   assert.ok(indicator);
   assert.equal(indicator.hidden, false);

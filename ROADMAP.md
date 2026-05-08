@@ -14,21 +14,17 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H181` - Repo-Wide Quality and Coverage Follow-Up
+  - none
 - Queued next waves:
   - none
 
 ## Active Wave Order
 
-1. `QLT-354` Owner `FE`
-2. `QLT-355` Owner `FE`
-3. `QLT-356` Owner `FE`
+None.
 
 ## Wave Dependencies
 
-- `QLT-354 -> QLT-355`
-- `QLT-354 -> QLT-356`
-- `QLT-355 -> QLT-356`
+None.
 
 ## Sequencing Rules
 
