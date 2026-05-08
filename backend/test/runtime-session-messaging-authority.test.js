@@ -181,6 +181,32 @@ test("runtime session messaging authority resolves and rejects messaging targets
   );
 });
 
+test("runtime session messaging authority narrows quick-id plus name selectors and fails closed for blank targets", () => {
+  const sessions = [
+    { id: "session-1", name: "ops", deckId: "default" },
+    { id: "session-2", name: "db", deckId: "default" }
+  ];
+  const { authority } = createHarness({
+    manager: {
+      list: () => sessions
+    },
+    getSessionQuickIdToken: (sessionId) => (sessionId === "session-1" ? "A" : "B")
+  });
+
+  const resolved = authority.resolveSessionForMessagingTarget({ quickIdToken: "A", sessionName: "ops" });
+  assert.equal(resolved.id, "session-1");
+  assert.equal(resolved.name, "ops");
+  assert.equal(resolved.quickIdToken, "A");
+  assert.equal(resolved.state, "running");
+  assert.equal(resolved.controlState.mode, "local");
+  assert.equal(resolved.appIdentity.source, "derived");
+
+  assert.throws(
+    () => authority.resolveSessionForMessagingTarget({ quickIdToken: "  ", sessionName: " " }),
+    (error) => error instanceof ApiError && error.statusCode === 404 && error.error === "SessionNotFound"
+  );
+});
+
 test("runtime session messaging authority retries via manager restart before falling back to restored session creation", () => {
   const restarted = { id: "session-1", quickIdToken: "B", name: "ops", deckId: "default", state: "running" };
   const restartHarness = createHarness({
@@ -337,6 +363,25 @@ test("runtime session messaging authority rethrows direct and delayed submit wri
   });
   delayedHarness.timeoutCalls[0].handler();
   await assert.rejects(() => pending, (error) => error === delayedError);
+
+  let delayedBodyCalls = 0;
+  const delayedBodyError = new Error("body failed");
+  const delayedBodyHarness = createHarness({
+    manager: {
+      sendInput() {
+        delayedBodyCalls += 1;
+        throw delayedBodyError;
+      }
+    }
+  });
+  assert.throws(
+    () => delayedBodyHarness.authority.requestMessagingSendInput("session-1", "echo hi\r", {
+      trace: { source: "messaging:telegram" }
+    }),
+    (error) => error === delayedBodyError
+  );
+  assert.equal(delayedBodyCalls, 1);
+  assert.equal(delayedBodyHarness.timeoutCalls.length, 0);
 });
 
 test("runtime session messaging authority schedules delayed submit writes for reply promotion", async () => {

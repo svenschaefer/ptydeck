@@ -19,19 +19,7 @@ import {
   DEFAULT_REMOTE_RECONNECT_DELAY_MS,
   DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
 } from "./session-manager-remote-runtime.js";
-import { createSessionManagerTraceRuntime } from "./session-manager-trace-runtime.js";
-import { createSessionManagerLaunchRuntime } from "./session-manager-launch-runtime.js";
-import { createSessionManagerSessionRuntime } from "./session-manager-session-runtime.js";
-import { createSessionManagerStartupRuntime } from "./session-manager-startup-runtime.js";
-import { createSessionManagerReplayRuntime } from "./session-manager-replay-runtime.js";
-import { createSessionManagerTerminalRuntime } from "./session-manager-terminal-runtime.js";
-import { createSessionManagerPtyRuntime } from "./session-manager-pty-runtime.js";
-import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
-import { createSessionManagerAppIdentityRuntime } from "./session-manager-app-identity-runtime.js";
-import { createSessionManagerMutationRuntime } from "./session-manager-mutation-runtime.js";
-import {
-  applySessionPatch
-} from "./session-manager-lifecycle.js";
+import { createSessionManagerRuntimeAssembly } from "./session-manager-runtime-assembly.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
 const SESSION_KIND_LOCAL = "local";
@@ -39,8 +27,6 @@ const SESSION_KIND_SSH = "ssh";
 const SESSION_MANAGER_DIRNAME = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SSH_ASKPASS_PATH = join(SESSION_MANAGER_DIRNAME, "../libexec/ssh-askpass.sh");
 const DEFAULT_SSH_KNOWN_HOSTS_PATH = join(SESSION_MANAGER_DIRNAME, "../data/ssh_known_hosts");
-const SESSION_STATE_EXITED = "exited";
-const SESSION_ACTIVITY_STATE_ACTIVE = "active";
 const DEFAULT_SESSION_ACTIVITY_QUIET_MS = 1400;
 const DEFAULT_REMOTE_RECONNECT_STABLE_MS = 500;
 const DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS = 90;
@@ -110,14 +96,10 @@ export class SessionManager {
         ? remoteReconnectStableMs
         : DEFAULT_REMOTE_RECONNECT_STABLE_MS;
     this.createTraceId = typeof createTraceId === "function" ? createTraceId : randomUUID;
-    this.traceRuntime = createSessionManagerTraceRuntime({
-      createTraceId: this.createTraceId
-    });
     this.nowFn = typeof nowFn === "function" ? nowFn : Date.now;
     this.setTimeoutFn = typeof setTimeoutFn === "function" ? setTimeoutFn : setTimeout;
     this.clearTimeoutFn = typeof clearTimeoutFn === "function" ? clearTimeoutFn : clearTimeout;
-    this.inspectTerminalForegroundProcess =
-      typeof inspectTerminalForegroundProcess === "function" ? inspectTerminalForegroundProcess : inspectLinuxTerminalForegroundProcess;
+    this.inspectTerminalForegroundProcess = inspectTerminalForegroundProcess;
     this.foregroundProcessRefreshDelayMs =
       Number.isInteger(foregroundProcessRefreshDelayMs) && foregroundProcessRefreshDelayMs >= 0
         ? foregroundProcessRefreshDelayMs
@@ -142,149 +124,64 @@ export class SessionManager {
           rows,
           env: env || process.env
         }));
-    this.launchRuntime = createSessionManagerLaunchRuntime({
-      baseEnv: process.env,
-      createPty: this.createPty,
-      sshAskpassPath: this.sshAskpassPath,
-      sshKnownHostsPath: this.sshKnownHostsPath,
-      resolveSshTrustedHostKeyTypes: this.resolveSshTrustedHostKeyTypes,
-      remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-      remoteReconnectDelayMs: this.remoteReconnectDelayMs,
-      remoteReconnectStableMs: this.remoteReconnectStableMs,
-      nowFn: this.nowFn,
-      setTimeoutFn: this.setTimeoutFn,
-      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
-      clearRemoteReconnectTimers: (session) => this.clearRemoteReconnectTimers(session),
-      clearSessionActivityTimer: (session) => this.clearSessionActivityTimer(session),
-      clearLaunchPostStartInputTimer: (session) => this.clearLaunchPostStartInputTimer(session),
-      clearStartupTerminalQueryFallback: (session) => this.clearStartupTerminalQueryFallback(session),
-      clearForegroundProcessRefreshTimer: (session) => this.clearForegroundProcessRefreshTimer(session),
-      clearRemoteReconnectStabilizeTimer: (session) => this.clearRemoteReconnectStabilizeTimer(session),
-      attachPtyProcess: (session, launchBundle) => this.attachPtyProcess(session, launchBundle),
-      emitSessionUpdated: (session) => this.emitSessionUpdated(session),
-      emitSessionExit: (session, { exitCode, exitSignal, exitTimestamp }) => {
-        const trace = this.traceRuntime.createTraceEnvelope(session.traceSeed, {
-          sessionId: session.id,
-          source: session.traceSeed?.source || "pty"
-        });
-        this.updateSessionTraceSeed(session, trace, { source: session.traceSeed?.source || "pty" });
-        this.events.emit("session.exit", {
-          sessionId: session.id,
-          exitCode,
-          signal: exitSignal,
-          exitedAt: exitTimestamp,
-          updatedAt: session.meta.updatedAt,
-          session: { ...session.meta },
-          trace
-        });
-      },
-      getSessionById: (sessionId) => this.sessions.get(sessionId),
-      removeSessionById: (sessionId) => this.sessions.delete(sessionId)
-    });
-    this.terminalRuntime = createSessionManagerTerminalRuntime({
-      sessions: this.sessions,
-      getSessionOrThrow: (sessionId) => this.get(sessionId),
-      createTraceEnvelope: (seed, overrides = {}) => this.traceRuntime.createTraceEnvelope(seed, overrides),
-      normalizeTraceSeed: this.traceRuntime.normalizeTraceSeed,
-      emit: (eventName, payload) => this.events.emit(eventName, payload),
-      nowFn: this.nowFn,
-      setTimeoutFn: this.setTimeoutFn,
-      sessionActivityQuietMs: this.sessionActivityQuietMs,
-      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
-      clearSessionActivityTimer: (session) => this.clearSessionActivityTimer(session),
-      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
-      scheduleLaunchPostStartInputDispatch: (session, reason, delayMs = 0) =>
-        this.scheduleLaunchPostStartInputDispatch(session, reason, delayMs),
-      buildReconnectUnavailableError: (session) => this.buildReconnectUnavailableError(session),
-      scheduleSessionForegroundProcessIdentityRefresh: (session, options = {}) =>
-        this.scheduleSessionForegroundProcessIdentityRefresh(session, options)
-    });
-    this.startupRuntime = createSessionManagerStartupRuntime({
-      nowFn: this.nowFn,
-      setTimeoutFn: this.setTimeoutFn,
-      getSessionById: (sessionId) => this.sessions.get(sessionId),
-      clearPendingLaunchPostStartInput: (session) => this.clearPendingLaunchPostStartInput(session),
-      clearLaunchPostStartInputTimer: (session) => this.clearLaunchPostStartInputTimer(session),
-      clearStartupTerminalQueryFallback: (session) => this.clearStartupTerminalQueryFallback(session),
-      sendInput: (sessionId, data, options) => this.sendInput(sessionId, data, options),
-      normalizeTraceSeed: this.traceRuntime.normalizeTraceSeed,
-      countCursorPositionQueries: this.traceRuntime.countCursorPositionQueries,
-      buildCursorPositionReport: this.traceRuntime.buildCursorPositionReport,
-      startupPostInputFallbackMs: this.startupPostInputFallbackMs,
-      startupTerminalQueryFallbackWindowMs: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
-      startupTerminalQueryFallbackMaxResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES
-    });
-    this.replayRuntime = createSessionManagerReplayRuntime({
-      sessionReplayMemoryMaxChars: this.sessionReplayMemoryMaxChars
-    });
-    this.appIdentityRuntime = createSessionManagerAppIdentityRuntime({
-      nowFn: this.nowFn,
-      setTimeoutFn: this.setTimeoutFn,
-      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
-      inspectTerminalForegroundProcess: this.inspectTerminalForegroundProcess,
-      clearForegroundProcessRefreshTimer: (session) => this.clearForegroundProcessRefreshTimer(session),
-      emitSessionUpdated: (session, options) => this.emitSessionUpdated(session, options),
-      getSessionById: (sessionId) => this.sessions.get(sessionId)
-    });
-    this.sessionRuntime = createSessionManagerSessionRuntime({
+    const runtimeAssembly = createSessionManagerRuntimeAssembly({
       sessions: this.sessions,
       defaultShell: this.defaultShell,
       sessionMaxConcurrent: this.sessionMaxConcurrent,
       sessionIdleTimeoutMs: this.sessionIdleTimeoutMs,
       sessionMaxLifetimeMs: this.sessionMaxLifetimeMs,
       sessionReplayMemoryMaxChars: this.sessionReplayMemoryMaxChars,
+      sessionActivityQuietMs: this.sessionActivityQuietMs,
       remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
       remoteReconnectDelayMs: this.remoteReconnectDelayMs,
+      remoteReconnectStableMs: this.remoteReconnectStableMs,
+      sshAskpassPath: this.sshAskpassPath,
+      sshKnownHostsPath: this.sshKnownHostsPath,
+      resolveSshTrustedHostKeyTypes: this.resolveSshTrustedHostKeyTypes,
+      baseEnv: process.env,
+      createPty: this.createPty,
       nowFn: this.nowFn,
-      normalizeTraceSeed: this.traceRuntime.normalizeTraceSeed,
-      buildLaunchBundle: (options) => this.buildLaunchBundle(options),
-      createInitialIdentityRuntime: (identityInput, options) =>
-        this.appIdentityRuntime.createInitialIdentityRuntime(identityInput, options),
-      createTraceEnvelope: (seed, overrides = {}) => this.traceRuntime.createTraceEnvelope(seed, overrides),
-      updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
-      transitionToRunning: (session) => this.transitionToRunning(session),
-      attachPtyProcess: (session, launchBundle) => this.attachPtyProcess(session, launchBundle),
-      armLaunchPostStartInput: (session, launchSpec, options = {}) =>
-        this.armLaunchPostStartInput(session, launchSpec, options),
+      setTimeoutFn: this.setTimeoutFn,
+      createTraceId: this.createTraceId,
+      inspectTerminalForegroundProcess: this.inspectTerminalForegroundProcess,
+      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
+      startupPostInputFallbackMs: this.startupPostInputFallbackMs,
+      startupTerminalQueryFallbackWindowMs: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
+      startupTerminalQueryFallbackMaxResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES,
+      captureSessionStreamChunk: this.captureSessionStreamChunk,
+      nodePtyAsyncWriteOptions: this.nodePtyAsyncWriteOptions,
+      emitEvent: (eventName, payload) => this.events.emit(eventName, payload),
+      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
+      clearRemoteReconnectTimers: (session) => this.clearRemoteReconnectTimers(session),
       clearSessionActivityTimer: (session) => this.clearSessionActivityTimer(session),
       clearLaunchPostStartInputTimer: (session) => this.clearLaunchPostStartInputTimer(session),
+      clearPendingLaunchPostStartInput: (session) => this.clearPendingLaunchPostStartInput(session),
+      clearStartupTerminalQueryFallback: (session) => this.clearStartupTerminalQueryFallback(session),
       clearForegroundProcessRefreshTimer: (session) => this.clearForegroundProcessRefreshTimer(session),
-      clearRemoteReconnectTimers: (session) => this.clearRemoteReconnectTimers(session),
-      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
-      emitSessionCreated: (event) => this.events.emit("session.created", event),
-      emitSessionClosed: (event) => this.events.emit("session.closed", event)
-    });
-    this.mutationRuntime = createSessionManagerMutationRuntime({
+      clearRemoteReconnectStabilizeTimer: (session) => this.clearRemoteReconnectStabilizeTimer(session),
+      attachPtyProcess: (session, launchBundle) => this.attachPtyProcess(session, launchBundle),
+      emitSessionUpdated: (session, options) => this.emitSessionUpdated(session, options),
+      getSessionById: (sessionId) => this.sessions.get(sessionId),
       getSessionOrThrow: (sessionId) => this.get(sessionId),
-      nowFn: this.nowFn,
-      defaultShell: this.defaultShell,
-      remoteReconnectMaxAttempts: this.remoteReconnectMaxAttempts,
-      remoteReconnectDelayMs: this.remoteReconnectDelayMs,
-      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
-      clearRemoteReconnectTimers: (session) => this.clearRemoteReconnectTimers(session),
-      clearExpectedExitReason: (session) => this.clearExpectedExitReason(session),
+      removeSessionById: (sessionId) => this.sessions.delete(sessionId),
+      sendInput: (sessionId, data, options) => this.sendInput(sessionId, data, options),
       updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
-      applySessionPatch,
-      appIdentityRuntime: this.appIdentityRuntime
-    });
-    this.ptyRuntime = createSessionManagerPtyRuntime({
-      nowFn: this.nowFn,
-      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
-      nodePtyAsyncWriteOptions: this.nodePtyAsyncWriteOptions,
-      emit: (eventName, payload) => this.events.emit(eventName, payload),
-      createTraceEnvelope: (seed, overrides = {}) => this.traceRuntime.createTraceEnvelope(seed, overrides),
-      updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
-      observeStartupTerminalQueryFallback: (session, options = {}) => this.observeStartupTerminalQueryFallback(session, options),
-      observeSessionTerminalSignals: (session, chunk, options = {}) =>
-        this.observeSessionTerminalSignals(session, chunk, options),
-      observeSessionOutputHeuristics: (session, output, options = {}) =>
-        this.observeSessionOutputHeuristics(session, output, options),
-      captureSessionStreamChunk: this.captureSessionStreamChunk,
-      emitSessionUpdated: (session, options = {}) => this.emitSessionUpdated(session, options),
+      transitionToRunning: (session) => this.transitionToRunning(session),
+      armLaunchPostStartInput: (session, launchSpec, options = {}) =>
+        this.armLaunchPostStartInput(session, launchSpec, options),
+      scheduleLaunchPostStartInputDispatch: (session, reason, delayMs = 0) =>
+        this.scheduleLaunchPostStartInputDispatch(session, reason, delayMs),
+      buildReconnectUnavailableError: (session) => this.buildReconnectUnavailableError(session),
       appendReplayOutput: (session, cleaned, promptBoundaries = []) =>
         this.appendReplayOutput(session, cleaned, promptBoundaries),
       observePendingLaunchPostStartInput: (session, options = {}) =>
         this.observePendingLaunchPostStartInput(session, options),
+      observeStartupTerminalQueryFallback: (session, options = {}) =>
+        this.observeStartupTerminalQueryFallback(session, options),
+      observeSessionTerminalSignals: (session, chunk, options = {}) =>
+        this.observeSessionTerminalSignals(session, chunk, options),
+      observeSessionOutputHeuristics: (session, output, options = {}) =>
+        this.observeSessionOutputHeuristics(session, output, options),
       markRemoteSessionConnected: (session, timestamp) => this.markRemoteSessionConnected(session, timestamp),
       emitSessionActivityStarted: (session, timestamp) => this.emitSessionActivityStarted(session, timestamp),
       scheduleSessionActivityCompletion: (session) => this.scheduleSessionActivityCompletion(session),
@@ -293,6 +190,15 @@ export class SessionManager {
       handleAsyncPtyWriteEvent: (session, event = {}) => this.handleAsyncPtyWriteEvent(session, event),
       handlePtyExit: (session, exit) => this.handlePtyExit(session, exit)
     });
+    this.traceRuntime = runtimeAssembly.traceRuntime;
+    this.launchRuntime = runtimeAssembly.launchRuntime;
+    this.terminalRuntime = runtimeAssembly.terminalRuntime;
+    this.startupRuntime = runtimeAssembly.startupRuntime;
+    this.replayRuntime = runtimeAssembly.replayRuntime;
+    this.appIdentityRuntime = runtimeAssembly.appIdentityRuntime;
+    this.sessionRuntime = runtimeAssembly.sessionRuntime;
+    this.mutationRuntime = runtimeAssembly.mutationRuntime;
+    this.ptyRuntime = runtimeAssembly.ptyRuntime;
   }
 
   updateSessionTraceSeed(session, trace, overrides = {}) {

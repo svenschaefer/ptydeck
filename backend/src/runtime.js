@@ -20,12 +20,9 @@ import { createRuntimeLibraryNormalization } from "./runtime-library-normalizati
 import { createRuntimeLifecycle } from "./runtime-lifecycle.js";
 import { createRuntimeAccessPolicy } from "./runtime-access-policy.js";
 import { createRuntimeMetrics } from "./runtime-metrics.js";
-import { createRuntimeResourceDispatch } from "./runtime-resource-dispatch.js";
-import { createRuntimeSessionDispatch } from "./runtime-session-dispatch.js";
 import { createRuntimeSessionAuthority } from "./runtime-session-authority.js";
 import { createRuntimeSessionControlAuthority } from "./runtime-session-control-authority.js";
-import { createRuntimeSessionControlDispatch } from "./runtime-session-control-dispatch.js";
-import { createRuntimeSessionEventAuthority } from "./runtime-session-event-authority.js";
+import { createRuntimeSessionDispatchAuthority } from "./runtime-session-dispatch-authority.js";
 import { createRuntimeSessionMessagingAuthority } from "./runtime-session-messaging-authority.js";
 import { createRuntimeSessionResourceAuthority } from "./runtime-session-resource-authority.js";
 import { createRuntimeSessionState } from "./runtime-session-state.js";
@@ -1719,7 +1716,12 @@ export function createRuntime(config) {
     }, traceSeed);
   }
 
-  const resourceDispatch = createRuntimeResourceDispatch({
+  const {
+    resourceDispatch,
+    sessionControlDispatch,
+    sessionDispatch,
+    runtimeSessionEventAuthority
+  } = createRuntimeSessionDispatchAuthority({
     validateResponse,
     parseBooleanQueryParam,
     normalizeCustomCommandScope,
@@ -1770,25 +1772,16 @@ export function createRuntime(config) {
     syncSshKnownHostsFile,
     probeSshHostKeysOrThrow,
     deleteSshTrustEntry,
-    messagingRuntime
-  });
-  const sessionControlDispatch = createRuntimeSessionControlDispatch({
-    validateResponse,
+    messagingRuntime,
     takeSessionControlOrThrow,
     takeSessionControlScopeOrThrow,
     releaseSessionControlOrThrow,
     transferSessionControlOrThrow,
     renameSessionControlClientOrThrow,
     forgetSessionControlClientOrThrow,
-    getApiSessionOrThrow,
-    persistNow
-  });
-  const sessionDispatch = createRuntimeSessionDispatch({
-    validateResponse,
     createSessionRateLimiter,
     rateLimitRestCreateMax: config.rateLimitRestCreateMax,
     normalizeConnectionProfileIdInput,
-    getConnectionProfileOrThrow,
     normalizeSessionKind,
     normalizeSessionStartupConfig,
     normalizeSessionRemoteConnection,
@@ -1802,14 +1795,11 @@ export function createRuntime(config) {
     hasKnownDeck: (deckId) => decks.has(deckId),
     normalizeConnectionProfileDeckId,
     normalizeQuickSendUsageMutation,
-    getApiSessionOrThrow,
-    listApiSessions,
     buildSessionReplayExportOrThrow,
     buildSessionReplayExcerptOrThrow,
     buildSessionFileDownloadOrThrow,
     uploadSessionFileOrThrow,
     ensureSessionControllerAccess,
-    messagingRuntime,
     manager,
     assignSessionQuickIdToken,
     deleteSessionQuickIdToken,
@@ -1818,10 +1808,7 @@ export function createRuntime(config) {
     deleteSessionControlState,
     reconcileSessionControllerForSession,
     toApiSession,
-    persistNow,
     persistSoon,
-    broadcast,
-    broadcastSessionUpdated,
     removeCustomCommandsForSession,
     cleanupLayoutProfiles,
     cleanupWorkspacePresets,
@@ -1833,20 +1820,10 @@ export function createRuntime(config) {
     swapSessionQuickIds,
     recordSessionLastInput,
     defaultSshClient: DEFAULT_SSH_CLIENT,
-    sessionKindSsh: SESSION_KIND_SSH
-  });
-  const runtimeSessionEventAuthority = createRuntimeSessionEventAuthority({
-    manager,
-    messagingRuntime,
+    sessionKindSsh: SESSION_KIND_SSH,
     startupWarmup,
     metrics,
     logDebug,
-    logError: (...args) => console.error(...args),
-    getApiSessionOrThrow,
-    toApiSession,
-    broadcast,
-    persistSoon,
-    persistNow,
     normalizeTraceSeed
   });
   runtimeSessionEventAuthority.registerManagerEventHandlers();

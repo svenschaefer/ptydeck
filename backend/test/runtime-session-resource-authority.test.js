@@ -374,6 +374,17 @@ test("runtime session resource authority rejects directory targets during upload
   );
 });
 
+test("runtime session resource authority rejects directory targets during download", async () => {
+  const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
+  await mkdir(join(transferRoot, "nested"), { recursive: true });
+
+  const { authority } = createHarness({ transferRoot });
+  await assert.rejects(
+    () => authority.buildSessionFileDownloadOrThrow("session-1", "nested"),
+    (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
+  );
+});
+
 test("runtime session resource authority rejects targets that resolve outside the transfer root", async () => {
   const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
   const outsideRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-outside-"));

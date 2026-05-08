@@ -525,6 +525,48 @@ test("runtime library normalization keeps lenient split-layout fallback branches
   });
 });
 
+test("runtime library normalization keeps malformed split-layout node branches fail-closed in lenient mode", () => {
+  const normalization = createHarness();
+
+  const malformedNodeLayout = normalization.normalizeLayoutProfileLayout(
+    {
+      deckSplitLayouts: {
+        default: {
+          root: null,
+          paneSessions: {
+            main: ["session-1"]
+          }
+        },
+        ops: {
+          root: {
+            type: "row",
+            children: "invalid"
+          },
+          paneSessions: {
+            main: ["session-2"]
+          }
+        }
+      }
+    },
+    {
+      strict: false,
+      hasKnownSession: (sessionId) => ["session-1", "session-2"].includes(sessionId),
+      resolveSessionDeckId: (sessionId) => (sessionId === "session-2" ? "ops" : "default")
+    }
+  );
+
+  assert.deepEqual(malformedNodeLayout.deckSplitLayouts, {
+    default: {
+      root: { type: "pane", paneId: "main" },
+      paneSessions: { main: ["session-1"] }
+    },
+    ops: {
+      root: { type: "pane", paneId: "main" },
+      paneSessions: { main: ["session-2"] }
+    }
+  });
+});
+
 test("runtime library normalization keeps malformed weight and workspace-group fallbacks deterministic in lenient mode", () => {
   const normalization = createHarness();
 
