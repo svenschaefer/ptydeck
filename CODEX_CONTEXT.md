@@ -32,6 +32,23 @@ Last updated: 2026-05-12 (the backend runtime still delegates session/resource r
   - `scope:global` / `scope:project` => do not send `sessionId` at all
 - Regression coverage for this FE/BE contract now lives in `frontend/test/command-executor-custom-admin-handlers.test.js`.
 
+## Planned Input Composer Placement Modes
+
+- The product now has one agreed queued feature contract for reducing accidental sends to the wrong terminal by making the composer block track terminal context more explicitly.
+- Two global composer-placement modes are planned:
+  - `shared-footer`: the existing shared composer block remains below the full terminal grid
+  - `active-overlay`: one shared composer block is rendered as a non-resizing overlay inside the active terminal, below the terminal header and above the terminal content
+- A per-terminal pin contract is planned only for `active-overlay`:
+  - multiple terminals may be pinned at the same time
+  - each pinned terminal gets its own overlay composer block
+  - pinned terminals keep their own drafts
+  - non-pinned terminals continue to use one shared active-overlay draft
+  - if a terminal is pinned, that terminal must not also show the shared active-overlay composer block
+- Persistence for this feature is intentionally not browser-local:
+  - composer mode, pinned session ids, shared overlay draft, and pinned per-session drafts are planned as server-side persisted state
+  - the persistence scope is per operator client, not one shared instance-wide setting for all clients
+- This feature is queued as roadmap wave `v0.4.0-H183` through tasks `CMP-401` to `CMP-404`.
+
 ## Repo-Wide Quality Review - 2026-05-08
 
 Fresh repo-wide evidence on the post-`H181` review tree that promoted `v0.4.0-H182`:

@@ -16,7 +16,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active wave:
   - `v0.4.0-H182` Repo-Wide Quality and Coverage Follow-Up
 - Queued next waves:
-  - none
+  - `v0.4.0-H183` Operator Input Composer Placement Modes
 
 ## Active Wave Order
 
@@ -33,6 +33,24 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - `QLT-357 -> QLT-359`
 - `QLT-360 -> QLT-361`
 - `QLT-360 -> QLT-362`
+
+## Queued Wave Order
+
+### `v0.4.0-H183` Operator Input Composer Placement Modes
+
+1. `CMP-401` Owner `BE`
+2. `CMP-402` Owner `FE`
+3. `CMP-403` Owner `FE`
+4. `CMP-404` Owner `QA`
+
+## Queued Wave Dependencies
+
+- `CMP-401 -> CMP-402`
+- `CMP-401 -> CMP-403`
+- `CMP-401 -> CMP-404`
+- `CMP-402 -> CMP-403`
+- `CMP-402 -> CMP-404`
+- `CMP-403 -> CMP-404`
 
 ## Sequencing Rules
 
