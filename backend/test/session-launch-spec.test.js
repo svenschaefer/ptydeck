@@ -7,7 +7,8 @@ import {
   normalizeRemoteAuth,
   normalizeRemoteConnection,
   normalizeRemoteSecret,
-  remoteAuthRequiresSecret
+  remoteAuthRequiresSecret,
+  resolveLocalShellCommand
 } from "../src/session-launch-spec.js";
 
 test("session launch spec normalizes remote connection defaults and rejects non-ssh payloads", () => {
@@ -148,6 +149,16 @@ test("session launch spec builds local launch payloads from normalized start com
 });
 
 test("session launch spec normalizes direct PowerShell local shell aliases", () => {
+  const powerShellShort = buildSessionLaunchSpec({
+    kind: "local",
+    shell: "ps",
+    spawnCwd: "/workspace/project",
+    startCwd: "/workspace/project",
+    startCommand: ""
+  });
+  assert.equal(powerShellShort.shellAdapterId, "powershell.exe");
+  assert.equal(powerShellShort.command, "powershell.exe");
+
   const windowsPowerShell = buildSessionLaunchSpec({
     kind: "local",
     shell: "powershell",
@@ -167,6 +178,57 @@ test("session launch spec normalizes direct PowerShell local shell aliases", () 
   });
   assert.equal(powerShellSeven.shellAdapterId, "pwsh.exe");
   assert.equal(powerShellSeven.command, "pwsh.exe");
+});
+
+test("session launch spec resolves local PowerShell launchers from PATH and WSL Windows fallback locations", () => {
+  assert.equal(
+    resolveLocalShellCommand("pwsh", {
+      pathEnv: "/usr/bin",
+      isExecutableFileFn: (path) => path === "/mnt/c/Program Files/PowerShell/7/pwsh.exe",
+      readDirFn: () => [
+        {
+          name: "7",
+          isDirectory() {
+            return true;
+          }
+        }
+      ]
+    }),
+    "/mnt/c/Program Files/PowerShell/7/pwsh.exe"
+  );
+
+  assert.equal(
+    resolveLocalShellCommand("ps", {
+      pathEnv: "/usr/bin",
+      isExecutableFileFn: (path) => path === "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe"
+    }),
+    "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe"
+  );
+
+  assert.equal(
+    resolveLocalShellCommand("bash", {
+      pathEnv: "/usr/local/bin:/bin",
+      isExecutableFileFn: (path) => path === "/bin/bash"
+    }),
+    "/bin/bash"
+  );
+
+  assert.equal(
+    resolveLocalShellCommand("/usr/bin/bash", {
+      pathEnv: "/usr/local/bin:/bin",
+      isExecutableFileFn: (path) => path === "/usr/bin/bash"
+    }),
+    "/usr/bin/bash"
+  );
+
+  assert.equal(
+    resolveLocalShellCommand("pwsh", {
+      pathEnv: "/usr/bin",
+      isExecutableFileFn: () => false,
+      readDirFn: () => []
+    }),
+    ""
+  );
 });
 
 test("session launch spec builds deterministic password ssh launches with askpass env", () => {

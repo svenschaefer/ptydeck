@@ -431,6 +431,54 @@ test("session-manager launch runtime keeps failed reconnect attempts bounded and
   assert.equal(sessionUpdates.length, 2);
 });
 
+test("session-manager launch runtime resolves direct PowerShell aliases before spawning local sessions", () => {
+  const { runtime, createdPtys } = createLaunchRuntimeHarness({
+    resolveLocalShellCommand(shell) {
+      if (shell === "powershell.exe") {
+        return "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe";
+      }
+      return "";
+    }
+  });
+
+  const launchBundle = runtime.buildLaunchBundle({
+    kind: "local",
+    shell: "powershell",
+    cwd: "/workspace/project",
+    startCwd: "/workspace/project",
+    startCommand: ""
+  });
+
+  assert.equal(launchBundle.launchSpec.command, "powershell.exe");
+  assert.equal(launchBundle.launchSpec.shellAdapterId, "powershell.exe");
+  assert.equal(createdPtys[0].spawnOptions.command, "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe");
+});
+
+test("session-manager launch runtime fails closed with a clear error when a requested local launcher is unavailable", () => {
+  const { runtime, createdPtys } = createLaunchRuntimeHarness({
+    resolveLocalShellCommand() {
+      return "";
+    }
+  });
+
+  assert.throws(
+    () =>
+      runtime.buildLaunchBundle({
+        kind: "local",
+        shell: "pwsh",
+        cwd: "/workspace/project",
+        startCwd: "/workspace/project",
+        startCommand: ""
+      }),
+    (error) =>
+      error instanceof Error &&
+      error.statusCode === 400 &&
+      error.error === "ValidationError" &&
+      /Install PowerShell 7 or use '\/new powershell'/.test(error.message)
+  );
+  assert.equal(createdPtys.length, 0);
+});
+
 test("session-manager launch runtime schedules ssh reconnects on unexpected transport exit and emits closed exits otherwise", () => {
   const { runtime, sessions, sessionExits, timers } = createLaunchRuntimeHarness();
 

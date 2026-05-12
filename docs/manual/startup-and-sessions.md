@@ -10,9 +10,11 @@ You can create sessions from the sidebar, from the `New Session` action, or with
 /new bash
 /new zsh
 /new powershell
+/new ps
+/new pwsh
 ```
 
-On WSL-backed installs, `/new powershell` launches Windows PowerShell directly instead of opening a WSL shell and running PowerShell inside it. If PowerShell 7 is installed on PATH, `/new pwsh` starts that launcher directly.
+On WSL-backed installs, `/new powershell` launches Windows PowerShell directly instead of opening a WSL shell and running PowerShell inside it. `/new ps` is shorthand for the same launcher. If PowerShell 7 is installed in a standard Windows location or is already available on PATH, `/new pwsh` starts that launcher directly.
 
 If you already know the deck you want, create or switch the deck first:
 

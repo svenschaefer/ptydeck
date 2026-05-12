@@ -1,4 +1,6 @@
+import { accessSync, constants, readdirSync } from "node:fs";
 import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
 
 import { ApiError } from "./errors.js";
 
@@ -15,8 +17,11 @@ const REMOTE_USERNAME_MAX_LENGTH = 64;
 const REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH = 1024;
 const REMOTE_SECRET_MAX_LENGTH = 4096;
 const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
+const WINDOWS_POWERSHELL_EXE_PATH = "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe";
+const WINDOWS_POWERSHELL_CORE_ROOT = "/mnt/c/Program Files/PowerShell";
 const LOCAL_SHELL_ALIAS_MAP = Object.freeze(
   new Map([
+    ["ps", "powershell.exe"],
     ["powershell", "powershell.exe"],
     ["pwsh", "pwsh.exe"]
   ])
@@ -186,13 +191,90 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'"'"'`)}'`;
 }
 
-function normalizeLocalShellCommand(shell) {
+function isExecutableFile(path, accessSyncFn = accessSync) {
+  try {
+    accessSyncFn(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeLocalShellCommand(shell) {
   const normalized = typeof shell === "string" ? shell.trim() : "";
   if (!normalized) {
     return "";
   }
   const alias = LOCAL_SHELL_ALIAS_MAP.get(normalized.toLowerCase());
   return alias || normalized;
+}
+
+function comparePowerShellVersionLabels(left, right) {
+  const leftParts = String(left)
+    .split(/[^0-9]+/)
+    .filter(Boolean)
+    .map((value) => Number.parseInt(value, 10));
+  const rightParts = String(right)
+    .split(/[^0-9]+/)
+    .filter(Boolean)
+    .map((value) => Number.parseInt(value, 10));
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftValue = leftParts[index] ?? 0;
+    const rightValue = rightParts[index] ?? 0;
+    if (leftValue !== rightValue) {
+      return rightValue - leftValue;
+    }
+  }
+  return String(right).localeCompare(String(left), "en-US", { sensitivity: "base" });
+}
+
+function resolvePowerShellCoreExecutable({ isExecutableFileFn = isExecutableFile, readDirFn = readdirSync } = {}) {
+  let directoryEntries = [];
+  try {
+    directoryEntries = readDirFn(WINDOWS_POWERSHELL_CORE_ROOT, { withFileTypes: true });
+  } catch {
+    return "";
+  }
+  const candidates = directoryEntries
+    .filter((entry) => entry?.isDirectory?.())
+    .map((entry) => join(WINDOWS_POWERSHELL_CORE_ROOT, entry.name, "pwsh.exe"))
+    .filter((candidate) => isExecutableFileFn(candidate))
+    .sort((left, right) =>
+      comparePowerShellVersionLabels(left.split("/").at(-2) || "", right.split("/").at(-2) || "")
+    );
+  return candidates[0] || "";
+}
+
+export function resolveLocalShellCommand(shell, options = {}) {
+  const normalized = normalizeLocalShellCommand(shell);
+  if (!normalized) {
+    return "";
+  }
+  const pathEnv = typeof options.pathEnv === "string" ? options.pathEnv : process.env.PATH || "";
+  const isExecutableFileFn =
+    typeof options.isExecutableFileFn === "function" ? options.isExecutableFileFn : (path) => isExecutableFile(path);
+  const readDirFn = typeof options.readDirFn === "function" ? options.readDirFn : readdirSync;
+  if (normalized.includes("/") || isAbsolute(normalized)) {
+    return isExecutableFileFn(normalized) ? normalized : "";
+  }
+  for (const directory of pathEnv.split(":")) {
+    const trimmedDirectory = directory.trim();
+    if (!trimmedDirectory) {
+      continue;
+    }
+    const candidate = join(trimmedDirectory, normalized);
+    if (isExecutableFileFn(candidate)) {
+      return candidate;
+    }
+  }
+  if (normalized === "powershell.exe" && isExecutableFileFn(WINDOWS_POWERSHELL_EXE_PATH)) {
+    return WINDOWS_POWERSHELL_EXE_PATH;
+  }
+  if (normalized === "pwsh.exe") {
+    return resolvePowerShellCoreExecutable({ isExecutableFileFn, readDirFn });
+  }
+  return "";
 }
 
 function buildSshRemoteCommand({ startCwd, startCommand }) {

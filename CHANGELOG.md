@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-05-12
+
+- [x] Direct local PowerShell launches now resolve WSL-backed Windows launcher paths more robustly instead of relying only on the backend PATH. `backend/src/session-manager-launch-runtime.js` now resolves local shell launchers before PTY spawn, while `backend/src/session-launch-spec.js` now recognizes `/new ps` as shorthand for Windows PowerShell and can resolve `powershell.exe` plus standard `C:\Program Files\PowerShell\<version>\pwsh.exe` installs into absolute WSL paths.
+- [x] Missing local PowerShell launchers now fail closed with an operator-facing validation error instead of surfacing the raw PTY spawn failure `execvp(3) failed.: No such file or directory`. The shipped contract now distinguishes missing `pwsh.exe` explicitly and tells the operator to install PowerShell 7 or use `/new powershell`.
+- [x] Direct deterministic regression coverage for the PowerShell launch contract now lives in `backend/test/session-launch-spec.test.js`, `backend/test/session-manager-launch-runtime.test.js`, and `frontend/test/command-schema.test.js`. The docs/help surface in `README.md`, `docs/manual/startup-and-sessions.md`, `docs/reference/commands.md`, and the generated handbook artifacts now also advertise `/new ps` and the standard-Windows-location `pwsh` fallback.
+- [x] Validation for the PowerShell launch polish passed with `node --check backend/src/session-launch-spec.js backend/src/session-manager-launch-runtime.js frontend/src/public/command-schema.js`, `node --test backend/test/session-launch-spec.test.js backend/test/session-manager-launch-runtime.test.js frontend/test/command-schema.test.js`, `npm run docs:generate`, `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`.
+
 ## 2026-05-08
 
 - [x] The custom-command admin path now omits `sessionId` entirely for non-session-scoped definitions instead of serializing `sessionId: null` into the upsert payload. This fixes the real frontend/backend contract bug behind `/custom scope:global ...` failing with `Field 'sessionId' must be a string.` even though the slash-command syntax itself was valid.

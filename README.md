@@ -122,6 +122,8 @@ Start a direct local Windows PowerShell session from WSL-backed installs:
 
 ```text
 /new powershell
+/new ps
+/new pwsh
 ```
 
 Route a slash command to another session without changing the active one:

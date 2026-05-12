@@ -224,7 +224,7 @@ create a new session
 ### Notes
 
 - The optional shell token is passed through to the backend as the local session launcher.
-- Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. Use `/new pwsh` when PowerShell 7 is available on PATH.
+- Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. `/new ps` is shorthand for the same launcher. Use `/new pwsh` when PowerShell 7 is installed in a standard Windows location or already available on PATH.
 
 ### Aliases
 

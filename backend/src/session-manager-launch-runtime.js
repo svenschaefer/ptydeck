@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 
 import { ApiError } from "./errors.js";
-import { buildSessionLaunchSpec } from "./session-launch-spec.js";
+import { buildSessionLaunchSpec, normalizeLocalShellCommand, resolveLocalShellCommand } from "./session-launch-spec.js";
 import {
   buildReconnectUnavailableErrorDetails,
   buildRemoteReconnectAttemptState,
@@ -23,6 +23,10 @@ function normalizeEnv(env) {
 export function createSessionManagerLaunchRuntime(dependencies = {}) {
   const baseEnv = dependencies.baseEnv && typeof dependencies.baseEnv === "object" ? dependencies.baseEnv : process.env;
   const createPty = typeof dependencies.createPty === "function" ? dependencies.createPty : () => null;
+  const resolveLocalShellCommandFn =
+    typeof dependencies.resolveLocalShellCommand === "function"
+      ? dependencies.resolveLocalShellCommand
+      : (shell) => resolveLocalShellCommand(shell, { pathEnv: baseEnv.PATH });
   const sshAskpassPath = typeof dependencies.sshAskpassPath === "string" ? dependencies.sshAskpassPath : "";
   const sshKnownHostsPath = typeof dependencies.sshKnownHostsPath === "string" ? dependencies.sshKnownHostsPath : "";
   const resolveSshTrustedHostKeyTypes =
@@ -64,6 +68,39 @@ export function createSessionManagerLaunchRuntime(dependencies = {}) {
   const getSessionById = typeof dependencies.getSessionById === "function" ? dependencies.getSessionById : () => null;
   const removeSessionById = typeof dependencies.removeSessionById === "function" ? dependencies.removeSessionById : () => {};
 
+  function buildLocalShellNotFoundError(shell) {
+    const normalizedShell = normalizeLocalShellCommand(shell);
+    if (normalizedShell === "pwsh.exe") {
+      return new ApiError(
+        400,
+        "ValidationError",
+        "Local shell launcher 'pwsh.exe' was not found on the backend PATH or in supported Windows PowerShell install locations. Install PowerShell 7 or use '/new powershell'."
+      );
+    }
+    if (normalizedShell === "powershell.exe") {
+      return new ApiError(
+        400,
+        "ValidationError",
+        "Local shell launcher 'powershell.exe' was not found on the backend PATH or in supported Windows PowerShell install locations."
+      );
+    }
+    return new ApiError(
+      400,
+      "ValidationError",
+      `Local shell launcher '${normalizedShell || shell || "default"}' was not found on the backend PATH.`
+    );
+  }
+
+  function resolveLocalSpawnCommand(launchSpec) {
+    if (!launchSpec || typeof launchSpec.command !== "string" || !launchSpec.command) {
+      return "";
+    }
+    if (launchSpec.command === "powershell.exe" || launchSpec.command === "pwsh.exe") {
+      return resolveLocalShellCommandFn(launchSpec.command);
+    }
+    return launchSpec.command;
+  }
+
   function buildLaunchBundle({
     kind,
     shell,
@@ -91,6 +128,11 @@ export function createSessionManagerLaunchRuntime(dependencies = {}) {
       sshAskpassPath,
       sshKnownHostsPath
     });
+    const resolvedSpawnCommand =
+      kind === SESSION_KIND_SSH ? launchSpec.command : resolveLocalSpawnCommand(launchSpec);
+    if (kind !== SESSION_KIND_SSH && !resolvedSpawnCommand) {
+      throw buildLocalShellNotFoundError(launchSpec.command);
+    }
     const shellAdapter = createShellAdapter(launchSpec.shellAdapterId);
     const ptyEnv = shellAdapter.prepareSpawnEnv({
       ...baseEnv,
@@ -98,8 +140,8 @@ export function createSessionManagerLaunchRuntime(dependencies = {}) {
       ...launchSpec.ptyEnvAdditions
     });
     const ptyProcess = createPty({
-      shell: launchSpec.command,
-      command: launchSpec.command,
+      shell: resolvedSpawnCommand,
+      command: resolvedSpawnCommand,
       args: launchSpec.args,
       cwd: launchSpec.spawnCwd,
       cols: 80,

@@ -49,7 +49,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(deck.summary, "/deck | /deck new <name> | /deck rename ... | /deck switch <deckSelector> | /deck delete [deckSelector] [force]");
   assert.deepEqual(newCommand.notes, [
     "The optional shell token is passed through to the backend as the local session launcher.",
-    "Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. Use `/new pwsh` when PowerShell 7 is available on PATH."
+    "Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. `/new ps` is shorthand for the same launcher. Use `/new pwsh` when PowerShell 7 is installed in a standard Windows location or already available on PATH."
   ]);
   assert.equal(
     connection.summary,
@@ -196,6 +196,7 @@ test("command schema formats topic help text for commands and subcommands", () =
   assert.match(newHelp, /^\/new$/m);
   assert.match(newHelp, /Usage: \/new \[shell]/);
   assert.match(newHelp, /\/new powershell/);
+  assert.match(newHelp, /\/new ps/);
   assert.match(newHelp, /\/new pwsh/);
 
   const topicHelp = createCommandTopicHelpText("deck", "", ["deck", "help"]);
@@ -270,7 +271,7 @@ test("command schema registry resolves declarative command definitions by name",
   const registry = createSlashCommandRegistry(["new", "deck", "connection", "ssh", "layout", "workspace", "broadcast", "share", "settings", "help"]);
   assert.deepEqual(registry.get("new")?.notes, [
     "The optional shell token is passed through to the backend as the local session launcher.",
-    "Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. Use `/new pwsh` when PowerShell 7 is available on PATH."
+    "Use `/new powershell` to open Windows PowerShell directly from WSL-backed installs. `/new ps` is shorthand for the same launcher. Use `/new pwsh` when PowerShell 7 is installed in a standard Windows location or already available on PATH."
   ]);
   assert.equal(registry.get("deck")?.insertText, "deck");
   assert.deepEqual(registry.get("connection")?.subcommands?.apply?.usage, ["/connection apply <profile>"]);
