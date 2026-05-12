@@ -38,6 +38,12 @@ test("runtime route table matches resource routes and decodes ids deterministica
     kind: "getWorkspacePreset",
     params: { presetId: "preset-a" }
   });
+  assertRoute("/api/v1/operator/composer-placement", "GET", {
+    kind: "getOperatorComposerPlacement"
+  });
+  assertRoute("/api/v1/operator/composer-placement", "PATCH", {
+    kind: "updateOperatorComposerPlacement"
+  });
   assertRoute("/api/v1/ssh-trust-entries/trust-abc", "DELETE", {
     kind: "deleteSshTrustEntry",
     params: { entryId: "trust-abc" }
@@ -82,6 +88,10 @@ test("runtime route table normalizes metrics paths for promoted resource routes"
   assert.equal(
     normalizeRuntimeMetricsPath("/api/v1/workspace-presets/preset-a"),
     "/api/v1/workspace-presets/{presetId}"
+  );
+  assert.equal(
+    normalizeRuntimeMetricsPath("/api/v1/operator/composer-placement"),
+    "/api/v1/operator/composer-placement"
   );
   assert.equal(
     normalizeRuntimeMetricsPath("/api/v1/ssh-trust-entries/trust-abc"),

@@ -351,6 +351,7 @@ test("runtime catalog authority snapshots persisted runtime state with session-c
   assert.deepEqual(snapshot.workspacePresets.map((entry) => entry.id), ["workspace-1"]);
   assert.deepEqual(snapshot.sshTrustEntries.map((entry) => entry.id), ["trust-1"]);
   assert.deepEqual(snapshot.shareLinks.map((entry) => entry.id), ["share-1"]);
+  assert.deepEqual(snapshot.operatorComposerPlacements, []);
   assert.deepEqual(
     snapshot.messagingTelegramTopicBindings.map((entry) => `${entry.chatId}:${entry.sessionId}`),
     ["099:session-1", "100:session-2"]

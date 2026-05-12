@@ -158,5 +158,7 @@ test("runtime http helpers enforce TLS ingress and keep route scopes determinist
   assert.equal(requiredScopeForRoute("wsTicket"), "ws:connect");
   assert.equal(requiredScopeForRoute("createSession"), "sessions:create");
   assert.equal(requiredScopeForRoute("downloadSessionFile"), "sessions:read");
+  assert.equal(requiredScopeForRoute("getOperatorComposerPlacement"), "sessions:read");
+  assert.equal(requiredScopeForRoute("updateOperatorComposerPlacement"), "sessions:write");
   assert.equal(requiredScopeForRoute("renameSessionControlClient"), "sessions:write");
 });

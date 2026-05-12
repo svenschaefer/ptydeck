@@ -7,7 +7,7 @@ import { createAppRuntimeOperatorSupportAssembly } from "./app-runtime-operator-
 import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-composition.js";
 import { createAppRuntimeSessionSurfaceAssembly } from "./app-runtime-session-surface-assembly.js";
 import { createAppRuntimeSessionGridActions } from "./app-runtime-session-grid-actions.js";
-import { createAppRuntimeStartupHelperAssembly } from "./app-runtime-startup-helper-assembly.js";
+import { createAppRuntimeStartupHelperComposition } from "./app-runtime-startup-helper-composition.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
@@ -1180,7 +1180,7 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   slashWorkflowRuntimeController,
   commandPaletteRuntimeController,
   appRuntimeInitializationController
-} = createAppRuntimeStartupHelperAssembly({
+} = createAppRuntimeStartupHelperComposition({
   store,
   api,
   config,
@@ -1200,7 +1200,6 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   defaultTerminalTheme: DEFAULT_TERMINAL_THEME,
   streamInterpretationPluginEngine,
   streamDebugTraceController,
-  traceDebugController,
   pasteObservationRuntimeController,
   appCommandUiFacadeController,
   appLayoutDeckFacadeController,
@@ -1252,10 +1251,8 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   commandPaletteCloseBtn,
   maybeRedirectToCanonicalOrigin,
   sessionControlRuntimeController,
-  trustedLocalClientRuntimeController,
   startupBackupRuntimeController,
   setRuntimeClientId,
-  appCommandUiFacadeController,
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
   devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS

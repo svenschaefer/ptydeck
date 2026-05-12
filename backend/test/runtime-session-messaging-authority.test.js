@@ -154,6 +154,45 @@ test("runtime session messaging authority shapes api sessions with derived ident
   });
 });
 
+test("runtime session messaging authority preserves explicit state and known identities without re-deriving hints", () => {
+  let deriveCalls = 0;
+  const { authority } = createHarness({
+    normalizeTerminalAppIdentity: (identity, { fallbackUpdatedAt } = {}) => ({
+      source: identity?.source || "foreground-process",
+      family: identity?.family || "coding-agent",
+      label: identity?.label || "codex",
+      updatedAt: fallbackUpdatedAt
+    }),
+    deriveTerminalAppIdentityFromSessionHints: () => {
+      deriveCalls += 1;
+      return {
+        source: "derived",
+        family: "shell",
+        label: "bash",
+        updatedAt: 0
+      };
+    }
+  });
+
+  const payload = authority.toApiSession(
+    {
+      id: "session-2",
+      shell: "pwsh",
+      appIdentity: {
+        source: "foreground-process",
+        family: "coding-agent",
+        label: "codex"
+      }
+    },
+    "degraded"
+  );
+
+  assert.equal(payload.state, "degraded");
+  assert.equal(payload.appIdentity.source, "foreground-process");
+  assert.equal(payload.appIdentity.family, "coding-agent");
+  assert.equal(deriveCalls, 0);
+});
+
 test("runtime session messaging authority resolves and rejects messaging targets deterministically", () => {
   const sessions = [
     { id: "session-1", name: "ops", deckId: "default" },
@@ -406,4 +445,26 @@ test("runtime session messaging authority schedules delayed submit writes for re
   assert.equal(harness.observeCalls[1].trace.replyInputText, "echo hi");
   assert.deepEqual(harness.recordLastInputCalls, [["session-1", null, null]]);
   assert.deepEqual(harness.broadcastCalls, [{ sessionId: "session-1", trace: { source: "messaging:telegram", requestId: "req-2" } }]);
+});
+
+test("runtime session messaging authority schedules submit-only delayed writes when the reply body is empty", async () => {
+  const harness = createHarness();
+
+  const pending = harness.authority.requestMessagingSendInput("session-1", "\r", {
+    trace: { source: "messaging:telegram", requestId: "req-3" }
+  });
+
+  assert.equal(harness.sendInputCalls.length, 0);
+  assert.equal(harness.observeCalls.length, 0);
+  assert.equal(harness.timeoutCalls.length, 1);
+
+  harness.timeoutCalls[0].handler();
+  const result = await pending;
+
+  assert.equal(result.id, "session-1");
+  assert.equal(harness.sendInputCalls.length, 1);
+  assert.equal(harness.sendInputCalls[0].data, "\r");
+  assert.equal(harness.observeCalls.length, 1);
+  assert.equal(harness.observeCalls[0].trace.replyInputText, undefined);
+  assert.deepEqual(harness.recordLastInputCalls, [["session-1", null, null]]);
 });

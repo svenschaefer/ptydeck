@@ -28,6 +28,9 @@ const appRuntimeCompositionHelperAssemblyPath = fileURLToPath(
 const appRuntimeStartupHelperAssemblyPath = fileURLToPath(
   new URL("../src/public/app-runtime-startup-helper-assembly.js", import.meta.url)
 );
+const appRuntimeStartupHelperCompositionPath = fileURLToPath(
+  new URL("../src/public/app-runtime-startup-helper-composition.js", import.meta.url)
+);
 const layoutWorkspaceCaptureStatePath = fileURLToPath(
   new URL("../src/public/layout-workspace-capture-state.js", import.meta.url)
 );
@@ -110,7 +113,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppRuntimeRecoveryComposition",
     "createAppRuntimeSessionSurfaceAssembly",
     "createAppRuntimeSessionGridActions",
-    "createAppRuntimeStartupHelperAssembly",
+    "createAppRuntimeStartupHelperComposition",
     "createSessionRuntimeController",
     "createSessionStreamAuthorityController",
     "createSessionViewModel",
@@ -262,6 +265,25 @@ test("runtime startup helper assembly owns the delegated initialization, reclaim
 
   for (const marker of requiredDelegationMarkers) {
     assert.ok(source.includes(marker), `expected runtime startup helper assembly marker ${marker}`);
+  }
+});
+
+test("runtime startup helper composition owns the delegated startup option assembly bridge contract", async () => {
+  const source = await readFile(appRuntimeStartupHelperCompositionPath, "utf8");
+
+  const requiredDelegationMarkers = [
+    "export function createAppRuntimeStartupHelperComposition(options = {}) {",
+    "createAppRuntimeStartupHelperAssembly as defaultCreateAppRuntimeStartupHelperAssembly",
+    "return createAppRuntimeStartupHelperAssembly({",
+    "layoutFoundationStateRef: options.layoutFoundationStateRef,",
+    "appCommandUiFacadeController: options.appCommandUiFacadeController,",
+    "sessionControlRuntimeController: options.sessionControlRuntimeController,",
+    "startupBackupRuntimeController: options.startupBackupRuntimeController,",
+    "setRuntimeClientId: options.setRuntimeClientId,"
+  ];
+
+  for (const marker of requiredDelegationMarkers) {
+    assert.ok(source.includes(marker), `expected runtime startup helper composition marker ${marker}`);
   }
 });
 

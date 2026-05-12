@@ -201,6 +201,22 @@
 
 <p>Operation ID: <code>deleteLayoutProfile</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Layout profile deleted; <code>404</code> Layout profile not found; <code>426</code> TLS required</p>
 
+<h2 id="operator">operator</h2>
+
+<h3 id="operator-composer-placement"><code>/operator/composer-placement</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get the server-side operator-client composer placement state.</li>
+</ul>
+
+<p>Operation ID: <code>getOperatorComposerPlacement</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Operator composer placement state; <code>409</code> Active operator client id is missing; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>PATCH</strong> Update the server-side operator-client composer placement state.</li>
+</ul>
+
+<p>Operation ID: <code>updateOperatorComposerPlacement</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Operator composer placement updated; <code>400</code> Invalid request; <code>404</code> Referenced session not found; <code>409</code> Active operator client id is missing; <code>426</code> TLS required</p>
+
 <h2 id="sessions">Sessions</h2>
 
 <h3 id="sessions-2"><code>/sessions</code></h3>
@@ -486,6 +502,8 @@
 <li><a class="handbook-page-toc-link" href="#layout-profiles">Layout Profiles</a></li>
 <li><a class="handbook-page-toc-link" href="#layout-profiles-2">`/layout-profiles`</a></li>
 <li><a class="handbook-page-toc-link" href="#layout-profiles-profileid">`/layout-profiles/{profileId}`</a></li>
+<li><a class="handbook-page-toc-link" href="#operator">operator</a></li>
+<li><a class="handbook-page-toc-link" href="#operator-composer-placement">`/operator/composer-placement`</a></li>
 <li><a class="handbook-page-toc-link" href="#sessions">Sessions</a></li>
 <li><a class="handbook-page-toc-link" href="#sessions-2">`/sessions`</a></li>
 <li><a class="handbook-page-toc-link" href="#sessions-sessionid">`/sessions/{sessionId}`</a></li>

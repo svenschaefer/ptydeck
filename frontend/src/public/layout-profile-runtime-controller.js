@@ -4,42 +4,17 @@ import {
   resolveLayoutProfileToken
 } from "./layout-runtime-state.js";
 import {
+  normalizeText,
+  replaceSelectOptions,
+  syncSelectionActionState
+} from "./layout-workspace-selection-state.js";
+import {
   applyLayoutProfileSnapshot,
   captureLayoutProfileSnapshot
 } from "./layout-workspace-orchestration-state.js";
 
-function normalizeText(value) {
-  return String(value || "").trim();
-}
-
 function normalizeLower(value) {
   return normalizeText(value).toLowerCase();
-}
-
-function clearChildren(element) {
-  if (!element || typeof element.removeChild !== "function") {
-    return;
-  }
-
-  if (element.firstChild) {
-    while (element.firstChild) {
-      element.removeChild(element.firstChild);
-    }
-    return;
-  }
-
-  const children = element.children;
-  if (!children || typeof children.length !== "number") {
-    return;
-  }
-
-  while (children.length > 0) {
-    const firstChild = children[0] || (typeof children.item === "function" ? children.item(0) : null);
-    if (!firstChild) {
-      break;
-    }
-    element.removeChild(firstChild);
-  }
 }
 
 export { normalizeLayoutProfileRecord, resolveLayoutProfileToken } from "./layout-runtime-state.js";
@@ -118,40 +93,33 @@ export function createLayoutProfileRuntimeController(options = {}) {
     if (!selectedProfileId || !profiles.some((entry) => entry.id === selectedProfileId)) {
       selectedProfileId = profiles[0]?.id || "";
     }
-    if (selectEl) {
-      selectEl.value = selectedProfileId;
-      selectEl.disabled = profiles.length === 0;
-    }
-    if (applyBtn) {
-      applyBtn.disabled = profiles.length === 0;
-    }
-    if (renameBtn) {
-      renameBtn.disabled = profiles.length === 0;
-    }
-    if (deleteBtn) {
-      deleteBtn.disabled = profiles.length === 0;
-    }
+    syncSelectionActionState({
+      selectEl,
+      selectedValue: selectedProfileId,
+      itemCount: profiles.length,
+      controls: [applyBtn, renameBtn, deleteBtn]
+    });
   }
 
   function render() {
-    if (selectEl) {
-      clearChildren(selectEl);
-      if (profiles.length === 0) {
-        const option = documentRef?.createElement?.("option") || { value: "", textContent: "" };
-        option.value = "";
-        option.textContent = "No layout profiles";
-        option.disabled = true;
-        option.selected = true;
-        selectEl.appendChild(option);
-      } else {
-        for (const profile of profiles) {
-          const option = documentRef?.createElement?.("option") || { value: "", textContent: "" };
-          option.value = profile.id;
-          option.textContent = `[${profile.id}] ${profile.name}`;
-          selectEl.appendChild(option);
-        }
-      }
-    }
+    replaceSelectOptions({
+      selectEl,
+      selectedValue: selectedProfileId,
+      placeholder:
+        profiles.length === 0
+          ? {
+              value: "",
+              label: "No layout profiles",
+              disabled: true,
+              selected: true
+            }
+          : null,
+      items: profiles.map((profile) => ({
+        value: profile.id,
+        label: `[${profile.id}] ${profile.name}`
+      })),
+      createOption: () => documentRef?.createElement?.("option") || { value: "", textContent: "" }
+    });
     syncSelection();
     setStatus(profiles.length > 0 ? `${profiles.length} profile(s)` : "No saved layout profiles.");
   }

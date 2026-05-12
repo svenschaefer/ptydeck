@@ -67,6 +67,9 @@ test("runtime session dispatch authority wires shared collaborators into the ext
     syncSshKnownHostsFile: Symbol("syncSshKnownHostsFile"),
     probeSshHostKeysOrThrow: Symbol("probeSshHostKeysOrThrow"),
     deleteSshTrustEntry: Symbol("deleteSshTrustEntry"),
+    getOperatorComposerPlacementStateOrThrow: Symbol("getOperatorComposerPlacementStateOrThrow"),
+    updateOperatorComposerPlacementStateOrThrow: Symbol("updateOperatorComposerPlacementStateOrThrow"),
+    broadcastOperatorComposerPlacementUpdated: Symbol("broadcastOperatorComposerPlacementUpdated"),
     messagingRuntime: Symbol("messagingRuntime"),
     takeSessionControlOrThrow: Symbol("takeSessionControlOrThrow"),
     takeSessionControlScopeOrThrow: Symbol("takeSessionControlScopeOrThrow"),
@@ -107,6 +110,7 @@ test("runtime session dispatch authority wires shared collaborators into the ext
     removeCustomCommandsForSession: Symbol("removeCustomCommandsForSession"),
     cleanupLayoutProfiles: Symbol("cleanupLayoutProfiles"),
     cleanupWorkspacePresets: Symbol("cleanupWorkspacePresets"),
+    cleanupOperatorComposerPlacementState: Symbol("cleanupOperatorComposerPlacementState"),
     deleteUnrestoredSession: Symbol("deleteUnrestoredSession"),
     deleteSessionDeckAssignment: Symbol("deleteSessionDeckAssignment"),
     setPendingSessionDeckAssignment: Symbol("setPendingSessionDeckAssignment"),
@@ -149,6 +153,9 @@ test("runtime session dispatch authority wires shared collaborators into the ext
   assert.equal(captures.resource.broadcastSessionUpdated, shared.broadcastSessionUpdated);
   assert.equal(captures.resource.broadcastDeckUpsert, shared.broadcastDeckUpsert);
   assert.equal(captures.resource.broadcastDeckDeleted, shared.broadcastDeckDeleted);
+  assert.equal(captures.resource.getOperatorComposerPlacementStateOrThrow, shared.getOperatorComposerPlacementStateOrThrow);
+  assert.equal(captures.resource.updateOperatorComposerPlacementStateOrThrow, shared.updateOperatorComposerPlacementStateOrThrow);
+  assert.equal(captures.resource.broadcastOperatorComposerPlacementUpdated, shared.broadcastOperatorComposerPlacementUpdated);
   assert.equal(captures.resource.toApiDeck, shared.toApiDeck);
   assert.equal(captures.resource.getApiSessionOrThrow, shared.getApiSessionOrThrow);
 
@@ -161,6 +168,7 @@ test("runtime session dispatch authority wires shared collaborators into the ext
   assert.equal(captures.session.broadcastSessionUpdated, shared.broadcastSessionUpdated);
   assert.equal(captures.session.toApiSession, shared.toApiSession);
   assert.equal(captures.session.persistSoon, shared.persistSoon);
+  assert.equal(captures.session.cleanupOperatorComposerPlacementState, shared.cleanupOperatorComposerPlacementState);
   assert.equal(captures.session.sessionKindSsh, shared.sessionKindSsh);
 
   assert.equal(captures.events.manager, shared.manager);

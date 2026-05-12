@@ -157,6 +157,21 @@ The operator API is served under `/api/v1`, REST calls use bearer auth, and WebS
   Auth note: Operator route under `/api/v1`; share spectators use share URLs instead of this route family.
   Responses: `204` Layout profile deleted; `404` Layout profile not found; `426` TLS required
 
+## operator
+
+### `/operator/composer-placement`
+
+- **GET** Get the server-side operator-client composer placement state.
+  Operation ID: `getOperatorComposerPlacement`
+  Request body: optional or none
+  Auth note: Operator route under `/api/v1`; share spectators use share URLs instead of this route family.
+  Responses: `200` Operator composer placement state; `409` Active operator client id is missing; `426` TLS required
+- **PATCH** Update the server-side operator-client composer placement state.
+  Operation ID: `updateOperatorComposerPlacement`
+  Request body: required
+  Auth note: Operator route under `/api/v1`; share spectators use share URLs instead of this route family.
+  Responses: `200` Operator composer placement updated; `400` Invalid request; `404` Referenced session not found; `409` Active operator client id is missing; `426` TLS required
+
 ## Sessions
 
 ### `/sessions`

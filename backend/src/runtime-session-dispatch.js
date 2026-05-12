@@ -56,6 +56,7 @@ export function createRuntimeSessionDispatch(dependencies = {}) {
     removeCustomCommandsForSession = () => [],
     cleanupLayoutProfiles = () => false,
     cleanupWorkspacePresets = () => false,
+    cleanupOperatorComposerPlacementState = () => false,
     deleteUnrestoredSession = () => false,
     deleteSessionDeckAssignment = () => false,
     setPendingSessionDeckAssignment = () => {},
@@ -223,6 +224,7 @@ export function createRuntimeSessionDispatch(dependencies = {}) {
       deleteSessionQuickIdToken(match.params.sessionId);
       deleteSessionControlState(match.params.sessionId);
       deleteUnrestoredSession(match.params.sessionId);
+      cleanupOperatorComposerPlacementState(match.params.sessionId);
       for (const deletedCommand of removeCustomCommandsForSession(match.params.sessionId)) {
         broadcast({
           type: "custom-command.deleted",

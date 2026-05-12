@@ -23,6 +23,13 @@ export function createRuntimeWsConnectionHandler(dependencies = {}) {
     listApiSessions = () => [],
     listCustomCommands = () => [],
     listDecks = () => [],
+    getOperatorComposerPlacementState = () => ({
+      clientId: "",
+      mode: "shared-footer",
+      pinnedSessionIds: [],
+      sharedDraft: "",
+      pinnedDrafts: {}
+    }),
     recordWsError = () => {}
   } = dependencies;
 
@@ -124,7 +131,11 @@ export function createRuntimeWsConnectionHandler(dependencies = {}) {
           sessions: listApiSessions(ws.auth || null),
           outputs: snapshot.outputs,
           customCommands: listCustomCommands(),
-          decks: listDecks(ws.auth || null)
+          decks: listDecks(ws.auth || null),
+          composerPlacement: getOperatorComposerPlacementState(
+            ws.auth || null,
+            ws.sessionControlClient?.clientId || sessionControlClientId
+          )
         },
         ws.traceContext
       ),

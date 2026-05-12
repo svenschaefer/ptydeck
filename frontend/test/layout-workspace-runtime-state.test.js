@@ -189,3 +189,47 @@ test("layout workspace runtime state fails closed for invalid presets and unreso
 
   assert.deepEqual(visibleSessions.map((session) => session.id), ["s-1"]);
 });
+
+test("layout workspace runtime state formats saved layout and group summaries and ignores active-deck filters for inactive decks", () => {
+  const preset = normalizeWorkspacePresetRecord({
+    id: "ops",
+    name: "Ops Saved",
+    workspace: {
+      activeDeckId: "ops",
+      layoutProfileId: "wide",
+      controlPaneVisible: false,
+      controlPanePosition: "left",
+      controlPaneSize: 260,
+      deckGroups: {
+        ops: {
+          activeGroupId: "focus",
+          groups: [{ id: "focus", name: "Focus", sessionIds: ["s-2"] }]
+        }
+      },
+      deckSplitLayouts: {
+        ops: {
+          root: { type: "pane", paneId: "main" },
+          paneSessions: { main: ["s-2"] }
+        }
+      }
+    }
+  });
+
+  assert.equal(
+    formatWorkspacePresetSummary(preset),
+    "[ops] Ops Saved · returns you to deck [ops] · uses layout [wide] · restores saved groups on 1 deck(s)"
+  );
+
+  const visibleSessions = captureCurrentVisibleDeckSessions({
+    deckId: "ops",
+    getActiveDeckId: () => "infra",
+    getSessions: () => [{ id: "s-1", deckId: "ops" }, { id: "s-2", deckId: "ops" }],
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    resolveSessionDeckId: (session) => session.deckId,
+    deckGroups: {},
+    getSessionFilterText: () => "ignored",
+    resolveFilterSelectors: () => ({ sessions: [] })
+  });
+
+  assert.deepEqual(visibleSessions.map((session) => session.id), ["s-1", "s-2"]);
+});

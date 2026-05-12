@@ -1189,6 +1189,58 @@ test("runtime library normalization validates retained split-layout and workspac
   );
 });
 
+test("runtime library normalization keeps lenient split-layout normalization deterministic for duplicate panes and invalid weights", () => {
+  const normalization = createHarness();
+
+  const collapsedLayout = normalization.normalizeLayoutProfileLayout(
+    {
+      deckSplitLayouts: {
+        default: {
+          root: {
+            type: "row",
+            children: [
+              { type: "pane", paneId: "main" },
+              { type: "pane", paneId: "main" }
+            ]
+          }
+        }
+      }
+    },
+    { strict: false }
+  );
+  assert.deepEqual(collapsedLayout.deckSplitLayouts.default.root, {
+    type: "pane",
+    paneId: "main"
+  });
+
+  const invalidWeightLayout = normalization.normalizeLayoutProfileLayout(
+    {
+      deckSplitLayouts: {
+        default: {
+          root: {
+            type: "row",
+            children: [
+              { type: "pane", paneId: "main" },
+              { type: "pane", paneId: "side" }
+            ],
+            weights: [3, "bad"]
+          },
+          paneSessions: {
+            main: ["session-1"],
+            side: ["session-3"]
+          }
+        }
+      }
+    },
+    { strict: false }
+  );
+  assert.deepEqual(invalidWeightLayout.deckSplitLayouts.default.root.weights, [0.5, 0.5]);
+  assert.deepEqual(invalidWeightLayout.deckSplitLayouts.default.paneSessions, {
+    main: ["session-1"],
+    side: ["session-3"]
+  });
+});
+
 test("runtime library normalization covers strict layout and workspace guard rails", () => {
   const normalization = createHarness();
 

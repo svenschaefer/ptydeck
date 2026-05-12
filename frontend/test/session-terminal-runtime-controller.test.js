@@ -2886,3 +2886,30 @@ test("session-terminal-runtime controller no-ops on non-paste beforeinput events
   assert.equal(auxClickEvent.defaultPrevented, false);
   assert.deepEqual(pasted, []);
 });
+
+test("session-terminal-runtime controller fails closed when a mounted entry loses its terminal instance before refresh", () => {
+  const terminals = new Map();
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: new FakeWindowEventTarget(),
+    terminals,
+    refreshTerminalViewport() {},
+    syncTerminalScrollArea() {}
+  });
+
+  const refs = createTerminalCardRefs("missing-terminal-instance");
+  controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    gridEl: { appendChild() {} },
+    terminals,
+    terminalObservers: new Map(),
+    onTerminalData() {},
+    onTerminalPaste() {},
+    applyResizeForSession() {}
+  });
+
+  const entry = terminals.get("s1");
+  entry.terminal = null;
+
+  assert.equal(controller.refreshMountedTerminal("s1"), false);
+});

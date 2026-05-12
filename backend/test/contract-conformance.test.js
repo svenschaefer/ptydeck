@@ -84,6 +84,8 @@ function runtimeOperationKeys() {
     "POST /ssh-trust-entries",
     "DELETE /ssh-trust-entries/{entryId}",
     "POST /ssh-host-key-probe",
+    "GET /operator/composer-placement",
+    "PATCH /operator/composer-placement",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
@@ -402,6 +404,31 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("DELETE /ssh-trust-entries/{entryId}").has(deleteSshTrustEntryRes.status));
+
+    const getOperatorComposerPlacementRes = await contractFetch(`${baseUrl}/operator/composer-placement`, {
+      headers: {
+        authorization: `Bearer ${tokenPayload.accessToken}`,
+        "x-ptydeck-client-id": "contract-client"
+      }
+    });
+    assert.ok(operations.get("GET /operator/composer-placement").has(getOperatorComposerPlacementRes.status));
+
+    const patchOperatorComposerPlacementRes = await contractFetch(`${baseUrl}/operator/composer-placement`, {
+      method: "PATCH",
+      headers: {
+        ...authHeaders,
+        "x-ptydeck-client-id": "contract-client"
+      },
+      body: JSON.stringify({
+        mode: "active-overlay",
+        pinnedSessionIds: [createdSession.id],
+        sharedDraft: "echo shared",
+        pinnedDrafts: {
+          [createdSession.id]: "pwd"
+        }
+      })
+    });
+    assert.ok(operations.get("PATCH /operator/composer-placement").has(patchOperatorComposerPlacementRes.status));
 
     const deleteLayoutProfileRes = await contractFetch(`${baseUrl}/layout-profiles/${createdLayoutProfile.id}`, {
       method: "DELETE",

@@ -2,10 +2,7 @@ import { createLayoutSplitLayoutRuntimeModel } from "./layout-split-layout-runti
 import { getSplitLayoutNodeByPath } from "./layout-runtime-state.js";
 import { collectSplitLayoutPaneIds, normalizeSplitLayoutWeights } from "./split-layout-state.js";
 import { serializeSplitLayoutRoot } from "./layout-workspace-orchestration-state.js";
-
-function normalizeText(value) {
-  return String(value || "").trim();
-}
+import { normalizeText, replaceSelectOptions } from "./layout-workspace-selection-state.js";
 
 function setDataValue(element, key, value) {
   if (!element) {
@@ -186,21 +183,19 @@ export function createSplitLayoutRuntimeController(options = {}) {
     if (!selectEl || typeof selectEl.appendChild !== "function") {
       return;
     }
-    clearChildren(selectEl);
-    const placeholder = createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Assign session";
-    selectEl.appendChild(placeholder);
-    for (const session of sessions) {
-      const option = createElement("option");
-      option.value = session.id;
-      option.textContent = `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
-      if (session.id === selectedSessionId) {
-        option.selected = true;
-      }
-      selectEl.appendChild(option);
-    }
-    selectEl.value = selectedSessionId || "";
+    replaceSelectOptions({
+      selectEl,
+      selectedValue: selectedSessionId || "",
+      placeholder: {
+        value: "",
+        label: "Assign session"
+      },
+      items: (Array.isArray(sessions) ? sessions : []).map((session) => ({
+        value: session.id,
+        label: `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`
+      })),
+      createOption: () => createElement("option")
+    });
   }
 
   function bindResizeHandle(handleEl, deckId, path, handleIndex, orientation, containerEl) {

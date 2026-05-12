@@ -3,7 +3,6 @@ import pty from "node-pty";
 import { EventEmitter } from "node:events";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ApiError } from "./errors.js";
 import {
   clearExpectedExitReason as clearSessionManagerExpectedExitReason,
   clearForegroundProcessRefreshTimer as clearSessionManagerForegroundProcessRefreshTimer,
@@ -20,10 +19,9 @@ import {
   DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS,
 } from "./session-manager-remote-runtime.js";
 import { createSessionManagerRuntimeAssembly } from "./session-manager-runtime-assembly.js";
+import { createSessionManagerRuntimeFacade } from "./session-manager-runtime-facade.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
-const SESSION_KIND_LOCAL = "local";
-const SESSION_KIND_SSH = "ssh";
 const SESSION_MANAGER_DIRNAME = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SSH_ASKPASS_PATH = join(SESSION_MANAGER_DIRNAME, "../libexec/ssh-askpass.sh");
 const DEFAULT_SSH_KNOWN_HOSTS_PATH = join(SESSION_MANAGER_DIRNAME, "../data/ssh_known_hosts");
@@ -199,10 +197,19 @@ export class SessionManager {
     this.sessionRuntime = runtimeAssembly.sessionRuntime;
     this.mutationRuntime = runtimeAssembly.mutationRuntime;
     this.ptyRuntime = runtimeAssembly.ptyRuntime;
-  }
-
-  updateSessionTraceSeed(session, trace, overrides = {}) {
-    return this.terminalRuntime.updateSessionTraceSeed(session, trace, overrides);
+    Object.assign(this, createSessionManagerRuntimeFacade({
+      sessions: this.sessions,
+      nowFn: this.nowFn,
+      foregroundProcessRefreshDelayMs: this.foregroundProcessRefreshDelayMs,
+      sessionReplayMemoryMaxChars: this.sessionReplayMemoryMaxChars,
+      launchRuntime: this.launchRuntime,
+      ptyRuntime: this.ptyRuntime,
+      startupRuntime: this.startupRuntime,
+      terminalRuntime: this.terminalRuntime,
+      replayRuntime: this.replayRuntime,
+      mutationRuntime: this.mutationRuntime,
+      sessionRuntime: this.sessionRuntime
+    }));
   }
 
   clearSessionActivityTimer(session) {
@@ -239,305 +246,6 @@ export class SessionManager {
 
   clearExpectedExitReason(session) {
     clearSessionManagerExpectedExitReason(session, this.clearTimeoutFn);
-  }
-
-  emitSessionActivityStarted(session, timestamp) {
-    return this.terminalRuntime.emitSessionActivityStarted(session, timestamp);
-  }
-
-  emitSessionActivityCompleted(session, timestamp) {
-    return this.terminalRuntime.emitSessionActivityCompleted(session, timestamp);
-  }
-
-  scheduleSessionActivityCompletion(session) {
-    return this.terminalRuntime.scheduleSessionActivityCompletion(session);
-  }
-
-  buildLaunchBundle({
-    kind,
-    shell,
-    cwd,
-    startCwd,
-    startCommand,
-    env,
-    remoteConnection,
-    remoteAuth,
-    remoteSecret
-  }) {
-    return this.launchRuntime.buildLaunchBundle({
-      kind,
-      shell,
-      cwd,
-      startCwd,
-      startCommand,
-      env,
-      remoteConnection,
-      remoteAuth,
-      remoteSecret
-    });
-  }
-
-  markRemoteSessionConnected(session, timestamp = this.nowFn()) {
-    return this.launchRuntime.markRemoteSessionConnected(session, timestamp);
-  }
-
-  markRemoteSessionUnavailable(session, connectivityState, timestamp, details = {}) {
-    return this.launchRuntime.markRemoteSessionUnavailable(session, connectivityState, timestamp, details);
-  }
-
-  attachPtyProcess(session, { ptyProcess, shellAdapter, launchSpec }) {
-    return this.ptyRuntime.attachPtyProcess(session, { ptyProcess, shellAdapter, launchSpec });
-  }
-
-  dispatchLaunchPostStartInput(session) {
-    return this.startupRuntime.dispatchLaunchPostStartInput(session);
-  }
-
-  scheduleLaunchPostStartInputDispatch(session, _reason = "", delayMs = 0) {
-    return this.startupRuntime.scheduleLaunchPostStartInputDispatch(session, _reason, delayMs);
-  }
-
-  armLaunchPostStartInput(session, launchSpec, options = {}) {
-    return this.startupRuntime.armLaunchPostStartInput(session, launchSpec, options);
-  }
-
-  observePendingLaunchPostStartInput(session, { rawData = "", promptBoundaries = [] } = {}) {
-    return this.startupRuntime.observePendingLaunchPostStartInput(session, { rawData, promptBoundaries });
-  }
-
-  observeStartupTerminalQueryFallback(session, { rawData = "", trace = null } = {}) {
-    return this.startupRuntime.observeStartupTerminalQueryFallback(session, { rawData, trace });
-  }
-
-  handleAsyncPtyWriteEvent(session, event = {}) {
-    return this.terminalRuntime.handleAsyncPtyWriteEvent(session, event);
-  }
-
-  buildReconnectUnavailableError(session) {
-    return this.launchRuntime.buildReconnectUnavailableError(session);
-  }
-
-  scheduleRemoteReconnect(session, details = {}) {
-    return this.launchRuntime.scheduleRemoteReconnect(session, details);
-  }
-
-  attemptRemoteReconnect(sessionId, reason = "ssh-transport-exit") {
-    return this.launchRuntime.attemptRemoteReconnect(sessionId, reason);
-  }
-
-  handlePtyExit(session, exit) {
-    return this.launchRuntime.handlePtyExit(session, exit);
-  }
-
-  list() {
-    return Array.from(this.sessions.values()).map((session) => session.meta);
-  }
-
-  buildReplayRetentionResult(value, maxChars = this.sessionReplayMemoryMaxChars) {
-    return this.replayRuntime.buildReplayRetentionResult(value, maxChars);
-  }
-
-  buildReplayRetentionState(value, shellBlocks = [], currentShellBlockStart = null, maxChars = this.sessionReplayMemoryMaxChars) {
-    return this.replayRuntime.buildReplayRetentionState(value, shellBlocks, currentShellBlockStart, maxChars);
-  }
-
-  appendReplayOutput(session, cleaned, promptBoundaries = []) {
-    return this.replayRuntime.appendReplayOutput(session, cleaned, promptBoundaries);
-  }
-
-  trimReplayOutput(value, maxChars = this.sessionReplayMemoryMaxChars) {
-    return this.replayRuntime.trimReplayOutput(value, maxChars);
-  }
-
-  getSnapshot({ outputMaxChars, includeTruncationMetadata = false, includeEmptyOutputs = false } = {}) {
-    return this.replayRuntime.getSnapshot(this.sessions.values(), {
-      outputMaxChars,
-      includeTruncationMetadata,
-      includeEmptyOutputs
-    });
-  }
-
-  getReplayExport(sessionId) {
-    const session = this.get(sessionId);
-    return this.replayRuntime.getReplayExport(session);
-  }
-
-  getReplayExcerpt(sessionId, selectorText) {
-    const session = this.get(sessionId);
-    return this.replayRuntime.getReplayExcerpt(sessionId, session, selectorText);
-  }
-
-  get(sessionId) {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
-    }
-    return session;
-  }
-
-  emitSessionUpdated(session, { trace = null, updatedAt = this.nowFn() } = {}) {
-    return this.terminalRuntime.emitSessionUpdated(session, { trace, updatedAt });
-  }
-
-  applySessionAppIdentity(session, nextIdentity, { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn() } = {}) {
-    return this.mutationRuntime.applySessionAppIdentity(session, nextIdentity, {
-      emitUpdatedEvent,
-      trace,
-      updatedAt
-    });
-  }
-
-  reconcileSessionAppIdentity(
-    session,
-    candidateUpdates,
-    { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn(), metaChanged = false } = {}
-  ) {
-    return this.mutationRuntime.reconcileSessionAppIdentity(session, candidateUpdates, {
-      emitUpdatedEvent,
-      trace,
-      updatedAt,
-      metaChanged
-    });
-  }
-
-  refreshSessionAppIdentity(sessionId, options = {}) {
-    return this.mutationRuntime.refreshSessionAppIdentity(sessionId, options);
-  }
-
-  setSessionAppIdentity(sessionId, appIdentity, options = {}) {
-    return this.mutationRuntime.setSessionAppIdentity(sessionId, appIdentity, options);
-  }
-
-  refreshSessionForegroundProcessIdentity(sessionId, options = {}) {
-    return this.mutationRuntime.refreshSessionForegroundProcessIdentity(sessionId, options);
-  }
-
-  observeSessionTerminalSignals(session, chunk, options = {}) {
-    return this.mutationRuntime.observeSessionTerminalSignals(session, chunk, options);
-  }
-
-  observeSessionOutputHeuristics(session, output, options = {}) {
-    return this.mutationRuntime.observeSessionOutputHeuristics(session, output, options);
-  }
-
-  scheduleSessionForegroundProcessIdentityRefresh(
-    session,
-    { delayMs = this.foregroundProcessRefreshDelayMs, trace = null } = {}
-  ) {
-    return this.mutationRuntime.scheduleSessionForegroundProcessIdentityRefresh(session, {
-      delayMs,
-      trace
-    });
-  }
-
-  transitionToRunning(session) {
-    return this.terminalRuntime.transitionToRunning(session);
-  }
-
-  create({
-    id = randomUUID(),
-    quickIdToken,
-    kind = SESSION_KIND_LOCAL,
-    remoteConnection,
-    remoteAuth,
-    remoteSecret,
-    cwd,
-    shell,
-    name,
-    startCwd,
-    startCommand = "",
-    env = {},
-    deckId = "",
-    replayOutput = "",
-    replayOutputTruncated = false,
-    note,
-    mouseForwardingMode,
-    inputSafetyProfile,
-    tags = [],
-    quickSendUsage = [],
-    themeProfile = {},
-    activeThemeProfile,
-    inactiveThemeProfile,
-    createdAt,
-    updatedAt,
-    trace
-  } = {}) {
-    return this.sessionRuntime.createSession({
-      id,
-      quickIdToken,
-      kind,
-      remoteConnection,
-      remoteAuth,
-      remoteSecret,
-      cwd,
-      shell,
-      name,
-      startCwd,
-      startCommand,
-      env,
-      deckId,
-      replayOutput,
-      replayOutputTruncated,
-      note,
-      mouseForwardingMode,
-      inputSafetyProfile,
-      tags,
-      quickSendUsage,
-      themeProfile,
-      activeThemeProfile,
-      inactiveThemeProfile,
-      createdAt,
-      updatedAt,
-      trace
-    });
-  }
-
-  delete(sessionId, options = {}) {
-    this.closeWithReason(sessionId, "deleted", options);
-  }
-
-  sendInput(sessionId, data, options = {}) {
-    return this.terminalRuntime.sendInput(sessionId, data, options);
-  }
-
-  resize(sessionId, cols, rows, options = {}) {
-    return this.terminalRuntime.resize(sessionId, cols, rows, options);
-  }
-
-  signal(sessionId, signal, options = {}) {
-    return this.terminalRuntime.signal(sessionId, signal, options);
-  }
-
-  interrupt(sessionId, options = {}) {
-    this.signal(sessionId, "SIGINT", options);
-  }
-
-  terminate(sessionId, options = {}) {
-    this.signal(sessionId, "SIGTERM", options);
-  }
-
-  kill(sessionId, options = {}) {
-    this.signal(sessionId, "SIGKILL", options);
-  }
-
-  updateSession(sessionId, patch = {}, options = {}) {
-    return this.mutationRuntime.updateSession(sessionId, patch, options);
-  }
-
-  rename(sessionId, name) {
-    return this.mutationRuntime.rename(sessionId, name);
-  }
-
-  restart(sessionId, options = {}) {
-    return this.sessionRuntime.restartSession(sessionId, options);
-  }
-
-  closeWithReason(sessionId, reason, options = {}) {
-    return this.sessionRuntime.closeSessionWithReason(sessionId, reason, options);
-  }
-
-  enforceGuardrails(currentTime = this.nowFn()) {
-    return this.sessionRuntime.enforceGuardrails(currentTime);
   }
 
   on(eventName, listener) {

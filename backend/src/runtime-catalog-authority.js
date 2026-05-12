@@ -45,6 +45,7 @@ export function createRuntimeCatalogAuthority(dependencies = {}) {
     listPersistedWorkspacePresets = () => [],
     listSshTrustEntries = () => [],
     listPersistedShareLinks = () => [],
+    listPersistedOperatorComposerPlacements = () => [],
     telegramTopicBindings = new Map()
   } = dependencies;
 
@@ -375,6 +376,7 @@ export function createRuntimeCatalogAuthority(dependencies = {}) {
       workspacePresets: listPersistedWorkspacePresets(),
       sshTrustEntries: listSshTrustEntries().map((entry) => ({ ...entry })),
       shareLinks: listPersistedShareLinks(),
+      operatorComposerPlacements: listPersistedOperatorComposerPlacements(),
       messagingTelegramTopicBindings: Array.from(telegramTopicBindings.values())
         .sort((left, right) => `${left.chatId}:${left.sessionId}`.localeCompare(`${right.chatId}:${right.sessionId}`))
         .map((entry) => ({ ...entry }))

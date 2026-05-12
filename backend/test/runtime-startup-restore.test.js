@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createRuntimeStartupRestore } from "../src/runtime-startup-restore.js";
+import { normalizePersistedOperatorComposerPlacementEntry } from "../src/runtime-operator-composer-authority.js";
 
 function createHarness(overrides = {}) {
   const startupWarmupCalls = [];
@@ -21,6 +22,7 @@ function createHarness(overrides = {}) {
   const workspacePresets = new Map([overrides.seedWorkspacePresets || []]);
   const sshTrustEntries = new Map([overrides.seedSshTrustEntries || []]);
   const shareLinks = new Map([overrides.seedShareLinks || []]);
+  const operatorComposerPlacements = new Map([overrides.seedOperatorComposerPlacements || []]);
   const telegramTopicBindings = new Map([overrides.seedTelegramTopicBindings || []]);
   const sessionDeckAssignments = new Map([overrides.seedSessionDeckAssignments || []]);
   const sessionQuickIdAssignments = new Map([overrides.seedSessionQuickIdAssignments || []]);
@@ -50,6 +52,7 @@ function createHarness(overrides = {}) {
     workspacePresets,
     sshTrustEntries,
     shareLinks,
+    operatorComposerPlacements,
     telegramTopicBindings,
     sessionDeckAssignments,
     sessionQuickIdAssignments,
@@ -88,6 +91,9 @@ function createHarness(overrides = {}) {
     normalizePersistedShareLinkEntity:
       overrides.normalizePersistedShareLinkEntity ||
       ((entry) => (entry && entry.id ? { ...entry } : null)),
+    normalizePersistedOperatorComposerPlacementEntry:
+      overrides.normalizePersistedOperatorComposerPlacementEntry ||
+      ((entry) => (entry && entry.attachmentKey ? { ...entry } : null)),
     normalizeMessagingTopicBindings: overrides.normalizeMessagingTopicBindings || ((value) => (Array.isArray(value) ? value : [])),
     syncSshKnownHostsFile: async () => {
       syncCalls.push("sync");
@@ -218,6 +224,7 @@ function createHarness(overrides = {}) {
     workspacePresets,
     sshTrustEntries,
     shareLinks,
+    operatorComposerPlacements,
     telegramTopicBindings,
     sessionDeckAssignments,
     sessionQuickIdAssignments,
@@ -308,6 +315,62 @@ test("runtime startup restore normalizes catalogs, topic bindings, and replay ou
   assert.equal(harness.restoreAttempts[0].replayOutputTruncated, true);
   assert.deepEqual(harness.quickIdAssignments.get("session-1"), "A1");
   assert.equal(harness.consoleErrors.length, 0);
+});
+
+test("runtime startup restore rehydrates persisted operator composer placements against known sessions", async () => {
+  const harness = createHarness({
+    normalizePersistedOperatorComposerPlacementEntry,
+    persistedState: {
+      sessions: [
+        {
+          id: "session-1",
+          deckId: "default",
+          kind: "local",
+          cwd: "/srv/app",
+          startCwd: "/srv/app",
+          shell: "bash",
+          quickIdToken: "A1",
+          createdAt: 10,
+          updatedAt: 20
+        }
+      ],
+      operatorComposerPlacements: [
+        {
+          attachmentKey: "client-1\u001foperator-1\u001fops\u001foperator\u001f",
+          clientId: "client-1",
+          subject: "operator-1",
+          tenantId: "ops",
+          accessMode: "operator",
+          permissionMode: "",
+          mode: "active-overlay",
+          pinnedSessionIds: ["session-1", "missing"],
+          sharedDraft: "echo shared",
+          pinnedDrafts: {
+            "session-1": "pwd",
+            missing: "skip me"
+          }
+        }
+      ]
+    }
+  });
+
+  await harness.startupRestore.restorePersistedRuntimeState();
+
+  assert.equal(harness.operatorComposerPlacements.size, 1);
+  assert.deepEqual(harness.operatorComposerPlacements.get("client-1\u001foperator-1\u001fops\u001foperator\u001f"), {
+    attachmentKey: "client-1\u001foperator-1\u001fops\u001foperator\u001f",
+    clientId: "client-1",
+    subject: "operator-1",
+    tenantId: "ops",
+    accessMode: "operator",
+    permissionMode: "",
+    mode: "active-overlay",
+    pinnedSessionIds: ["session-1"],
+    sharedDraft: "echo shared",
+    pinnedDrafts: {
+      "session-1": "pwd"
+    }
+  });
 });
 
 test("runtime startup restore fails closed for secret-backed and unrecoverable sessions while bounding custom commands", async () => {

@@ -50,6 +50,9 @@ export function createRuntimeResourceDispatch(dependencies = {}) {
     syncSshKnownHostsFile = async () => {},
     probeSshHostKeysOrThrow = async () => null,
     deleteSshTrustEntry = () => {},
+    getOperatorComposerPlacementStateOrThrow = () => null,
+    updateOperatorComposerPlacementStateOrThrow = () => null,
+    broadcastOperatorComposerPlacementUpdated = () => {},
     messagingRuntime = {
       observeShareChange: async () => {},
       syncTelegramCommandCatalog: async () => {}
@@ -361,6 +364,22 @@ export function createRuntimeResourceDispatch(dependencies = {}) {
     if (match.kind === "listSshTrustEntries") {
       const payload = listSshTrustEntries();
       validateResponse({ statusCode: 200, body: payload, expect: "sshTrustEntryList" });
+      writeJsonResponse(200, payload);
+      return true;
+    }
+
+    if (match.kind === "getOperatorComposerPlacement") {
+      const payload = getOperatorComposerPlacementStateOrThrow(auth, req);
+      validateResponse({ statusCode: 200, body: payload, expect: "operatorComposerPlacement" });
+      writeJsonResponse(200, payload);
+      return true;
+    }
+
+    if (match.kind === "updateOperatorComposerPlacement") {
+      const payload = updateOperatorComposerPlacementStateOrThrow(body, auth, req);
+      validateResponse({ statusCode: 200, body: payload, expect: "operatorComposerPlacement" });
+      await persistNow("operator-composer-placement.update");
+      broadcastOperatorComposerPlacementUpdated(auth, payload.clientId, requestTraceContext);
       writeJsonResponse(200, payload);
       return true;
     }

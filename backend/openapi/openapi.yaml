@@ -856,6 +856,61 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /operator/composer-placement:
+    get:
+      operationId: getOperatorComposerPlacement
+      summary: Get the server-side operator-client composer placement state.
+      responses:
+        '200':
+          description: Operator composer placement state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorComposerPlacement'
+        '409':
+          description: Active operator client id is missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    patch:
+      operationId: updateOperatorComposerPlacement
+      summary: Update the server-side operator-client composer placement state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOperatorComposerPlacementRequest'
+      responses:
+        '200':
+          description: Operator composer placement updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorComposerPlacement'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Referenced session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Active operator client id is missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions:
     get:
       operationId: listSessions
@@ -2492,6 +2547,50 @@ components:
           type: string
         fingerprintSha256:
           type: string
+    OperatorComposerPlacement:
+      type: object
+      required:
+        - clientId
+        - mode
+        - pinnedSessionIds
+        - sharedDraft
+        - pinnedDrafts
+      properties:
+        clientId:
+          type: string
+        mode:
+          type: string
+          enum:
+            - shared-footer
+            - active-overlay
+        pinnedSessionIds:
+          type: array
+          items:
+            type: string
+        sharedDraft:
+          type: string
+        pinnedDrafts:
+          type: object
+          additionalProperties:
+            type: string
+    UpdateOperatorComposerPlacementRequest:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+            - shared-footer
+            - active-overlay
+        pinnedSessionIds:
+          type: array
+          items:
+            type: string
+        sharedDraft:
+          type: string
+        pinnedDrafts:
+          type: object
+          additionalProperties:
+            type: string
     CustomCommand:
       type: object
       required:

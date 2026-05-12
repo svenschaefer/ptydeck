@@ -112,3 +112,36 @@ test("app runtime startup helper assembly fails closed for missing optional coll
   assert.equal(startupArgs.setTrustedLocalClientLabel("Deck"), undefined);
   assert.equal(startupArgs.applyInitializationError("Init failed."), undefined);
 });
+
+test("app runtime startup helper assembly preserves explicit helper overrides instead of default collaborator fallbacks", async () => {
+  let startupArgs = null;
+  const overrides = {
+    getTerminalSettings: () => ({ cols: 99, rows: 33 }),
+    recordTrace: () => "trace-override",
+    consumeOriginHandoffSourceFromWindow: () => "https://override.example",
+    ensureStartupBackup: () => Promise.resolve("backup-override"),
+    getTrustedLocalClientIdentity: () => ({ clientId: "override" }),
+    ensureTrustedLocalClientIdentity: () => Promise.resolve({ clientId: "override", label: "Deck" }),
+    setRuntimeClientIdentityCreatedOnThisOrigin: () => "created-override",
+    setTrustedLocalClientLabel: () => "label-override",
+    applyInitializationError: () => "error-override"
+  };
+
+  createAppRuntimeStartupHelperAssembly({
+    ...overrides,
+    createAppRuntimeStartupComposition(args) {
+      startupArgs = args;
+      return {};
+    }
+  });
+
+  assert.deepEqual(startupArgs.getTerminalSettings(), { cols: 99, rows: 33 });
+  assert.equal(startupArgs.recordTrace(), "trace-override");
+  assert.equal(startupArgs.consumeOriginHandoffSourceFromWindow(), "https://override.example");
+  assert.equal(await startupArgs.ensureStartupBackup(), "backup-override");
+  assert.deepEqual(startupArgs.getTrustedLocalClientIdentity(), { clientId: "override" });
+  assert.deepEqual(await startupArgs.ensureTrustedLocalClientIdentity(), { clientId: "override", label: "Deck" });
+  assert.equal(startupArgs.setRuntimeClientIdentityCreatedOnThisOrigin(), "created-override");
+  assert.equal(startupArgs.setTrustedLocalClientLabel(), "label-override");
+  assert.equal(startupArgs.applyInitializationError(), "error-override");
+});

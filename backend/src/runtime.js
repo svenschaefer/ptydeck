@@ -14,15 +14,18 @@ import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { createRuntimeCatalogAuthority } from "./runtime-catalog-authority.js";
 import { createRuntimeHttpHelpers } from "./runtime-http-helpers.js";
-import { createRuntimeHttpRequestHandler } from "./runtime-http-request-handler.js";
 import { createRuntimeLibraryAuthority } from "./runtime-library-authority.js";
 import { createRuntimeLibraryNormalization } from "./runtime-library-normalization.js";
 import { createRuntimeLifecycle } from "./runtime-lifecycle.js";
 import { createRuntimeAccessPolicy } from "./runtime-access-policy.js";
 import { createRuntimeMetrics } from "./runtime-metrics.js";
+import {
+  createRuntimeOperatorComposerAuthority,
+  normalizePersistedOperatorComposerPlacementEntry
+} from "./runtime-operator-composer-authority.js";
 import { createRuntimeSessionAuthority } from "./runtime-session-authority.js";
 import { createRuntimeSessionControlAuthority } from "./runtime-session-control-authority.js";
-import { createRuntimeSessionDispatchAuthority } from "./runtime-session-dispatch-authority.js";
+import { createRuntimeSessionDispatchAssembly } from "./runtime-session-dispatch-assembly.js";
 import { createRuntimeSessionMessagingAuthority } from "./runtime-session-messaging-authority.js";
 import { createRuntimeSessionResourceAuthority } from "./runtime-session-resource-authority.js";
 import { createRuntimeSessionState } from "./runtime-session-state.js";
@@ -990,6 +993,7 @@ export function createRuntime(config) {
   const layoutProfiles = new Map();
   const workspacePresets = new Map();
   const shareLinks = new Map();
+  const operatorComposerPlacements = new Map();
   const runtimeSessionResourceAuthority = createRuntimeSessionResourceAuthority({
     manager,
     getApiSessionOrThrow: (...args) => getApiSessionOrThrow(...args),
@@ -1322,6 +1326,19 @@ export function createRuntime(config) {
     swapSessionQuickIds,
     withDeckId
   } = runtimeSessionState;
+  const runtimeOperatorComposerAuthority = createRuntimeOperatorComposerAuthority({
+    operatorComposerPlacements,
+    sessionControlAttachmentRegistry,
+    sessionControlClientIdHeader: SESSION_CONTROL_CLIENT_ID_HEADER,
+    hasKnownSession
+  });
+  const {
+    cleanupSessionState: cleanupOperatorComposerPlacementState,
+    getStateForClient: getOperatorComposerPlacementState,
+    getStateOrThrow: getOperatorComposerPlacementStateOrThrow,
+    listPersistedOperatorComposerPlacements,
+    updateStateOrThrow: updateOperatorComposerPlacementStateOrThrow
+  } = runtimeOperatorComposerAuthority;
   let runtimeCatalogAuthority = null;
   let runtimeSessionMessagingAuthority = null;
   const runtimeSessionAuthority = createRuntimeSessionAuthority({
@@ -1442,6 +1459,7 @@ export function createRuntime(config) {
     listPersistedWorkspacePresets,
     listSshTrustEntries,
     listPersistedShareLinks,
+    listPersistedOperatorComposerPlacements,
     telegramTopicBindings
   });
   const messagingRuntime = createMessagingRuntime({
@@ -1509,6 +1527,7 @@ export function createRuntime(config) {
     listApiSessions,
     listCustomCommands,
     listDecks,
+    getOperatorComposerPlacementState,
     recordWsError
   });
   const handleWsUpgrade = createRuntimeWsUpgradeHandler({
@@ -1606,7 +1625,8 @@ export function createRuntime(config) {
         connectionProfileCount: state.connectionProfiles.length,
         workspacePresetCount: state.workspacePresets.length,
         sshTrustEntryCount: state.sshTrustEntries.length,
-        shareLinkCount: state.shareLinks.length
+        shareLinkCount: state.shareLinks.length,
+        operatorComposerPlacementCount: state.operatorComposerPlacements.length
       });
       await persistence.saveState(state);
       logDebug("persist.save.ok", {
@@ -1617,7 +1637,8 @@ export function createRuntime(config) {
         connectionProfileCount: state.connectionProfiles.length,
         workspacePresetCount: state.workspacePresets.length,
         sshTrustEntryCount: state.sshTrustEntries.length,
-        shareLinkCount: state.shareLinks.length
+        shareLinkCount: state.shareLinks.length,
+        operatorComposerPlacementCount: state.operatorComposerPlacements.length
       });
     };
 
@@ -1716,13 +1737,61 @@ export function createRuntime(config) {
     }, traceSeed);
   }
 
-  const {
-    resourceDispatch,
-    sessionControlDispatch,
-    sessionDispatch,
-    runtimeSessionEventAuthority
-  } = createRuntimeSessionDispatchAuthority({
+  function broadcastOperatorComposerPlacementUpdated(auth, clientId, traceSeed = null) {
+    const normalizedClientId = typeof clientId === "string" ? clientId.trim() : "";
+    if (!normalizedClientId) {
+      return;
+    }
+    const attachmentKey = sessionControlAttachmentRegistry.getAttachmentKey({
+      clientId: normalizedClientId,
+      auth
+    });
+    if (!attachmentKey) {
+      return;
+    }
+    const tracedPayload = withTracePayload(
+      {
+        type: "composer-placement.updated",
+        composerPlacement: getOperatorComposerPlacementState(auth, normalizedClientId)
+      },
+      traceSeed
+    );
+    for (const socket of sockets) {
+      if (socket.readyState !== socket.OPEN || socket.sessionControlAttachmentKey !== attachmentKey) {
+        continue;
+      }
+      socket.send(JSON.stringify(tracedPayload));
+    }
+  }
+
+  const { handleHttpRequest } = createRuntimeSessionDispatchAssembly({
+    config,
+    maxBodyBytes,
+    metrics,
+    recordHttpDuration,
+    bumpMetricCounter,
+    logDebug,
+    resolveRequestContext,
+    buildRequestTraceContext,
+    parseJsonBody,
+    validateRequest,
     validateResponse,
+    ensureTlsIngress,
+    authenticateRequest,
+    writeJson,
+    buildSecurityHeaders,
+    buildTraceHeaders,
+    auditLogger,
+    getIsReady: runtimeStartupReadiness.getIsReady,
+    startupWarmup,
+    manager,
+    unrestoredSessions,
+    sockets,
+    httpDurationBucketsMs: HTTP_DURATION_BUCKETS_MS,
+    escapePrometheusLabel,
+    wsTicketRegistry,
+    messagingRuntime,
+    sessionStreamAnalysisCapture,
     parseBooleanQueryParam,
     normalizeCustomCommandScope,
     normalizeCustomCommandSessionId,
@@ -1772,7 +1841,9 @@ export function createRuntime(config) {
     syncSshKnownHostsFile,
     probeSshHostKeysOrThrow,
     deleteSshTrustEntry,
-    messagingRuntime,
+    getOperatorComposerPlacementStateOrThrow,
+    updateOperatorComposerPlacementStateOrThrow,
+    broadcastOperatorComposerPlacementUpdated,
     takeSessionControlOrThrow,
     takeSessionControlScopeOrThrow,
     releaseSessionControlOrThrow,
@@ -1800,7 +1871,6 @@ export function createRuntime(config) {
     buildSessionFileDownloadOrThrow,
     uploadSessionFileOrThrow,
     ensureSessionControllerAccess,
-    manager,
     assignSessionQuickIdToken,
     deleteSessionQuickIdToken,
     createDefaultSessionOwner,
@@ -1812,6 +1882,7 @@ export function createRuntime(config) {
     removeCustomCommandsForSession,
     cleanupLayoutProfiles,
     cleanupWorkspacePresets,
+    cleanupOperatorComposerPlacementState,
     deleteUnrestoredSession: (sessionId) => unrestoredSessions.delete(sessionId),
     deleteSessionDeckAssignment: (sessionId) => sessionDeckAssignments.delete(sessionId),
     setPendingSessionDeckAssignment: (sessionId, deckId) => {
@@ -1821,44 +1892,7 @@ export function createRuntime(config) {
     recordSessionLastInput,
     defaultSshClient: DEFAULT_SSH_CLIENT,
     sessionKindSsh: SESSION_KIND_SSH,
-    startupWarmup,
-    metrics,
-    logDebug,
     normalizeTraceSeed
-  });
-  runtimeSessionEventAuthority.registerManagerEventHandlers();
-
-  const handleHttpRequest = createRuntimeHttpRequestHandler({
-    config,
-    maxBodyBytes,
-    metrics,
-    recordHttpDuration,
-    bumpMetricCounter,
-    logDebug,
-    resolveRequestContext,
-    buildRequestTraceContext,
-    parseJsonBody,
-    validateRequest,
-    validateResponse,
-    ensureTlsIngress,
-    authenticateRequest,
-    writeJson,
-    buildSecurityHeaders,
-    buildTraceHeaders,
-    auditLogger,
-    getIsReady: runtimeStartupReadiness.getIsReady,
-    startupWarmup,
-    manager,
-    unrestoredSessions,
-    sockets,
-    httpDurationBucketsMs: HTTP_DURATION_BUCKETS_MS,
-    escapePrometheusLabel,
-    wsTicketRegistry,
-    messagingRuntime,
-    sessionStreamAnalysisCapture,
-    dispatchResourceRequest: (input) => resourceDispatch.dispatchResourceRequest(input),
-    dispatchSessionRequest: (input) => sessionDispatch.dispatchSessionRequest(input),
-    dispatchSessionControlRequest: (input) => sessionControlDispatch.dispatchSessionControlRequest(input)
   });
 
   const server = http.createServer(handleHttpRequest);
@@ -1890,6 +1924,7 @@ export function createRuntime(config) {
     workspacePresets,
     sshTrustEntries,
     shareLinks,
+    operatorComposerPlacements,
     telegramTopicBindings,
     sessionDeckAssignments,
     sessionQuickIdAssignments,
@@ -1905,6 +1940,7 @@ export function createRuntime(config) {
     normalizeSshTrustEntryEntity,
     findSshTrustConflict,
     normalizePersistedShareLinkEntity,
+    normalizePersistedOperatorComposerPlacementEntry,
     normalizeMessagingTopicBindings,
     syncSshKnownHostsFile,
     ensureDefaultDeck,

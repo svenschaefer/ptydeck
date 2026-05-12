@@ -554,3 +554,96 @@ test("runtime resource dispatch handles ssh trust routes and returns false for u
     ["persist", "ssh-trust-entry.delete"]
   ]);
 });
+
+test("runtime resource dispatch handles operator composer placement routes deterministically", async () => {
+  const observed = [];
+  const validation = createValidateRecorder();
+  const writer = createWriter();
+  const dispatcher = createRuntimeResourceDispatch({
+    validateResponse: validation.validateResponse,
+    getOperatorComposerPlacementStateOrThrow(auth, req) {
+      observed.push(["get", auth.subject, req.headers["x-ptydeck-client-id"]]);
+      return {
+        clientId: "client-1",
+        mode: "shared-footer",
+        pinnedSessionIds: [],
+        sharedDraft: "",
+        pinnedDrafts: {}
+      };
+    },
+    updateOperatorComposerPlacementStateOrThrow(body, auth, req) {
+      observed.push(["patch", body.mode, auth.subject, req.headers["x-ptydeck-client-id"]]);
+      return {
+        clientId: "client-1",
+        mode: "active-overlay",
+        pinnedSessionIds: ["session-1"],
+        sharedDraft: "shared",
+        pinnedDrafts: {
+          "session-1": "pwd"
+        }
+      };
+    },
+    persistNow: async (reason) => {
+      observed.push(["persist", reason]);
+    },
+    broadcastOperatorComposerPlacementUpdated(auth, clientId, trace) {
+      observed.push(["broadcast", auth.subject, clientId, trace.traceId]);
+    }
+  });
+
+  await dispatcher.dispatchResourceRequest({
+    match: { kind: "getOperatorComposerPlacement", params: {} },
+    parsedUrl: createSearchParams(),
+    body: undefined,
+    auth: { subject: "alice" },
+    req: { method: "GET", headers: { "x-ptydeck-client-id": "client-1" } },
+    requestContext: {},
+    requestTraceContext: { traceId: "trc-6" },
+    writeJsonResponse: writer.writeJsonResponse
+  });
+  await dispatcher.dispatchResourceRequest({
+    match: { kind: "updateOperatorComposerPlacement", params: {} },
+    parsedUrl: createSearchParams(),
+    body: { mode: "active-overlay" },
+    auth: { subject: "alice" },
+    req: { method: "PATCH", headers: { "x-ptydeck-client-id": "client-1" } },
+    requestContext: {},
+    requestTraceContext: { traceId: "trc-6" },
+    writeJsonResponse: writer.writeJsonResponse
+  });
+
+  assert.deepEqual(writer.calls, [
+    {
+      statusCode: 200,
+      body: {
+        clientId: "client-1",
+        mode: "shared-footer",
+        pinnedSessionIds: [],
+        sharedDraft: "",
+        pinnedDrafts: {}
+      }
+    },
+    {
+      statusCode: 200,
+      body: {
+        clientId: "client-1",
+        mode: "active-overlay",
+        pinnedSessionIds: ["session-1"],
+        sharedDraft: "shared",
+        pinnedDrafts: {
+          "session-1": "pwd"
+        }
+      }
+    }
+  ]);
+  assert.deepEqual(validation.calls.map((entry) => [entry.statusCode, entry.expect]), [
+    [200, "operatorComposerPlacement"],
+    [200, "operatorComposerPlacement"]
+  ]);
+  assert.deepEqual(observed, [
+    ["get", "alice", "client-1"],
+    ["patch", "active-overlay", "alice", "client-1"],
+    ["persist", "operator-composer-placement.update"],
+    ["broadcast", "alice", "client-1", "trc-6"]
+  ]);
+});

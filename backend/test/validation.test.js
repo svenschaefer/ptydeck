@@ -2591,3 +2591,60 @@ test("validateRequest rejects unsupported query combinations for custom command 
     });
   });
 });
+
+test("validateRequest accepts and rejects operator composer placement patch payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/operator/composer-placement",
+      params: {},
+      body: {
+        mode: "active-overlay",
+        pinnedSessionIds: ["session-1"],
+        sharedDraft: "shared",
+        pinnedDrafts: {
+          "session-1": "pwd"
+        }
+      }
+    });
+  });
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/operator/composer-placement",
+      params: {},
+      body: {}
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/operator/composer-placement",
+      params: {},
+      body: {
+        pinnedDrafts: {
+          "": "bad"
+        }
+      }
+    });
+  });
+});
+
+test("validateResponse accepts operator composer placement payloads", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "operatorComposerPlacement",
+      body: {
+        clientId: "client-1",
+        mode: "active-overlay",
+        pinnedSessionIds: ["session-1"],
+        sharedDraft: "shared",
+        pinnedDrafts: {
+          "session-1": "pwd"
+        }
+      }
+    });
+  });
+});

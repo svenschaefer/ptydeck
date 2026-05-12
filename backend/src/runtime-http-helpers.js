@@ -32,6 +32,12 @@ export function requiredScopeForRoute(kind) {
   if (kind === "createSshTrustEntry" || kind === "deleteSshTrustEntry") {
     return "sessions:write";
   }
+  if (kind === "getOperatorComposerPlacement") {
+    return "sessions:read";
+  }
+  if (kind === "updateOperatorComposerPlacement") {
+    return "sessions:write";
+  }
   if (kind === "listCustomCommands" || kind === "getCustomCommand") {
     return "sessions:read";
   }

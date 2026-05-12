@@ -38,7 +38,8 @@ function normalizePersistedState(value) {
     workspacePresets: toArray(state.workspacePresets),
     sshTrustEntries: toArray(state.sshTrustEntries),
     shareLinks: toArray(state.shareLinks),
-    messagingTelegramTopicBindings: toArray(state.messagingTelegramTopicBindings)
+    messagingTelegramTopicBindings: toArray(state.messagingTelegramTopicBindings),
+    operatorComposerPlacements: toArray(state.operatorComposerPlacements)
   };
 }
 
@@ -53,6 +54,7 @@ export function createRuntimeStartupRestore(dependencies = {}) {
     workspacePresets = new Map(),
     sshTrustEntries = new Map(),
     shareLinks = new Map(),
+    operatorComposerPlacements = new Map(),
     telegramTopicBindings = new Map(),
     sessionDeckAssignments = new Map(),
     sessionQuickIdAssignments = new Map(),
@@ -70,6 +72,7 @@ export function createRuntimeStartupRestore(dependencies = {}) {
     normalizeSshTrustEntryEntity = () => null,
     findSshTrustConflict = () => null,
     normalizePersistedShareLinkEntity = () => null,
+    normalizePersistedOperatorComposerPlacementEntry = () => null,
     normalizeMessagingTopicBindings = (value) => toArray(value),
     syncSshKnownHostsFile = async () => {},
     ensureDefaultDeck = () => {},
@@ -130,6 +133,7 @@ export function createRuntimeStartupRestore(dependencies = {}) {
     workspacePresets.clear();
     sshTrustEntries.clear();
     shareLinks.clear();
+    operatorComposerPlacements.clear();
     telegramTopicBindings.clear();
     sessionDeckAssignments.clear();
     sessionQuickIdAssignments.clear();
@@ -214,6 +218,17 @@ export function createRuntimeStartupRestore(dependencies = {}) {
       shareLinks.set(normalizedShareLink.id, normalizedShareLink);
     }
 
+    for (const persistedOperatorComposerPlacement of persistedState.operatorComposerPlacements) {
+      const normalizedEntry = normalizePersistedOperatorComposerPlacementEntry(persistedOperatorComposerPlacement, {
+        strict: false,
+        hasKnownSession: (sessionId) => persistedSessionDeckAssignments.has(sessionId) || hasKnownSession(sessionId)
+      });
+      if (!normalizedEntry) {
+        continue;
+      }
+      operatorComposerPlacements.set(normalizedEntry.attachmentKey, normalizedEntry);
+    }
+
     for (const binding of normalizeMessagingTopicBindings(persistedState.messagingTelegramTopicBindings)) {
       telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
     }
@@ -229,7 +244,8 @@ export function createRuntimeStartupRestore(dependencies = {}) {
       persistedLayoutProfileCount: persistedState.layoutProfiles.length,
       persistedWorkspacePresetCount: persistedState.workspacePresets.length,
       persistedSshTrustEntryCount: persistedState.sshTrustEntries.length,
-      persistedShareLinkCount: persistedState.shareLinks.length
+      persistedShareLinkCount: persistedState.shareLinks.length,
+      persistedOperatorComposerPlacementCount: persistedState.operatorComposerPlacements.length
     });
 
     for (const session of persistedState.sessions) {

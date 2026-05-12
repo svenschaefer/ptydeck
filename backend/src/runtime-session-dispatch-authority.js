@@ -59,6 +59,9 @@ export function createRuntimeSessionDispatchAuthority(dependencies = {}) {
     syncSshKnownHostsFile,
     probeSshHostKeysOrThrow,
     deleteSshTrustEntry,
+    getOperatorComposerPlacementStateOrThrow,
+    updateOperatorComposerPlacementStateOrThrow,
+    broadcastOperatorComposerPlacementUpdated,
     messagingRuntime,
     takeSessionControlOrThrow,
     takeSessionControlScopeOrThrow,
@@ -99,6 +102,7 @@ export function createRuntimeSessionDispatchAuthority(dependencies = {}) {
     removeCustomCommandsForSession,
     cleanupLayoutProfiles,
     cleanupWorkspacePresets,
+    cleanupOperatorComposerPlacementState,
     deleteUnrestoredSession,
     deleteSessionDeckAssignment,
     setPendingSessionDeckAssignment,
@@ -164,6 +168,9 @@ export function createRuntimeSessionDispatchAuthority(dependencies = {}) {
     syncSshKnownHostsFile,
     probeSshHostKeysOrThrow,
     deleteSshTrustEntry,
+    getOperatorComposerPlacementStateOrThrow,
+    updateOperatorComposerPlacementStateOrThrow,
+    broadcastOperatorComposerPlacementUpdated,
     messagingRuntime
   });
 
@@ -221,6 +228,7 @@ export function createRuntimeSessionDispatchAuthority(dependencies = {}) {
     removeCustomCommandsForSession,
     cleanupLayoutProfiles,
     cleanupWorkspacePresets,
+    cleanupOperatorComposerPlacementState,
     deleteUnrestoredSession,
     deleteSessionDeckAssignment,
     setPendingSessionDeckAssignment,

@@ -101,6 +101,17 @@ function createDependencies(overrides = {}) {
     listDecks(auth) {
       return [{ id: "deck-1", owner: auth?.subject || "anon" }];
     },
+    getOperatorComposerPlacementState(auth, clientId) {
+      return {
+        clientId,
+        mode: "active-overlay",
+        pinnedSessionIds: ["session-1"],
+        sharedDraft: "shared",
+        pinnedDrafts: {
+          "session-1": "pwd"
+        }
+      };
+    },
     recordWsError(reason) {
       observed.errors.push(reason);
     },
@@ -161,6 +172,15 @@ test("runtime ws connection handler registers accepted sockets and sends the fil
     outputs: [{ sessionId: "session-1", data: "hello" }],
     customCommands: [{ name: "build" }],
     decks: [{ id: "deck-1", owner: "alice" }],
+    composerPlacement: {
+      clientId: "client-1",
+      mode: "active-overlay",
+      pinnedSessionIds: ["session-1"],
+      sharedDraft: "shared",
+      pinnedDrafts: {
+        "session-1": "pwd"
+      }
+    },
     trace: {
       traceId: "upgrade-1",
       correlationId: "corr-1",
@@ -230,6 +250,15 @@ test("runtime ws connection handler falls back to connection identity and record
 
   const snapshotPayload = JSON.parse(socket.sent[0]);
   assert.equal(snapshotPayload.clientId, "ws-1");
+  assert.deepEqual(snapshotPayload.composerPlacement, {
+    clientId: "ws-1",
+    mode: "active-overlay",
+    pinnedSessionIds: ["session-1"],
+    sharedDraft: "shared",
+    pinnedDrafts: {
+      "session-1": "pwd"
+    }
+  });
   assert.equal(socket.clientIp, "unknown");
   assert.equal(socket.sessionControlAttachmentKey, "ws-1:anon");
   assert.deepEqual(socket.sessionControlClient, { clientId: "ws-1", label: "" });

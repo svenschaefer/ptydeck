@@ -72,6 +72,12 @@ export function matchRuntimeRoute(pathname, method) {
   if (pathname === "/api/v1/ssh-host-key-probe" && method === "POST") {
     return { kind: "probeSshHostKeys" };
   }
+  if (pathname === "/api/v1/operator/composer-placement" && method === "GET") {
+    return { kind: "getOperatorComposerPlacement" };
+  }
+  if (pathname === "/api/v1/operator/composer-placement" && method === "PATCH") {
+    return { kind: "updateOperatorComposerPlacement" };
+  }
 
   const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
   if (customCommandMatch && method === "GET") {
@@ -294,6 +300,9 @@ export function normalizeRuntimeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/ssh-trust-entries\/[^/]+$/.test(pathname)) {
     return "/api/v1/ssh-trust-entries/{entryId}";
+  }
+  if (pathname === "/api/v1/operator/composer-placement") {
+    return "/api/v1/operator/composer-placement";
   }
   if (/^\/api\/v1\/shares\/[^/]+\/revoke$/.test(pathname)) {
     return "/api/v1/shares/{shareId}/revoke";

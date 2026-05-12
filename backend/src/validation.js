@@ -650,6 +650,27 @@ function validateConnectionProfileLaunchPayload(value, fieldPathPrefix = "launch
   }
 }
 
+function isOperatorComposerPlacement(value) {
+  if (!isObject(value)) {
+    return false;
+  }
+  if (
+    typeof value.clientId !== "string" ||
+    (value.mode !== "shared-footer" && value.mode !== "active-overlay") ||
+    !Array.isArray(value.pinnedSessionIds) ||
+    !value.pinnedSessionIds.every((entry) => typeof entry === "string") ||
+    typeof value.sharedDraft !== "string"
+  ) {
+    return false;
+  }
+  if (!isObject(value.pinnedDrafts)) {
+    return false;
+  }
+  return Object.entries(value.pinnedDrafts).every(
+    ([sessionId, draft]) => typeof sessionId === "string" && typeof draft === "string"
+  );
+}
+
 export function validateRequest({ method, pathname, params, query, body }) {
   if (method === "POST" && pathname === "/api/v1/sessions") {
     if (body !== undefined && !isObject(body)) {
@@ -722,6 +743,60 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body.launch !== undefined) {
       validateConnectionProfileLaunchPayload(body.launch, "launch");
+    }
+  }
+
+  if (method === "PATCH" && pathname === "/api/v1/operator/composer-placement") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (
+      body.mode === undefined &&
+      body.pinnedSessionIds === undefined &&
+      body.sharedDraft === undefined &&
+      body.pinnedDrafts === undefined
+    ) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "At least one operator composer placement field is required."
+      );
+    }
+    if (
+      body.mode !== undefined &&
+      (typeof body.mode !== "string" || !["shared-footer", "active-overlay"].includes(body.mode.trim().toLowerCase()))
+    ) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'mode' must be one of: shared-footer, active-overlay."
+      );
+    }
+    if (
+      body.pinnedSessionIds !== undefined &&
+      (!Array.isArray(body.pinnedSessionIds) || !body.pinnedSessionIds.every((entry) => typeof entry === "string"))
+    ) {
+      throw new ApiError(400, "ValidationError", "Field 'pinnedSessionIds' must be an array of strings.");
+    }
+    if (body.sharedDraft !== undefined && typeof body.sharedDraft !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'sharedDraft' must be a string.");
+    }
+    if (body.pinnedDrafts !== undefined) {
+      if (!isObject(body.pinnedDrafts)) {
+        throw new ApiError(400, "ValidationError", "Field 'pinnedDrafts' must be an object.");
+      }
+      for (const [sessionId, draft] of Object.entries(body.pinnedDrafts)) {
+        if (!sessionId.trim()) {
+          throw new ApiError(400, "ValidationError", "Field 'pinnedDrafts' must not contain empty session ids.");
+        }
+        if (typeof draft !== "string") {
+          throw new ApiError(
+            400,
+            "ValidationError",
+            `Field 'pinnedDrafts.${sessionId}' must be a string.`
+          );
+        }
+      }
     }
   }
 
@@ -1568,5 +1643,9 @@ export function validateResponse({ statusCode, body, expect }) {
     if (!Array.isArray(body) || !body.every((item) => isSshHostKeyProbeCandidate(item))) {
       throw new ApiError(500, "ResponseValidationError", "Response does not match SshHostKeyProbeCandidate[] schema.");
     }
+  }
+
+  if (expect === "operatorComposerPlacement" && !isOperatorComposerPlacement(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match OperatorComposerPlacement schema.");
   }
 }

@@ -383,6 +383,7 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
         updatedAt: 13
       }
     ],
+    operatorComposerPlacements: [],
     shareLinks: [],
     messagingTelegramTopicBindings: [
       {
@@ -420,6 +421,7 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
     layoutProfiles: [],
     workspacePresets: [],
     sshTrustEntries: [],
+    operatorComposerPlacements: [],
     shareLinks: [],
     messagingTelegramTopicBindings: []
   });
@@ -449,6 +451,7 @@ test("JsonPersistence loadState supports encrypted legacy array payload format",
     layoutProfiles: [],
     workspacePresets: [],
     sshTrustEntries: [],
+    operatorComposerPlacements: [],
     shareLinks: [],
     messagingTelegramTopicBindings: []
   });
