@@ -15,6 +15,22 @@ The control pane states that nothing has been sent yet, then shows `Send anyway`
 
 Use the [session settings reference](../reference/session-settings.md#input-tab) for the exact input-safety switches and thresholds.
 
+## Composer Placement Modes
+
+`ptydeck` now supports two server-persisted composer placement modes for each operator client:
+
+- `shared-footer`: one shared composer stays below the terminal grid
+- `active-overlay`: the shared composer moves into the active terminal as a non-resizing overlay below the terminal header
+
+In `active-overlay` mode, you can also pin individual terminals:
+
+- pinned terminals get their own overlay composer block
+- multiple terminals can stay pinned at the same time
+- pinned terminals keep their own drafts
+- the shared overlay composer is shown only for the active terminal when that terminal is not pinned
+
+Use this when accidental sends happen because the footer composer is still visible while a different terminal is active.
+
 ## Terminal-Local Paste
 
 Terminal-local paste is routed through the guarded send path instead of bypassing safety checks.
@@ -41,5 +57,6 @@ When paste behavior differs across sessions, compare these first:
 1. the `Input` tab
 2. the session's send terminator
 3. whether the session has stricter send-safety rules enabled
+4. whether the operator client is using `shared-footer`, `active-overlay`, or one or more pinned overlays
 
 The field-level truth stays in the [generated input reference](../reference/session-settings.md#input-tab).

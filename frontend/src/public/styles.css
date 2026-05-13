@@ -347,12 +347,26 @@ body {
   display: none;
 }
 
+.workspace-shell.composer-placement-active-overlay .control-pane.control-pane-overlay-mode {
+  flex: 0 0 auto;
+  height: auto;
+  max-height: none;
+}
+
+.workspace-shell.composer-placement-active-overlay .control-pane.control-pane-overlay-mode .control-pane-body {
+  display: none;
+}
+
 .control-pane-meta {
   padding: 4px 16px;
   border-bottom: 1px solid var(--border);
 }
 
 .workspace-shell.control-pane-hidden .control-pane-meta {
+  border-bottom: 0;
+}
+
+.workspace-shell.composer-placement-active-overlay .control-pane.control-pane-overlay-mode .control-pane-meta {
   border-bottom: 0;
 }
 
@@ -404,6 +418,10 @@ body {
 }
 
 .workspace-shell.control-pane-hidden .control-pane-resize-handle {
+  display: none;
+}
+
+.control-pane-resize-handle.control-pane-resize-handle-hidden {
   display: none;
 }
 
@@ -1512,6 +1530,24 @@ button:hover {
   margin-bottom: -6px;
 }
 
+.session-composer-pin {
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.1;
+  border-color: #33536d;
+  background: #162534;
+  color: #b7d8ef;
+}
+
+.session-composer-pin:hover,
+.session-composer-pin:focus-visible {
+  border-color: #53799a;
+  background: #1b3042;
+  color: #eef7ff;
+}
+
 .session-quick-send-panel {
   position: absolute;
   right: 0;
@@ -1606,6 +1642,110 @@ button:hover {
   border-color: #35526d;
   color: #9fd3ff;
   background: #182534;
+}
+
+.session-composer-overlay-host {
+  position: absolute;
+  top: var(--session-composer-overlay-top-px, 52px);
+  left: 10px;
+  right: 10px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.session-composer-overlay-host[hidden] {
+  display: none !important;
+}
+
+.session-composer-overlay-host > * {
+  pointer-events: auto;
+}
+
+.session-composer-overlay-shell {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid #28435d;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(14, 23, 35, 0.96), rgba(10, 17, 28, 0.97)),
+    rgba(10, 17, 28, 0.96);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.session-composer-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.session-composer-overlay-title,
+.session-composer-overlay-target {
+  margin: 0;
+}
+
+.session-composer-overlay-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8fb4cf;
+}
+
+.session-composer-overlay-target {
+  min-width: 0;
+  color: #d9e9f5;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-composer-overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.session-composer-overlay-slot {
+  min-width: 0;
+}
+
+.session-composer-overlay-shell .control-pane-body {
+  padding: 0;
+  overflow: visible;
+  gap: 10px;
+}
+
+.session-composer-overlay-command-row {
+  min-width: 0;
+}
+
+.session-composer-overlay-input {
+  min-height: 6.25rem;
+}
+
+.session-composer-overlay-unpin,
+.session-composer-overlay-guard-send,
+.session-composer-overlay-guard-cancel,
+.session-composer-overlay-send {
+  min-height: 32px;
+}
+
+.session-composer-overlay-unpin {
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.1;
+  border-color: #35526d;
+  color: #d6e7f2;
+  background: #1a2b3d;
 }
 
 .terminal-toolbar-meta {

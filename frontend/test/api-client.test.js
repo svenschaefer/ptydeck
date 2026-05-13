@@ -210,6 +210,49 @@ test("api client calls deck lifecycle and move endpoints", async () => {
   assert.equal(calls[5].options.method, "DELETE");
 });
 
+test("api client calls operator composer placement endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    const method = options.method || "GET";
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        clientId: "client-1",
+        mode: method === "PATCH" ? "active-overlay" : "shared-footer",
+        pinnedSessionIds: method === "PATCH" ? ["s-2"] : [],
+        sharedDraft: "",
+        pinnedDrafts: method === "PATCH" ? { "s-2": "ls" } : {}
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  const current = await api.getOperatorComposerPlacement();
+  const updated = await api.updateOperatorComposerPlacement({
+    mode: "active-overlay",
+    pinnedSessionIds: ["s-2"],
+    pinnedDrafts: { "s-2": "ls" }
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/operator/composer-placement");
+  assert.equal((calls[0].options.method || "GET"), "GET");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/operator/composer-placement");
+  assert.equal(calls[1].options.method, "PATCH");
+  assert.equal(
+    calls[1].options.body,
+    JSON.stringify({
+      mode: "active-overlay",
+      pinnedSessionIds: ["s-2"],
+      pinnedDrafts: { "s-2": "ls" }
+    })
+  );
+  assert.equal(current.mode, "shared-footer");
+  assert.equal(updated.mode, "active-overlay");
+});
+
 test("api client calls layout profile lifecycle endpoints", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

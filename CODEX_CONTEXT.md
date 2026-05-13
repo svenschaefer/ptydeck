@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-12 (the backend runtime still delegates startup/session-dispatch assembly into `backend/src/runtime-session-dispatch-assembly.js` plus retained route authority into `backend/src/runtime-session-dispatch-authority.js`, start/stop orchestration into `backend/src/runtime-lifecycle.js`, API session shaping and messaging/session authority into `backend/src/runtime-session-messaging-authority.js`, manager-session lifecycle-to-messaging/broadcast/warmup/persistence bridging into `backend/src/runtime-session-event-authority.js`, replay export/excerpt shaping plus session file-transfer guard rails and restore-create forwarding into `backend/src/runtime-session-resource-authority.js`, custom-command and deck catalog shaping into `backend/src/runtime-catalog-authority.js`, startup-readiness state into `backend/src/runtime-startup-readiness.js`, session-control client/session authority into `backend/src/runtime-session-control-authority.js`, share/spectator request-access and metrics helpers into `backend/src/runtime-access-policy.js` and `backend/src/runtime-metrics.js`, deck/session-state shaping into `backend/src/runtime-session-state.js`, persisted startup/restore authority into `backend/src/runtime-startup-restore.js`, operator-client composer placement persistence into `backend/src/runtime-operator-composer-authority.js`, share/layout/connection/workspace authority into `backend/src/runtime-library-authority.js`, retained catalog/state normalization into `backend/src/runtime-library-normalization.js`, and SSH trust lifecycle handling into `backend/src/runtime-ssh-trust.js`. The backend session manager still delegates retained runtime facade wiring into `backend/src/session-manager-runtime-facade.js` alongside constructor lifecycle/runtime wiring in `backend/src/session-manager-runtime-assembly.js`, PTY attachment and live stream handling in `backend/src/session-manager-pty-runtime.js`, mutation handling in `backend/src/session-manager-mutation-runtime.js`, trace/activity/input/resize/signal orchestration in `backend/src/session-manager-terminal-runtime.js`, trace-envelope and startup terminal-query helper shaping in `backend/src/session-manager-trace-runtime.js`, create/restart/close/guardrail orchestration in `backend/src/session-manager-session-runtime.js`, cleanup in `backend/src/session-manager-cleanup.js`, SSH remote-runtime state shaping in `backend/src/session-manager-remote-runtime.js`, startup/post-start input lifecycle in `backend/src/session-manager-startup-runtime.js`, create/update/restart lifecycle shaping in `backend/src/session-manager-lifecycle.js`, replay-output append/export/excerpt handling in `backend/src/session-manager-replay-runtime.js`, app-identity refresh and output-heuristic arbitration in `backend/src/session-manager-app-identity-runtime.js`, and SSH launch/reconnect orchestration in `backend/src/session-manager-launch-runtime.js`. Direct local PowerShell sessions remain first-class local launch aliases with explicit WSL fallback resolution for standard Windows PowerShell and PowerShell 7 install paths plus fail-closed launcher validation, trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets, SSH launches still keep secret-backed auth on one masked action-dialog seam plus trusted-host-key pinning and absolute managed known-hosts handling, multiline shell sends still normalize internal separators to the configured terminator for shell-family sessions, and the frontend runtime composition still delegates startup/reclaim/operator helper wiring into `frontend/src/public/app-runtime-startup-helper-composition.js` plus layout foundation assembly into `frontend/src/public/app-runtime-layout-foundation-assembly.js`, access-control composition into `frontend/src/public/app-runtime-access-control-composition.js`, stateful split-layout merge/mutation orchestration into `frontend/src/public/layout-split-layout-runtime-model.js`, and layout/workspace selection shaping into `frontend/src/public/layout-workspace-selection-state.js` alongside layout/workspace apply plus visible-session orchestration in `frontend/src/public/layout-workspace-orchestration-state.js`.)
+Last updated: 2026-05-13 (the backend runtime still delegates startup/session-dispatch assembly into `backend/src/runtime-session-dispatch-assembly.js` plus retained route authority into `backend/src/runtime-session-dispatch-authority.js`, start/stop orchestration into `backend/src/runtime-lifecycle.js`, API session shaping and messaging/session authority into `backend/src/runtime-session-messaging-authority.js`, manager-session lifecycle-to-messaging/broadcast/warmup/persistence bridging into `backend/src/runtime-session-event-authority.js`, replay export/excerpt shaping plus session file-transfer guard rails and restore-create forwarding into `backend/src/runtime-session-resource-authority.js`, custom-command and deck catalog shaping into `backend/src/runtime-catalog-authority.js`, startup-readiness state into `backend/src/runtime-startup-readiness.js`, session-control client/session authority into `backend/src/runtime-session-control-authority.js`, share/spectator request-access and metrics helpers into `backend/src/runtime-access-policy.js` and `backend/src/runtime-metrics.js`, deck/session-state shaping into `backend/src/runtime-session-state.js`, persisted startup/restore authority into `backend/src/runtime-startup-restore.js`, operator-client composer placement persistence into `backend/src/runtime-operator-composer-authority.js`, share/layout/connection/workspace authority into `backend/src/runtime-library-authority.js`, retained catalog/state normalization into `backend/src/runtime-library-normalization.js`, and SSH trust lifecycle handling into `backend/src/runtime-ssh-trust.js`. The backend session manager still delegates retained runtime facade wiring into `backend/src/session-manager-runtime-facade.js` alongside constructor lifecycle/runtime wiring in `backend/src/session-manager-runtime-assembly.js`, PTY attachment and live stream handling in `backend/src/session-manager-pty-runtime.js`, mutation handling in `backend/src/session-manager-mutation-runtime.js`, trace/activity/input/resize/signal orchestration in `backend/src/session-manager-terminal-runtime.js`, trace-envelope and startup terminal-query helper shaping in `backend/src/session-manager-trace-runtime.js`, create/restart/close/guardrail orchestration in `backend/src/session-manager-session-runtime.js`, cleanup in `backend/src/session-manager-cleanup.js`, SSH remote-runtime state shaping in `backend/src/session-manager-remote-runtime.js`, startup/post-start input lifecycle in `backend/src/session-manager-startup-runtime.js`, create/update/restart lifecycle shaping in `backend/src/session-manager-lifecycle.js`, replay-output append/export/excerpt handling in `backend/src/session-manager-replay-runtime.js`, app-identity refresh and output-heuristic arbitration in `backend/src/session-manager-app-identity-runtime.js`, and SSH launch/reconnect orchestration in `backend/src/session-manager-launch-runtime.js`. Direct local PowerShell sessions remain first-class local launch aliases with explicit WSL fallback resolution for standard Windows PowerShell and PowerShell 7 install paths plus fail-closed launcher validation, trusted-local handoff still resolves runtime client id through the session-control authority seam and fails closed on stale session takeover targets, SSH launches still keep secret-backed auth on one masked action-dialog seam plus trusted-host-key pinning and absolute managed known-hosts handling, multiline shell sends still normalize internal separators to the configured terminator for shell-family sessions, the runtime create-session path now passes the freshly shaped API payload into the follow-up session update broadcast so ultra-fast guardrail cleanup cannot race a successful `POST /api/v1/sessions` into a late `404`, and the frontend runtime composition still delegates startup/reclaim/operator helper wiring into `frontend/src/public/app-runtime-startup-helper-composition.js` plus layout foundation assembly into `frontend/src/public/app-runtime-layout-foundation-assembly.js`, access-control composition into `frontend/src/public/app-runtime-access-control-composition.js`, stateful split-layout merge/mutation orchestration into `frontend/src/public/layout-split-layout-runtime-model.js`, and layout/workspace selection shaping into `frontend/src/public/layout-workspace-selection-state.js` alongside layout/workspace apply plus visible-session orchestration in `frontend/src/public/layout-workspace-orchestration-state.js`. The operator input composer now also supports server-persisted per-operator-client placement through `frontend/src/public/operator-composer-placement-runtime-controller.js`, which reuses the shared composer body for `shared-footer` versus `active-overlay` placement, renders non-resizing active-terminal overlays, manages per-terminal pinned overlay composers, and applies persisted placement updates from the runtime snapshot and targeted `composer-placement.updated` events.)
 
 ## Direct Local PowerShell Session Baseline
 
@@ -34,35 +34,40 @@ Last updated: 2026-05-12 (the backend runtime still delegates startup/session-di
 
 ## Operator Input Composer Placement Modes
 
-- The product now has one approved feature contract for reducing accidental sends to the wrong terminal by making the composer block track terminal context more explicitly.
-- Two global composer-placement modes are planned:
+- The product now supports one shipped composer-placement contract for reducing accidental sends to the wrong terminal by making the composer block track terminal context more explicitly.
+- Two global composer-placement modes are now live:
   - `shared-footer`: the existing shared composer block remains below the full terminal grid
   - `active-overlay`: one shared composer block is rendered as a non-resizing overlay inside the active terminal, below the terminal header and above the terminal content
-- A per-terminal pin contract is planned only for `active-overlay`:
+- A per-terminal pin contract is now live only for `active-overlay`:
   - multiple terminals may be pinned at the same time
   - each pinned terminal gets its own overlay composer block
   - pinned terminals keep their own drafts
   - non-pinned terminals continue to use one shared active-overlay draft
   - if a terminal is pinned, that terminal must not also show the shared active-overlay composer block
 - Persistence for this feature is intentionally not browser-local:
-  - composer mode, pinned session ids, shared overlay draft, and pinned per-session drafts are planned as server-side persisted state
+  - composer mode, pinned session ids, shared overlay draft, and pinned per-session drafts are stored as server-side persisted state
   - the persistence scope is per operator client, not one shared instance-wide setting for all clients
-- `CMP-401` is now implemented as the backend authority baseline:
+- `CMP-401` implemented the backend authority baseline:
   - persisted runtime state now includes `operatorComposerPlacements`
   - startup restore rehydrates persisted operator-client composer placement entries through `backend/src/runtime-startup-restore.js`
   - the runtime snapshot emitted through `backend/src/runtime-catalog-authority.js` now includes `operatorComposerPlacements`
   - the REST surface now exposes `GET` and `PATCH /api/v1/operator/composer-placement`
   - the runtime WebSocket snapshot now includes `composerPlacement`, and targeted `composer-placement.updated` events are broadcast only to sockets attached to the matching operator-client session-control attachment key
   - session cleanup now prunes pinned session ids and pinned drafts fail closed when a referenced session disappears
-- `v0.4.0-H183` therefore remains active only for the frontend placement/pinning work (`CMP-402`, `CMP-403`) plus focused QA coverage (`CMP-404`).
+- `CMP-402` through `CMP-404` are now also complete:
+  - the control pane now exposes a global mode selector for `shared-footer` versus `active-overlay`
+  - session cards now expose pin and unpin actions plus overlay hosts for pinned composers
+  - the frontend now reuses the shared composer body for the active overlay path instead of cloning the shared footer composer into a second source of truth
+  - pinned overlays use isolated drafts and keep using the normal guarded send/completion/runtime command seams
+  - focused regression coverage now locks down REST wiring, runtime snapshot/update application, overlay migration, pin lifecycle, draft isolation, and the shipped template/CSS contract
 
 ## Current Quality Baseline
 
-Validated evidence on the current post-`H182` / active-`H183` tree:
+Validated evidence on the current post-`H183` tree:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
-- backend coverage: `97.41%` line / `90.98%` branch / `87.78%` funcs
-- frontend coverage: `97.70%` line / `91.04%` branch / `82.39%` funcs
+- backend coverage: `97.40%` line / `90.97%` branch / `87.77%` funcs
+- frontend coverage: `97.21%` line / `90.85%` branch / `81.87%` funcs
 
 Current lane health:
 
@@ -74,24 +79,22 @@ Current lane health:
 Current highest retained hotspots:
 
 - backend:
-  - `backend/src/runtime.js`: `2050` lines, `87.12%` line / `80.92%` branch
-  - `backend/src/runtime-library-normalization.js`: `1724` lines, `92.34%` line / `87.52%` branch
-  - `backend/src/runtime-operator-composer-authority.js`: `417` lines, `81.77%` line / `77.55%` branch
-  - `backend/src/runtime-session-resource-authority.js`: `96.51%` line / `90.68%` branch
-  - `backend/src/session-manager.js`: `258` lines, `98.45%` line / `78.08%` branch
+  - `backend/src/runtime.js`
+  - `backend/src/runtime-library-normalization.js`
+  - `backend/src/runtime-operator-composer-authority.js`
+  - `backend/src/runtime-session-resource-authority.js`
+  - `backend/src/session-manager.js`
 - frontend:
-  - `frontend/src/public/app-runtime-composition-controller.js`: `1265` lines, still the largest retained frontend runtime-composition monolith
-  - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `824` lines, `93.69%` line / `87.70%` branch
-  - `frontend/src/public/connection-profile-draft-state.js`: `680` lines, `99.71%` line / `88.73%` branch
-  - `frontend/src/public/split-layout-runtime-controller.js`: `483` lines
-  - `frontend/src/public/layout-profile-runtime-controller.js`: `433` lines
-  - `frontend/src/public/layout-runtime-state.js`: `91.92%` line / `81.72%` branch
+  - `frontend/src/public/app-runtime-composition-controller.js`
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js`
+  - `frontend/src/public/connection-profile-draft-state.js`
+  - `frontend/src/public/split-layout-runtime-controller.js`
+  - `frontend/src/public/layout-profile-runtime-controller.js`
+  - `frontend/src/public/layout-runtime-state.js`
 
 Current active tasks:
 
-- `CMP-402` Owner `FE`: add the global composer-placement mode switch between `shared-footer` and `active-overlay`.
-- `CMP-403` Owner `FE`: add per-terminal pin/unpin controls plus concurrent pinned overlay rendering and isolated pinned drafts.
-- `CMP-404` Owner `QA`: add focused regression coverage for server-side persistence, mode switching, pin lifecycle, draft isolation, and send-target correctness across all composer-placement modes.
+- `None.`
 
 ## H181 Frontend Closeout
 

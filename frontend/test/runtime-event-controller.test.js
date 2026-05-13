@@ -7,6 +7,7 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
   const calls = [];
   const controller = createRuntimeEventController({
     setRuntimeClientId: (clientId) => calls.push(["clientId", clientId]),
+    setComposerPlacementState: (state) => calls.push(["composerPlacement", state?.mode || ""]),
     getPreferredActiveDeckId: () => "deck-a",
     setDecks: (decks, options) => calls.push(["decks", decks, options.preferredActiveDeckId]),
     replaceCustomCommandState: (commands) => calls.push(["commands", commands.length]),
@@ -21,6 +22,7 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
 
   const applied = controller.applyRuntimeEvent({
     type: "snapshot",
+    composerPlacement: { mode: "active-overlay" },
     decks: [{ id: "deck-a" }],
     customCommands: [{ name: "go" }],
     sessions: [{ id: "s1" }, { id: "s2" }],
@@ -30,6 +32,7 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
   assert.equal(applied, true);
   assert.deepEqual(calls, [
     ["clientId", ""],
+    ["composerPlacement", "active-overlay"],
     ["decks", [{ id: "deck-a" }], "deck-a"],
     ["commands", 1],
     ["sessions", 2],
@@ -39,6 +42,35 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
     ["clearError"],
     ["bootstrap", "ws"],
     ["stabilize", ["s1", "s2"]]
+  ]);
+});
+
+test("runtime-event controller applies composer placement updates", () => {
+  const calls = [];
+  const controller = createRuntimeEventController({
+    setComposerPlacementState: (state) => calls.push(state)
+  });
+
+  const applied = controller.applyRuntimeEvent({
+    type: "composer-placement.updated",
+    composerPlacement: {
+      clientId: "client-1",
+      mode: "active-overlay",
+      pinnedSessionIds: ["s-2"],
+      sharedDraft: "",
+      pinnedDrafts: { "s-2": "pwd" }
+    }
+  });
+
+  assert.equal(applied, true);
+  assert.deepEqual(calls, [
+    {
+      clientId: "client-1",
+      mode: "active-overlay",
+      pinnedSessionIds: ["s-2"],
+      sharedDraft: "",
+      pinnedDrafts: { "s-2": "pwd" }
+    }
   ]);
 });
 

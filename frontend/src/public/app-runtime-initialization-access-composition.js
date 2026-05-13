@@ -60,6 +60,10 @@ export function createAppRuntimeInitializationAccessComposition(options = {}) {
       : () => null;
   const getControlPaneRuntimeController =
     typeof options.getControlPaneRuntimeController === "function" ? options.getControlPaneRuntimeController : () => null;
+  const getOperatorComposerPlacementRuntimeController =
+    typeof options.getOperatorComposerPlacementRuntimeController === "function"
+      ? options.getOperatorComposerPlacementRuntimeController
+      : () => null;
   const getWorkspacePresetRuntimeController =
     typeof options.getWorkspacePresetRuntimeController === "function"
       ? options.getWorkspacePresetRuntimeController
@@ -116,6 +120,7 @@ export function createAppRuntimeInitializationAccessComposition(options = {}) {
     getSessionGridController,
     getConnectionProfileRuntimeController,
     getControlPaneRuntimeController,
+    getOperatorComposerPlacementRuntimeController,
     getWorkspacePresetRuntimeController,
     getWorkspaceManagerRuntimeController,
     getSendHistoryRuntimeController,

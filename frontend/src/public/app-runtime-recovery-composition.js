@@ -55,6 +55,8 @@ export function createAppRuntimeRecoveryComposition(options = {}) {
     markRuntimeBootstrapReady:
       typeof options.markRuntimeBootstrapReady === "function" ? options.markRuntimeBootstrapReady : () => {},
     setRuntimeClientId: typeof options.setRuntimeClientId === "function" ? options.setRuntimeClientId : () => {},
+    setComposerPlacementState:
+      typeof options.setComposerPlacementState === "function" ? options.setComposerPlacementState : () => {},
     applySessionInterpretationActions:
       typeof options.applySessionInterpretationActions === "function" ? options.applySessionInterpretationActions : () => {},
     upsertSession: (session) => {

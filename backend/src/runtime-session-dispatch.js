@@ -175,11 +175,15 @@ export function createRuntimeSessionDispatch(dependencies = {}) {
       });
       validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
       await persistNow("session.create");
-      broadcastSessionUpdated(payload.id, {
-        ...requestTraceContext,
-        sessionId: payload.id,
-        deckId: apiPayload.deckId
-      });
+      broadcastSessionUpdated(
+        payload.id,
+        {
+          ...requestTraceContext,
+          sessionId: payload.id,
+          deckId: apiPayload.deckId
+        },
+        apiPayload
+      );
       writeJsonResponse(201, apiPayload);
       return true;
     }

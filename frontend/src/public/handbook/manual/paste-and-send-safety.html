@@ -50,6 +50,26 @@
 
 <p>Use the <a href="/handbook/reference/session-settings.html#input-tab">session settings reference</a> for the exact input-safety switches and thresholds.</p>
 
+<h2 id="composer-placement-modes">Composer Placement Modes</h2>
+
+<p><code>ptydeck</code> now supports two server-persisted composer placement modes for each operator client:</p>
+
+<ul>
+<li><code>shared-footer</code>: one shared composer stays below the terminal grid</li>
+<li><code>active-overlay</code>: the shared composer moves into the active terminal as a non-resizing overlay below the terminal header</li>
+</ul>
+
+<p>In <code>active-overlay</code> mode, you can also pin individual terminals:</p>
+
+<ul>
+<li>pinned terminals get their own overlay composer block</li>
+<li>multiple terminals can stay pinned at the same time</li>
+<li>pinned terminals keep their own drafts</li>
+<li>the shared overlay composer is shown only for the active terminal when that terminal is not pinned</li>
+</ul>
+
+<p>Use this when accidental sends happen because the footer composer is still visible while a different terminal is active.</p>
+
 <h2 id="terminal-local-paste">Terminal-Local Paste</h2>
 
 <p>Terminal-local paste is routed through the guarded send path instead of bypassing safety checks.</p>
@@ -79,6 +99,7 @@
 <li>the <code>Input</code> tab</li>
 <li>the session&#39;s send terminator</li>
 <li>whether the session has stricter send-safety rules enabled</li>
+<li>whether the operator client is using <code>shared-footer</code>, <code>active-overlay</code>, or one or more pinned overlays</li>
 </ol>
 
 <p>The field-level truth stays in the <a href="/handbook/reference/session-settings.html#input-tab">generated input reference</a>.</p>
@@ -87,6 +108,7 @@
         <p class="handbook-page-toc-title">On This Page</p>
         <ul class="handbook-page-toc-list">
 <li><a class="handbook-page-toc-link" href="#guarded-sends">Guarded Sends</a></li>
+<li><a class="handbook-page-toc-link" href="#composer-placement-modes">Composer Placement Modes</a></li>
 <li><a class="handbook-page-toc-link" href="#terminal-local-paste">Terminal-Local Paste</a></li>
 <li><a class="handbook-page-toc-link" href="#auto-continue">Auto Continue</a></li>
 <li><a class="handbook-page-toc-link" href="#practical-checks">Practical Checks</a></li>

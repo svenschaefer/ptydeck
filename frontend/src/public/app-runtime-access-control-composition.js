@@ -28,6 +28,7 @@ export function createAppRuntimeAccessControlComposition(options = {}) {
       getSessionGridController: options.getSessionGridController,
       getConnectionProfileRuntimeController: options.getConnectionProfileRuntimeController,
       getControlPaneRuntimeController: options.getControlPaneRuntimeController,
+      getOperatorComposerPlacementRuntimeController: options.getOperatorComposerPlacementRuntimeController,
       getWorkspacePresetRuntimeController: options.getWorkspacePresetRuntimeController,
       getWorkspaceManagerRuntimeController: options.getWorkspaceManagerRuntimeController,
       getSendHistoryRuntimeController: options.getSendHistoryRuntimeController,

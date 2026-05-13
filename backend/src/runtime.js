@@ -1715,10 +1715,19 @@ export function createRuntime(config) {
     }
   }
 
-  function broadcastSessionUpdated(sessionId, traceSeed = null) {
+  function broadcastSessionUpdated(sessionId, traceSeed = null, fallbackSession = null) {
+    let sessionPayload = null;
+    try {
+      sessionPayload = getApiSessionOrThrow(sessionId);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404 || !fallbackSession) {
+        throw error;
+      }
+      sessionPayload = fallbackSession;
+    }
     broadcast({
       type: "session.updated",
-      session: getApiSessionOrThrow(sessionId)
+      session: sessionPayload
     }, traceSeed);
   }
 

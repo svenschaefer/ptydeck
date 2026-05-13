@@ -152,6 +152,13 @@
                   <a id="handbook-open" class="control-pane-link" href="/handbook/index.html">Handbook</a>
                   <p id="control-pane-status" class="control-pane-status"></p>
                   <label class="control-pane-position-wrap">
+                    <span>Composer</span>
+                    <select id="composer-placement-mode" aria-label="Composer placement mode">
+                      <option value="shared-footer">Footer</option>
+                      <option value="active-overlay">Overlay</option>
+                    </select>
+                  </label>
+                  <label class="control-pane-position-wrap">
                     <span>Position</span>
                     <select id="control-pane-position" aria-label="Control pane position">
                       <option value="bottom">Bottom</option>
@@ -162,7 +169,7 @@
                 </div>
               </div>
             </div>
-            <div class="control-pane-body">
+            <div id="control-pane-body" class="control-pane-body">
               <section class="command-row">
                 <div class="command-input-column">
                   <div class="command-entry-row">
@@ -743,6 +750,7 @@
               <span class="session-control-badge" hidden></span>
             </div>
             <div class="session-toolbar-actions">
+              <button class="session-composer-pin" type="button" aria-label="Pin overlay composer" hidden>Pin Input</button>
               <div class="session-quick-send-panel" hidden>
                 <div class="session-quick-send-head">
                   <p class="session-quick-send-title">Send to Session</p>
@@ -764,6 +772,7 @@
             <p class="session-tag-list empty"></p>
           </div>
         </div>
+        <div class="session-composer-overlay-host" hidden></div>
         <p class="session-unrestored-hint" hidden></p>
         <dialog class="session-settings-dialog">
           <div class="session-settings-head">

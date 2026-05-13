@@ -114,10 +114,12 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppRuntimeSessionSurfaceAssembly",
     "createAppRuntimeSessionGridActions",
     "createAppRuntimeStartupHelperComposition",
+    "createOperatorComposerPlacementRuntimeController",
     "createSessionRuntimeController",
     "createSessionStreamAuthorityController",
     "createSessionViewModel",
-    "initialize: () => appRuntimeInitializationController.initialize(),",
+    "initialize: async () => {",
+    "await operatorComposerPlacementRuntimeController?.initialize?.();",
     "setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)"
   ];
 

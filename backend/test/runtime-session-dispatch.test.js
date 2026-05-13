@@ -169,7 +169,7 @@ test("runtime session dispatch creates sessions through the extracted create-ses
     reconcileSessionControllerForSession: () => true,
     toApiSession: (value) => ({ ...value, api: true }),
     persistNow: async (reason) => persistReasons.push(reason),
-    broadcastSessionUpdated: (sessionId, trace) => broadcastCalls.push({ sessionId, trace }),
+    broadcastSessionUpdated: (sessionId, trace, fallbackSession) => broadcastCalls.push({ sessionId, trace, fallbackSession }),
     setAuditContext: (value) => auditCalls.push(value)
   });
 
@@ -211,6 +211,7 @@ test("runtime session dispatch creates sessions through the extracted create-ses
   assert.deepEqual(auditCalls, [{ target: { sessionId: "session-1" }, metadata: { deckId: "infra", sessionKind: "ssh" } }]);
   assert.equal(broadcastCalls.length, 1);
   assert.equal(broadcastCalls[0].sessionId, "session-1");
+  assert.deepEqual(broadcastCalls[0].fallbackSession, responseCalls[0].body);
   assert.equal(responseCalls.length, 1);
   assert.equal(responseCalls[0].statusCode, 201);
   assert.equal(responseCalls[0].body.api, true);

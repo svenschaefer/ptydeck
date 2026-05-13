@@ -252,6 +252,16 @@ export function createApiClient(baseUrl, options = {}) {
     async listDecks() {
       return request("/decks");
     },
+    async getOperatorComposerPlacement() {
+      return request("/operator/composer-placement");
+    },
+    async updateOperatorComposerPlacement(payload) {
+      return request("/operator/composer-placement", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload || {})
+      });
+    },
     async createDeck(payload) {
       return request("/decks", withJson(payload || {}));
     },

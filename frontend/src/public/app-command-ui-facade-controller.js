@@ -44,6 +44,10 @@ export function createAppCommandUiFacadeController(options = {}) {
       : () => null;
   const getControlPaneRuntimeController =
     typeof options.getControlPaneRuntimeController === "function" ? options.getControlPaneRuntimeController : () => null;
+  const getOperatorComposerPlacementRuntimeController =
+    typeof options.getOperatorComposerPlacementRuntimeController === "function"
+      ? options.getOperatorComposerPlacementRuntimeController
+      : () => null;
   const getCommandExecutor =
     typeof options.getCommandExecutor === "function" ? options.getCommandExecutor : () => null;
 
@@ -155,6 +159,7 @@ export function createAppCommandUiFacadeController(options = {}) {
     getSendHistoryRuntimeController()?.render?.();
     getTrustedLocalHandoffRuntimeController()?.render?.();
     getPasteObservationRuntimeController()?.render?.();
+    getOperatorComposerPlacementRuntimeController()?.render?.();
   }
 
   async function executeControlCommand(interpreted) {

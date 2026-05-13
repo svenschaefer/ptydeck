@@ -8,6 +8,7 @@ import { createAppRuntimeRecoveryComposition } from "./app-runtime-recovery-comp
 import { createAppRuntimeSessionSurfaceAssembly } from "./app-runtime-session-surface-assembly.js";
 import { createAppRuntimeSessionGridActions } from "./app-runtime-session-grid-actions.js";
 import { createAppRuntimeStartupHelperComposition } from "./app-runtime-startup-helper-composition.js";
+import { createOperatorComposerPlacementRuntimeController } from "./operator-composer-placement-runtime-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
@@ -256,9 +257,11 @@ const {
   startupWarmupSkipBtn,
   workspaceShellEl,
   controlPaneEl,
+  controlPaneBodyEl,
   controlPaneLauncherBtn,
   controlPaneToggleBtn,
   controlPanePositionSelectEl,
+  composerPlacementModeSelectEl,
   controlPaneStatusEl,
   controlPaneResizeHandleEl,
   terminalSearchInputEl,
@@ -419,6 +422,7 @@ let pasteObservationRuntimeController = null;
 let replayViewerRuntimeController = null;
 let commandPaletteRuntimeController = null;
 let controlPaneRuntimeController = null;
+let operatorComposerPlacementRuntimeController = null;
 let layoutProfileRuntimeController = null;
 let workspacePresetRuntimeController = null;
 let workspaceManagerRuntimeController = null;
@@ -581,6 +585,7 @@ const appRuntimeAccessControlComposition = createAppRuntimeAccessControlComposit
   getSessionGridController: () => sessionGridController,
   getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
   getControlPaneRuntimeController: () => controlPaneRuntimeController,
+  getOperatorComposerPlacementRuntimeController: () => operatorComposerPlacementRuntimeController,
   getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
   getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
   getSendHistoryRuntimeController: () => sendHistoryRuntimeController,
@@ -955,6 +960,8 @@ sessionRuntimeController = createSessionRuntimeController({
   clearError: () => appRuntimeStateController?.clearError(),
   markRuntimeBootstrapReady: (source) => appCommandUiFacadeController?.markRuntimeBootstrapReady(source),
   setRuntimeClientId,
+  setComposerPlacementState: (nextState) =>
+    operatorComposerPlacementRuntimeController?.applyPlacementState?.(nextState),
   applySessionInterpretationActions: (sessionId, actions) => store.applySessionInterpretationActions(sessionId, actions),
   upsertSession: (nextSession) => {
     appSessionRuntimeFacadeController?.upsertSession(nextSession);
@@ -1258,8 +1265,79 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS
 }));
 
+operatorComposerPlacementRuntimeController = createOperatorComposerPlacementRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  api,
+  workspaceShellEl,
+  controlPaneEl,
+  controlPaneBodyEl,
+  controlPaneResizeHandleEl,
+  composerPlacementModeSelectEl,
+  commandInput,
+  terminals,
+  getState: () => store?.getState?.() || {},
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
+  parseAutocompleteContext: (rawInput, customCommands) =>
+    commandEngine?.parseAutocompleteContext?.(rawInput, customCommands) || null,
+  listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
+  recordDiscoveryUsage: (key) => commandDiscoveryUsageStore?.record?.(key),
+  resolveQuickSwitchTarget: (selectorText, sessions) =>
+    commandTargetRuntimeController?.resolveQuickSwitchTarget?.(selectorText, sessions) || { error: "Unknown target." },
+  activateSessionTarget: (session) =>
+    commandTargetRuntimeController?.activateSessionTarget?.(session) || { ok: false, message: "" },
+  activateDeckTarget: (deck) =>
+    commandTargetRuntimeController?.activateDeckTarget?.(deck) || { ok: false, message: "" },
+  resolveTargetSelectors: (selectorText, sessions, runtimeOptions) =>
+    commandTargetRuntimeController?.resolveTargetSelectors?.(selectorText, sessions, runtimeOptions) || {
+      sessions: [],
+      error: ""
+    },
+  setActiveSession: (sessionId) => store?.setActiveSession?.(sessionId),
+  executeControlCommand: (interpreted) => appCommandUiFacadeController?.executeControlCommand?.(interpreted),
+  executeControlCommandDetailed: (interpreted) =>
+    appCommandUiFacadeController?.executeControlCommandDetailed?.(interpreted) || { ok: true, feedback: "" },
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  getLastActiveSessionSwitchAt: () => commandTargetRuntimeController?.getLastActiveSessionSwitchAt?.() || 0,
+  getBlockedSessionActionMessage: sessionUiFacadeController?.getBlockedSessionActionMessage,
+  isSessionActionBlocked: sessionUiFacadeController?.isSessionActionBlocked,
+  canWriteToSession,
+  getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
+  showBlockedWriteReclaimUi,
+  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
+  sendInputWithConfiguredTerminator,
+  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode?.(value) || "auto",
+  delayedSubmitMs: DELAYED_SUBMIT_MS,
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
+  setError: (message) => appCommandUiFacadeController?.setError?.(message),
+  clearError: () => appRuntimeStateController?.clearError?.(),
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  isReadOnlyMode,
+  getReadOnlyModeMessage,
+  getCustomCommandState: (name) => appCommandUiFacadeController?.getCustomCommand?.(name),
+  recordCommandSubmission: (sessionId, submission) => store?.recordSessionCommandSubmission?.(sessionId, submission),
+  recordSendHistory: (sessionId, payload, runtimeOptions) =>
+    sendHistoryRuntimeController?.recordSend?.(sessionId, payload, runtimeOptions),
+  scheduleSharedCommandRefresh: () => {
+    appCommandUiFacadeController?.scheduleCommandPreview?.();
+    appCommandUiFacadeController?.scheduleCommandSuggestions?.();
+    appCommandUiFacadeController?.render?.();
+  },
+  formatQuickSwitchPreview: (selectorText, sessions) =>
+    commandTargetRuntimeController?.formatQuickSwitchPreview?.(selectorText, sessions) || "",
+  runWorkflowDetailed: (interpreted) => slashWorkflowRuntimeController?.runWorkflowDetailed?.(interpreted),
+  readClipboardText: () => clipboardRuntimeController?.readText?.(),
+  writeClipboardText: (text) => clipboardRuntimeController?.writeText?.(text)
+});
+
 return {
-  initialize: () => appRuntimeInitializationController.initialize(),
+  initialize: async () => {
+    const result = await appRuntimeInitializationController.initialize();
+    await operatorComposerPlacementRuntimeController?.initialize?.();
+    return result;
+  },
   setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)
 };
 }

@@ -96,3 +96,27 @@ test("session quick-send hover actions stay clickable while moving from the tool
     /\.session-quick-send-target \{[\s\S]*text-overflow: ellipsis;[\s\S]*\}/m
   );
 });
+
+test("active-overlay composer mode collapses the footer body and uses non-resizing terminal overlays", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(
+    stylesCss,
+    /\.workspace-shell\.composer-placement-active-overlay \.control-pane\.control-pane-overlay-mode \{[\s\S]*height: auto;[\s\S]*max-height: none;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.workspace-shell\.composer-placement-active-overlay \.control-pane\.control-pane-overlay-mode \.control-pane-body \{[\s\S]*display: none;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-host \{[\s\S]*position: absolute;[\s\S]*pointer-events: none;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell \{[\s\S]*width: 100%;[\s\S]*backdrop-filter: blur\(8px\);[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell \.control-pane-body \{[\s\S]*padding: 0;[\s\S]*overflow: visible;[\s\S]*\}/m
+  );
+});

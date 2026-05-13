@@ -11,6 +11,8 @@ export function createRuntimeEventController(options = {}) {
   const clearError = options.clearError || (() => {});
   const markRuntimeBootstrapReady = options.markRuntimeBootstrapReady || (() => {});
   const setRuntimeClientId = typeof options.setRuntimeClientId === "function" ? options.setRuntimeClientId : () => {};
+  const setComposerPlacementState =
+    typeof options.setComposerPlacementState === "function" ? options.setComposerPlacementState : () => {};
   const applySessionInterpretationActions =
     typeof options.applySessionInterpretationActions === "function"
       ? options.applySessionInterpretationActions
@@ -61,6 +63,7 @@ export function createRuntimeEventController(options = {}) {
 
   function applyRuntimeSnapshot(event) {
     setRuntimeClientId(event?.clientId || "");
+    setComposerPlacementState(event?.composerPlacement || null);
     const sessionIds = Array.isArray(event.sessions)
       ? event.sessions.map((session) => String(session?.id || "").trim()).filter(Boolean)
       : [];
@@ -209,6 +212,10 @@ export function createRuntimeEventController(options = {}) {
           return true;
         }
         return false;
+      case "composer-placement.updated":
+        setComposerPlacementState(event?.composerPlacement || null);
+        clearError();
+        return true;
       default:
         return false;
     }

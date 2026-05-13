@@ -21,11 +21,14 @@ export function createSessionCardFactoryController(options = {}) {
     const stateBadgeEl = node.querySelector(".session-state-badge");
     const controlBadgeEl = node.querySelector(".session-control-badge");
     const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
+    const toolbarEl = node.querySelector(".terminal-toolbar");
     const sessionAppIdentityEl = node.querySelector(".session-app-identity");
     const sessionNoteEl = node.querySelector(".session-note-text");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
     const refreshBtn = node.querySelector(".session-refresh");
     const settingsBtn = node.querySelector(".session-settings");
+    const composerPinBtn = node.querySelector(".session-composer-pin");
+    const composerOverlayHostEl = node.querySelector(".session-composer-overlay-host");
     const quickSendPanelEl = node.querySelector(".session-quick-send-panel");
     const quickSendTitleEl = node.querySelector(".session-quick-send-title");
     const quickSendTargetEl = node.querySelector(".session-quick-send-target");
@@ -153,12 +156,15 @@ export function createSessionCardFactoryController(options = {}) {
       focusBtn,
       stateBadgeEl,
       controlBadgeEl,
+      toolbarEl,
       sessionMetaRowEl,
       sessionAppIdentityEl,
       sessionNoteEl,
       unrestoredHintEl,
       refreshBtn,
       settingsBtn,
+      composerPinBtn,
+      composerOverlayHostEl,
       quickSendPanelEl,
       quickSendTitleEl,
       quickSendTargetEl,
