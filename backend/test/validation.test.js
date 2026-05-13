@@ -592,6 +592,17 @@ test("validateRequest rejects malformed session create-only and patch edge field
 
   assert.throws(() => {
     validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        deckId: 42
+      }
+    });
+  }, /Field 'deckId' must be a string/);
+
+  assert.throws(() => {
+    validateRequest({
       method: "PATCH",
       pathname: "/api/v1/sessions/abc",
       params: { sessionId: "abc" },
@@ -1022,6 +1033,7 @@ test("validateRequest accepts ssh session create payload", () => {
           method: "password"
         },
         remoteSecret: "super-secret",
+        deckId: "ops",
         startCwd: "~",
         startCommand: "hostname"
       }

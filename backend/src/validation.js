@@ -60,7 +60,7 @@ const SESSION_MUTABLE_COMMON_FIELDS = Object.freeze([
   "activeThemeProfile",
   "inactiveThemeProfile"
 ]);
-const SESSION_CREATE_ONLY_FIELDS = Object.freeze(["cwd", "shell", "connectionProfileId"]);
+const SESSION_CREATE_ONLY_FIELDS = Object.freeze(["cwd", "shell", "connectionProfileId", "deckId"]);
 
 function isRemoteConnection(value) {
   return (
@@ -320,6 +320,7 @@ function validateSessionMutableFields(body, { allowCreateOnlyFields = false, req
     validateOptionalStringField(body, "cwd", "Field 'cwd' must be a string.");
     validateOptionalStringField(body, "shell", "Field 'shell' must be a string.");
     validateOptionalStringField(body, "connectionProfileId", "Field 'connectionProfileId' must be a string.");
+    validateOptionalStringField(body, "deckId", "Field 'deckId' must be a string.");
   }
   validateOptionalStringField(body, "name", "Field 'name' must be a string.");
   if (body?.kind !== undefined && !SESSION_KIND_VALUES.has(body.kind)) {

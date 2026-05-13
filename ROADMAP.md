@@ -14,17 +14,22 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `None.`
+  - `v0.4.0-H185` Session Lifecycle Stabilization
 - Queued next waves:
   - `None.`
 
 ## Active Wave Order
 
-1. `None.`
+1. `STAB-502`
+2. `STAB-503`
+3. `STAB-504`
+4. `STAB-505`
 
 ## Wave Dependencies
 
-- `None.`
+- `STAB-502 -> STAB-505`
+- `STAB-503 -> STAB-505`
+- `STAB-504 -> STAB-505`
 
 ## Queued Wave Order
 

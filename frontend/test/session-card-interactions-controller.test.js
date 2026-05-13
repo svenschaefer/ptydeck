@@ -652,6 +652,72 @@ test("session-card-interactions controller handles delete cancel and delete fail
   assert.deepEqual(failureCalls, ["Failed to delete session."]);
 });
 
+test("session-card-interactions controller removes stale ghost sessions when no live session record remains", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController({
+    isSessionExited: (session) => session?.state === "exited"
+  });
+  const refs = {
+    focusBtn: createEventTarget(),
+    closeBtn: createEventTarget(),
+    settingsDialog: {}
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha", state: "running" },
+    refs,
+    api: {},
+    getSession: () => null,
+    confirmSessionDelete: async () => true,
+    removeSession: (sessionId) => calls.push(`remove:${sessionId}`),
+    closeSettingsDialog: () => calls.push("close-dialog"),
+    clearError: () => calls.push("clear-error"),
+    setCommandFeedback: (message) => calls.push(`feedback:${message}`),
+    formatSessionToken: () => "A",
+    formatSessionDisplayName: () => "alpha"
+  });
+
+  await refs.closeBtn.emit("click");
+
+  assert.deepEqual(calls, ["remove:s1", "close-dialog", "clear-error", "feedback:Removed stale session [A] alpha."]);
+});
+
+test("session-card-interactions controller removes stale sessions on backend SessionNotFound delete responses", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController();
+  const refs = {
+    focusBtn: createEventTarget(),
+    closeBtn: createEventTarget(),
+    settingsDialog: {}
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha", state: "running" },
+    refs,
+    api: {
+      async deleteSession() {
+        const error = new Error("missing");
+        error.status = 404;
+        error.error = "SessionNotFound";
+        throw error;
+      }
+    },
+    getSession: () => ({ id: "s1", name: "alpha", state: "running" }),
+    confirmSessionDelete: async () => true,
+    removeSession: (sessionId) => calls.push(`remove:${sessionId}`),
+    closeSettingsDialog: () => calls.push("close-dialog"),
+    clearError: () => calls.push("clear-error"),
+    setCommandFeedback: (message) => calls.push(`feedback:${message}`),
+    formatSessionToken: () => "A",
+    formatSessionDisplayName: () => "alpha",
+    setError: (message) => calls.push(`error:${message}`)
+  });
+
+  await refs.closeBtn.emit("click");
+
+  assert.deepEqual(calls, ["remove:s1", "close-dialog", "clear-error", "feedback:Removed stale session [A] alpha."]);
+});
+
 test("session-card-interactions controller applies valid settings and persists session update", async () => {
   const calls = [];
   const drafts = new Map();

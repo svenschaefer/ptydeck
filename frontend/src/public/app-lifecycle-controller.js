@@ -82,9 +82,10 @@ export function createAppLifecycleController(options = {}) {
     }
     try {
       debugLog("sessions.create.start");
-      const createdSession = await api.createSession();
-      let session = createdSession;
       const activeDeck = getActiveDeck();
+      const createPayload = activeDeck?.id ? { deckId: activeDeck.id } : {};
+      const createdSession = await api.createSession(createPayload);
+      let session = createdSession;
       if (activeDeck && resolveSessionDeckId(createdSession) !== activeDeck.id) {
         session = await api.moveSessionToDeck(activeDeck.id, createdSession.id);
       }

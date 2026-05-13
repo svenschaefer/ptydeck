@@ -85,6 +85,12 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
 - Stopped-session rendering must now stay visually empty in all composer-placement modes:
   - `active-overlay` and pinned overlay composers are hidden for stopped sessions even though their draft state remains persisted server-side for later restart
   - the card layout slot still remains occupied while the session is stopped
+- The current session-create/delete stabilization baseline now includes two additional frontend invariants:
+  - `frontend/src/public/app-lifecycle-controller.js` must pass the active deck as `deckId` directly into `api.createSession(...)` instead of depending on an immediate follow-up `moveSessionToDeck(...)` request, because fast-exiting sessions can vanish before that second request completes and otherwise produce a false create failure plus wrong-deck residue
+  - `frontend/src/public/ui/session-card-interactions-controller.js` must treat missing live session records and backend `404 SessionNotFound` delete responses as bounded stale-card cleanup cases, removing the card locally instead of leaving a permanent undeletable ghost card behind
+- The backend validator now treats `deckId` as an explicit create-only session field:
+  - `backend/src/validation.js` validates `deckId` for `POST /api/v1/sessions`
+  - the field remains outside normal session patch semantics; deck moves still belong to the dedicated move endpoint
 
 ## Custom Command Scope Contract
 

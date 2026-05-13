@@ -350,16 +350,21 @@ export function createSessionCardInteractionsController(options = {}) {
     });
 
     refs.closeBtn?.addEventListener("click", async () => {
-      const currentSession = getSession() || session;
+      const latestSession = getSession();
+      const currentSession = latestSession || session;
       if (!(await confirmSessionDelete(session))) {
         return;
       }
-      if (isSessionExited(currentSession)) {
+      if (!latestSession || isSessionExited(currentSession)) {
         removeSession(currentSession.id);
         closeSettingsDialog(refs.settingsDialog);
         clearError();
         setCommandFeedback(
-          `Removed exited session [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`
+          `${
+            latestSession
+              ? `Removed exited session [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`
+              : `Removed stale session [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`
+          }`
         );
         return;
       }
@@ -367,7 +372,16 @@ export function createSessionCardInteractionsController(options = {}) {
         await api.deleteSession(session.id);
         applyRuntimeEvent({ type: "session.closed", sessionId: session.id });
         clearError();
-      } catch {
+      } catch (error) {
+        if (error?.status === 404 && error?.error === "SessionNotFound") {
+          removeSession(currentSession.id);
+          closeSettingsDialog(refs.settingsDialog);
+          clearError();
+          setCommandFeedback(
+            `Removed stale session [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`
+          );
+          return;
+        }
         setError("Failed to delete session.");
       }
     });

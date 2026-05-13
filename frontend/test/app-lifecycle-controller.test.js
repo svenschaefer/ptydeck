@@ -61,11 +61,13 @@ test("app lifecycle controller wires create-session flow and moves session into 
   const runtimeEvents = [];
   const errors = [];
   let clearCalls = 0;
+  const createPayloads = [];
 
   const controller = createAppLifecycleController({
     createBtn,
     api: {
-      async createSession() {
+      async createSession(payload) {
+        createPayloads.push(payload);
         return {
           id: "s-1",
           deckId: "default"
@@ -102,12 +104,56 @@ test("app lifecycle controller wires create-session flow and moves session into 
       }
     }
   ]);
+  assert.deepEqual(createPayloads, [{ deckId: "ops" }]);
   assert.equal(clearCalls, 1);
   assert.deepEqual(errors, []);
   assert.deepEqual(
     debugEvents.map((entry) => entry.event),
     ["sessions.create.start", "sessions.create.ok"]
   );
+});
+
+test("app lifecycle controller passes the active deck into create-session so no deck move is needed when the backend honors it", async () => {
+  const createBtn = createEventTarget();
+  const runtimeEvents = [];
+  const createPayloads = [];
+  let moveCalls = 0;
+
+  const controller = createAppLifecycleController({
+    createBtn,
+    api: {
+      async createSession(payload) {
+        createPayloads.push(payload);
+        return {
+          id: "s-2",
+          deckId: "ops"
+        };
+      },
+      async moveSessionToDeck() {
+        moveCalls += 1;
+        throw new Error("move should not run");
+      }
+    },
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    applyRuntimeEvent: (event) => runtimeEvents.push(event),
+    setError: () => {}
+  });
+
+  controller.bindUiEvents();
+  await createBtn.dispatch("click");
+
+  assert.deepEqual(createPayloads, [{ deckId: "ops" }]);
+  assert.equal(moveCalls, 0);
+  assert.deepEqual(runtimeEvents, [
+    {
+      type: "session.created",
+      session: {
+        id: "s-2",
+        deckId: "ops"
+      }
+    }
+  ]);
 });
 
 test("app lifecycle controller binds deck/send actions and window cleanup hooks", async () => {
