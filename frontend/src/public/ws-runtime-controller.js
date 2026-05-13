@@ -18,7 +18,7 @@ export function createWsRuntimeController(options = {}) {
       : () => {};
   const recordTrace = typeof options.recordTrace === "function" ? options.recordTrace : () => {};
   const getWsAuthToken = options.getWsAuthToken || (() => "");
-  const createWsTicket = options.createWsTicket || (() => Promise.resolve({ ticket: "" }));
+  const createWsTicket = typeof options.createWsTicket === "function" ? options.createWsTicket : null;
   const bootstrapDevAuthToken = options.bootstrapDevAuthToken || (() => Promise.resolve(false));
 
   function normalizeInterpretationResult(result) {
@@ -104,15 +104,16 @@ export function createWsRuntimeController(options = {}) {
       debug,
       log,
       protocolsProvider: async () => {
-        if (!getWsAuthToken()) {
+        if (!createWsTicket) {
           return ["ptydeck.v1"];
         }
+        const authToken = getWsAuthToken();
         let payload;
         try {
           payload = await createWsTicket();
         } catch (err) {
           const status = err && typeof err.status === "number" ? err.status : 0;
-          if (status === 401) {
+          if (status === 401 && authToken) {
             const refreshed = await bootstrapDevAuthToken({ reason: "ws-ticket-401" });
             if (!refreshed) {
               throw err;

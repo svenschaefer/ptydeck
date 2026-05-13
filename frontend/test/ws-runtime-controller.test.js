@@ -26,13 +26,14 @@ test("ws-runtime controller wires state transitions, session-data routing, and r
     hasTerminal: (sessionId) => sessionId === "s1",
     pushSessionData: (sessionId, data) => calls.push(["data", sessionId, data]),
     applyRuntimeEvent: (event) => calls.push(["event", event.type]),
-    getWsAuthToken: () => ""
+    getWsAuthToken: () => "",
+    createWsTicket: async () => ({ ticket: "ticket-local-1" })
   });
 
   const started = controller.start();
   assert.equal(started, client);
   assert.equal(typeof capturedOptions.protocolsProvider, "function");
-  assert.deepEqual(await capturedOptions.protocolsProvider(), ["ptydeck.v1"]);
+  assert.deepEqual(await capturedOptions.protocolsProvider(), ["ptydeck.v1", "ptydeck.auth.ticket-local-1"]);
 
   capturedHandlers.onState("connected");
   capturedHandlers.onMessage({
@@ -61,6 +62,20 @@ test("ws-runtime controller wires state transitions, session-data routing, and r
       trace: { traceId: "trc-1", correlationId: "corr-1", sessionId: "s1" }
     }
   ]);
+});
+
+test("ws-runtime controller falls back to a bare ws protocol when no ws ticket creator is available", async () => {
+  let capturedOptions = null;
+  createWsRuntimeController({
+    createWsClient(_url, _handlers, options) {
+      capturedOptions = options;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    getWsAuthToken: () => ""
+  }).start();
+
+  assert.deepEqual(await capturedOptions.protocolsProvider(), ["ptydeck.v1"]);
 });
 
 test("ws-runtime controller retries ws ticket acquisition once after 401 refresh", async () => {

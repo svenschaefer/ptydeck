@@ -101,6 +101,35 @@ test("ws ticket registry rejects missing and expired tickets", () => {
   assert.equal(registry.size(), 0);
 });
 
+test("ws ticket registry supports auth-disabled local operator tickets with stable trusted-local metadata", () => {
+  const registry = createRuntimeWsTicketRegistry({
+    ttlSeconds: 5,
+    now: () => 5_000,
+    randomBytes: (size) => Buffer.alloc(size, 3),
+    normalizeSessionControlClientLabel: (value) => String(value || "").trim()
+  });
+
+  const issued = registry.issue(null, {
+    clientId: "trusted-local-1",
+    label: "Desk Browser"
+  });
+  const consumed = registry.consume(issued.ticket);
+
+  assert.deepEqual(consumed, {
+    subject: "local-operator",
+    tenantId: "default",
+    scopes: [],
+    accessMode: "operator",
+    permissionMode: "",
+    shareLinkId: "",
+    shareTargetType: "",
+    shareTargetId: "",
+    shareTokenId: "",
+    sessionControlClientId: "trusted-local-1",
+    sessionControlClientLabel: "Desk Browser"
+  });
+});
+
 test("ws disconnect reason normalization prefers explicit hints before fallback classification", () => {
   assert.equal(normalizeWsDisconnectReason(1000, "", "heartbeat_timeout"), "heartbeat_timeout");
   assert.equal(normalizeWsDisconnectReason(1000, "", ""), "normal_closure");

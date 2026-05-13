@@ -2,16 +2,30 @@ import crypto from "node:crypto";
 import { ApiError } from "./errors.js";
 
 function normalizeSessionControlTicketAuth(auth, requestedClientId, requestedLabel) {
+  const normalizedAuth =
+    auth && typeof auth === "object" && !Array.isArray(auth)
+      ? auth
+      : {
+          subject: "local-operator",
+          tenantId: "default",
+          scopes: [],
+          accessMode: "operator",
+          permissionMode: "",
+          shareLinkId: "",
+          shareTargetType: "",
+          shareTargetId: "",
+          shareTokenId: ""
+        };
   return {
-    subject: auth.subject,
-    tenantId: auth.tenantId,
-    scopes: Array.isArray(auth.scopes) ? auth.scopes.slice() : [],
-    accessMode: typeof auth.accessMode === "string" ? auth.accessMode : "operator",
-    permissionMode: typeof auth.permissionMode === "string" ? auth.permissionMode : "",
-    shareLinkId: typeof auth.shareLinkId === "string" ? auth.shareLinkId : "",
-    shareTargetType: typeof auth.shareTargetType === "string" ? auth.shareTargetType : "",
-    shareTargetId: typeof auth.shareTargetId === "string" ? auth.shareTargetId : "",
-    shareTokenId: typeof auth.shareTokenId === "string" ? auth.shareTokenId : "",
+    subject: normalizedAuth.subject,
+    tenantId: normalizedAuth.tenantId,
+    scopes: Array.isArray(normalizedAuth.scopes) ? normalizedAuth.scopes.slice() : [],
+    accessMode: typeof normalizedAuth.accessMode === "string" ? normalizedAuth.accessMode : "operator",
+    permissionMode: typeof normalizedAuth.permissionMode === "string" ? normalizedAuth.permissionMode : "",
+    shareLinkId: typeof normalizedAuth.shareLinkId === "string" ? normalizedAuth.shareLinkId : "",
+    shareTargetType: typeof normalizedAuth.shareTargetType === "string" ? normalizedAuth.shareTargetType : "",
+    shareTargetId: typeof normalizedAuth.shareTargetId === "string" ? normalizedAuth.shareTargetId : "",
+    shareTokenId: typeof normalizedAuth.shareTokenId === "string" ? normalizedAuth.shareTokenId : "",
     sessionControlClientId: requestedClientId || "",
     sessionControlClientLabel: requestedLabel || ""
   };

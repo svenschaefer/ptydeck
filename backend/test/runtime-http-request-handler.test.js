@@ -356,6 +356,39 @@ test("runtime http request handler serves dev-token and ws-ticket routes with th
   );
 });
 
+test("runtime http request handler serves ws-ticket in auth-disabled mode for trusted-local ws bootstrap", async () => {
+  const harness = createHandlerHarness({
+    config: {
+      authEnabled: false,
+      authDevMode: false
+    },
+    bodyByPath: new Map([
+      ["/api/v1/auth/ws-ticket", { clientId: "trusted-local-1", label: "Desk Browser" }]
+    ]),
+    wsTicketRegistry: {
+      issue: (auth, body) => ({
+        ticket: "ticket:local-operator",
+        auth,
+        body
+      })
+    },
+    authenticateRequest: async () => null
+  });
+
+  const wsTicketResponse = await harness.run({
+    method: "POST",
+    url: "/api/v1/auth/ws-ticket"
+  });
+
+  assert.equal(wsTicketResponse.statusCode, 200);
+  assert.deepEqual(JSON.parse(wsTicketResponse.body), {
+    ticket: "ticket:local-operator",
+    auth: null,
+    body: { clientId: "trusted-local-1", label: "Desk Browser" }
+  });
+  assert.deepEqual(harness.observed.authCalls, [["/api/v1/auth/ws-ticket", "ws:connect", "wsTicket"]]);
+});
+
 test("runtime http request handler preserves dispatch order and skips auth for not-found routes", async () => {
   let authCallCount = 0;
   const harness = createHandlerHarness({

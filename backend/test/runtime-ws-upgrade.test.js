@@ -222,6 +222,51 @@ test("runtime ws upgrade handler authenticates upgrade requests and delegates ac
   assert.equal(observed.accepted[0].details.upgradeTraceContext.traceId, "trace-1");
 });
 
+test("runtime ws upgrade handler consumes trusted-local ws tickets even when auth is disabled", async () => {
+  const consumedTickets = [];
+  const { dependencies, observed } = createBaseDependencies({
+    config: {
+      trustedProxy: false,
+      enforceTlsIngress: false,
+      rateLimitWsConnectMax: 5,
+      authEnabled: false
+    },
+    wsTicketRegistry: {
+      consume: (ticket) => {
+        consumedTickets.push(ticket);
+        return {
+          subject: "local-operator",
+          tenantId: "default",
+          scopes: [],
+          sessionControlClientId: "trusted-local-1",
+          sessionControlClientLabel: "Desk Browser"
+        };
+      }
+    },
+    resolveWsTicketFromProtocols: () => "ticket-local-1"
+  });
+  const socket = createSocket();
+  const handler = createRuntimeWsUpgradeHandler(dependencies);
+
+  const accepted = await handler(
+    {
+      url: "/ws",
+      headers: {
+        origin: "https://ptydeck.local",
+        "sec-websocket-protocol": "ptydeck.v1, ptydeck.auth.ticket-local-1"
+      }
+    },
+    socket,
+    Buffer.alloc(0)
+  );
+
+  assert.equal(accepted, true);
+  assert.deepEqual(consumedTickets, ["ticket-local-1"]);
+  assert.equal(observed.accepted.length, 1);
+  assert.equal(observed.accepted[0].details.auth.sessionControlClientId, "trusted-local-1");
+  assert.equal(observed.accepted[0].details.auth.sessionControlClientLabel, "Desk Browser");
+});
+
 test("runtime ws upgrade handler maps auth/bootstrap failures into upgrade_auth_rejected responses", async () => {
   const { dependencies, observed } = createBaseDependencies({
     ensureShareRouteAllowed() {

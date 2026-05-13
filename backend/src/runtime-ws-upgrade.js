@@ -93,15 +93,30 @@ export function createRuntimeWsUpgradeHandler(dependencies = {}) {
       }
 
       let auth = null;
+      const wsTicket = resolveWsTicketFromProtocols(request);
       if (config.authEnabled) {
         try {
           const token = resolveBearerToken(request, requestUrl);
           auth = token
             ? await accessTokenVerifier.verifyAccessToken(token)
-            : wsTicketRegistry.consume(resolveWsTicketFromProtocols(request));
+            : wsTicketRegistry.consume(wsTicket);
           ensureShareLinkAuthActive(auth);
           ensureScope(auth, "ws:connect");
           ensureShareRouteAllowed(auth, "wsTicket");
+        } catch (error) {
+          const mapped = toErrorResponse(error);
+          logDebug("ws.upgrade.auth_rejected", {
+            statusCode: mapped.statusCode,
+            error: mapped.body.error,
+            message: mapped.body.message
+          }, upgradeTraceContext);
+          recordWsError("upgrade_auth_rejected");
+          writeUpgradeErrorResponse(socket, mapped.statusCode, mapped.body.error, mapped.body);
+          return false;
+        }
+      } else if (wsTicket) {
+        try {
+          auth = wsTicketRegistry.consume(wsTicket);
         } catch (error) {
           const mapped = toErrorResponse(error);
           logDebug("ws.upgrade.auth_rejected", {

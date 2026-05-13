@@ -69,6 +69,20 @@
 
 <p>That keeps desktop and laptop form factors usable without forcing one shared layout across all devices.</p>
 
+<h2 id="local-dev-refresh-baseline">Local Dev Refresh Baseline</h2>
+
+<p>In local development, trusted-local session control must survive a frontend-only reload without requiring a backend restart.</p>
+
+<p>That is why the browser now prefers a short-lived WebSocket ticket bootstrap even when <code>AUTH_MODE=off</code>:</p>
+
+<ul>
+<li>the HTTP-side trusted-local client id/label can be carried through the WebSocket upgrade</li>
+<li>the backend can reattach the same logical local device after a refresh</li>
+<li>session-control writes do not drift onto an ephemeral connection id just because the frontend was reloaded</li>
+</ul>
+
+<p>If no ws-ticket creator is wired at all, the runtime still falls back to a bare <code>ptydeck.v1</code> protocol, but that is only the bounded compatibility path.</p>
+
 <h2 id="origin-discipline">Origin Discipline</h2>
 
 <p>Trusted-local identity and layout recall are browser-origin-local. In practice, that means:</p>
@@ -101,6 +115,7 @@
 <li><a class="handbook-page-toc-link" href="#take-or-reclaim-control">Take or Reclaim Control</a></li>
 <li><a class="handbook-page-toc-link" href="#scope">Scope</a></li>
 <li><a class="handbook-page-toc-link" href="#device-local-layout-recall">Device-Local Layout Recall</a></li>
+<li><a class="handbook-page-toc-link" href="#local-dev-refresh-baseline">Local Dev Refresh Baseline</a></li>
 <li><a class="handbook-page-toc-link" href="#origin-discipline">Origin Discipline</a></li>
 <li><a class="handbook-page-toc-link" href="#startup-prompt">Startup Prompt</a></li>
 <li><a class="handbook-page-toc-link" href="#related-references">Related References</a></li>

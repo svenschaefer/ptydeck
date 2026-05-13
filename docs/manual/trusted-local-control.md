@@ -32,6 +32,18 @@ When takeover succeeds, `ptydeck` reapplies the remembered layout and terminal-s
 
 That keeps desktop and laptop form factors usable without forcing one shared layout across all devices.
 
+## Local Dev Refresh Baseline
+
+In local development, trusted-local session control must survive a frontend-only reload without requiring a backend restart.
+
+That is why the browser now prefers a short-lived WebSocket ticket bootstrap even when `AUTH_MODE=off`:
+
+- the HTTP-side trusted-local client id/label can be carried through the WebSocket upgrade
+- the backend can reattach the same logical local device after a refresh
+- session-control writes do not drift onto an ephemeral connection id just because the frontend was reloaded
+
+If no ws-ticket creator is wired at all, the runtime still falls back to a bare `ptydeck.v1` protocol, but that is only the bounded compatibility path.
+
 ## Origin Discipline
 
 Trusted-local identity and layout recall are browser-origin-local. In practice, that means:
