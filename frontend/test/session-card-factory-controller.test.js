@@ -31,6 +31,20 @@ class ClassList {
 function createNodeStub() {
   const map = new Map();
   const make = () => ({ textContent: "", hidden: true, classList: new ClassList(), addEventListener() {} });
+  const makeButton = () => {
+    const attrs = new Map();
+    return {
+      disabled: false,
+      classList: new ClassList(),
+      addEventListener() {},
+      setAttribute(name, value) {
+        attrs.set(String(name), String(value));
+      },
+      getAttribute(name) {
+        return attrs.get(String(name)) || null;
+      }
+    };
+  };
   const selectors = [
     ".session-quick-id",
     ".session-focus",
@@ -39,6 +53,7 @@ function createNodeStub() {
     ".terminal-toolbar-meta",
     ".session-note-text",
     ".session-unrestored-hint",
+    ".session-start-stop",
     ".session-refresh",
     ".session-settings",
     ".session-quick-send-panel",
@@ -79,10 +94,14 @@ function createNodeStub() {
     ".session-settings-cancel",
     ".session-settings-status",
     ".terminal-mount",
-    ".session-theme-bright-red"
+    ".session-theme-bright-red",
+    ".session-start-stop-icon"
   ];
   for (const selector of selectors) {
-    map.set(selector, make());
+    map.set(
+      selector,
+      selector === ".session-start-stop" ? makeButton() : make()
+    );
   }
   const node = {
     classList: new ClassList(),
@@ -155,6 +174,37 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.equal(result.node.classList.contains("active"), true);
   assert.ok(result.themeInputs.brightRed);
   assert.deepEqual(calls, ["app", "tags", "note", "quick", "visible:true"]);
+});
+
+test("session-card-factory controller applies the initial start icon state for stopped sessions", () => {
+  const template = {
+    content: {
+      firstElementChild: {
+        cloneNode() {
+          return createNodeStub();
+        }
+      }
+    }
+  };
+  const controller = createSessionCardFactoryController({
+    getSessionRuntimeState: (session) => session.state,
+    isSessionStopped: (session) => session.state === "stopped",
+    renderSessionAppIdentity: () => {},
+    renderSessionTagList: () => {},
+    renderSessionNote: () => {},
+    setSessionCardVisibility: () => {}
+  });
+
+  const result = controller.createSessionCardView({
+    template,
+    session: { id: "s2", name: "ssh", state: "stopped" },
+    visible: true
+  });
+
+  assert.equal(result.startStopBtn.getAttribute("aria-label"), "Start session");
+  assert.equal(result.startStopBtn.getAttribute("title"), "Start session");
+  assert.equal(result.startStopIconEl.classList.contains("icon-tabler-player-play-filled"), true);
+  assert.equal(result.startStopIconEl.classList.contains("icon-tabler-player-stop-filled"), false);
 });
 
 test("session-card-factory controller uses the derived session header label", () => {

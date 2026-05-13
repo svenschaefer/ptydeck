@@ -137,3 +137,15 @@ test("stopped terminal cards keep their reserved terminal space while hiding the
     /\.terminal-card\.stopped \.terminal-mount \{[\s\S]*visibility: hidden;[\s\S]*pointer-events: none;[\s\S]*\}/m
   );
 });
+
+test("session header lifecycle toggle shares the same button sizing and icon color contract as refresh and settings", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(
+    stylesCss,
+    /\.session-start-stop,\s*\.session-refresh,\s*\.session-settings \{[\s\S]*width: 30px;[\s\S]*height: 30px;[\s\S]*color: #a9d9d6;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-start-stop-icon,\s*\.session-refresh-icon,\s*\.session-settings-icon \{[\s\S]*width: 18px;[\s\S]*height: 18px;[\s\S]*\}/m
+  );
+});

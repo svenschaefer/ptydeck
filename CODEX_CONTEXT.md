@@ -56,6 +56,10 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - `frontend/src/public/ui/session-grid-controller.js` must forward `startStopBtn` into `bindSessionCardInteractions(...)`
   - the same grid seam must forward `startStopBtn` plus `startStopIconEl` into `mountSessionTerminalCard(...)`
   - `frontend/src/public/ui/session-terminal-runtime-controller.js` must retain those refs on the mounted entry so later session-card rerenders can update the live button/icon state instead of operating on a detached template-only control
+- The header lifecycle toggle also has to stay consistent across both creation and update paths:
+  - `frontend/src/public/ui/session-card-factory-controller.js` must set the initial `Play` versus `Stop` icon, tooltip, and `aria-label` from the session lifecycle state so restored stopped sessions do not render the template-default stop icon before the first runtime rerender
+  - `frontend/src/public/ui/session-card-render-controller.js` must continue to mirror that same contract on subsequent session updates
+  - `frontend/src/public/styles.css` now keeps `.session-start-stop` in the same sizing/color group as `.session-refresh` and `.session-settings`, so lifecycle, refresh, and settings actions stay visually aligned in the header
 - Restored stopped secret-backed SSH sessions now surface an explicit fail-closed restart status:
   - the backend API can publish `startBlockedReason: remote-secret-unavailable`
   - the session-view-model maps that to a concrete operator-facing explanation

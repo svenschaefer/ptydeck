@@ -6,9 +6,17 @@ export function createSessionCardFactoryController(options = {}) {
       : (session) => session?.name || String(session?.id || "").slice(0, 8);
   const getSessionStateBadgeText = options.getSessionStateBadgeText || (() => "");
   const getSessionStateHintText = options.getSessionStateHintText || (() => "");
+  const getSessionRuntimeState = options.getSessionRuntimeState || ((session) => String(session?.state || "").trim().toLowerCase());
   const isSessionStopped = options.isSessionStopped || (() => false);
+  const isSessionStartBlocked = options.isSessionStartBlocked || (() => false);
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
+  const getSessionStartBlockedMessage = options.getSessionStartBlockedMessage || (() => "Session start is unavailable.");
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function"
+      ? options.getReadOnlyModeMessage
+      : () => "Read-only spectator mode. Write actions are disabled.";
   const renderSessionAppIdentity = options.renderSessionAppIdentity || (() => {});
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
@@ -129,6 +137,20 @@ export function createSessionCardFactoryController(options = {}) {
     const quickId = ensureQuickId(session.id);
     const stateBadgeText = getSessionStateBadgeText(session);
     const stateHintText = getSessionStateHintText(session);
+    const runtimeState = getSessionRuntimeState(session);
+    const sessionStopped = isSessionStopped(session);
+    const startBlocked = isSessionStartBlocked(session);
+    const readOnlyMode = isReadOnlyMode();
+    const readOnlyMessage = readOnlyMode ? getReadOnlyModeMessage() : "";
+    const startBlockedMessage = startBlocked ? getSessionStartBlockedMessage(session) : "";
+    const interactiveToggleState =
+      runtimeState === "created" ||
+      runtimeState === "starting" ||
+      runtimeState === "running" ||
+      runtimeState === "busy" ||
+      runtimeState === "idle" ||
+      sessionStopped;
+    const startMode = sessionStopped;
 
     if (focusBtn) {
       focusBtn.textContent = getSessionHeaderLabel(session);
@@ -140,6 +162,21 @@ export function createSessionCardFactoryController(options = {}) {
     node.classList.toggle("unrestored", isSessionUnrestored(session));
     node.classList.toggle("exited", isSessionExited(session));
     node.classList.toggle("active", activeSessionId === session.id);
+    if (startStopBtn) {
+      startStopBtn.disabled = readOnlyMode || !interactiveToggleState || startBlocked;
+      startStopBtn.setAttribute(
+        "aria-label",
+        startBlocked ? "Start session unavailable" : startMode ? "Start session" : "Stop session"
+      );
+      startStopBtn.setAttribute(
+        "title",
+        readOnlyMessage || startBlockedMessage || (startMode ? "Start session" : "Stop session")
+      );
+    }
+    if (startStopIconEl) {
+      startStopIconEl.classList.toggle("icon-tabler-player-play-filled", startMode);
+      startStopIconEl.classList.toggle("icon-tabler-player-stop-filled", !startMode);
+    }
     if (stateBadgeEl) {
       stateBadgeEl.hidden = !stateBadgeText;
       stateBadgeEl.textContent = stateBadgeText;
