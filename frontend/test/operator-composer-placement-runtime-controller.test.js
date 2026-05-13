@@ -514,3 +514,84 @@ test("operator composer placement controller does not rewrite the focused shared
   assert.equal(controller.getState().sharedDraft, "server-overwrite");
   controller.dispose();
 });
+
+test("operator composer placement controller ignores stale pinned-draft echoes while local pinned input is newer", async () => {
+  const patchCalls = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const session = { id: "s-pin", name: "Pinned" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 40 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState({
+          mode: "active-overlay",
+          pinnedSessionIds: [session.id],
+          pinnedDrafts: { [session.id]: "server-old" }
+        });
+      }
+    },
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput: new FakeElement("textarea"),
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session,
+    formatSessionToken: () => "P",
+    formatSessionDisplayName: (entry) => entry?.name || ""
+  });
+
+  controller.applyPlacementState(
+    createApiState({
+      mode: "active-overlay",
+      pinnedSessionIds: [session.id],
+      pinnedDrafts: { [session.id]: "server-old" }
+    })
+  );
+
+  const pinnedRoot = overlayHostEl.firstChild;
+  const pinnedTextarea = pinnedRoot?.children?.[2]?.children?.[0]?.children?.[0]?.children?.[0]?.children?.[0] || null;
+  assert.ok(pinnedTextarea);
+
+  pinnedTextarea.dispatch("focus");
+  pinnedTextarea.value = "client-new";
+  pinnedTextarea.dispatch("input");
+
+  await waitForTurn();
+  await waitForTurn();
+
+  assert.deepEqual(patchCalls, [{ pinnedDrafts: { [session.id]: "client-new" } }]);
+  assert.equal(pinnedTextarea.value, "client-new");
+  assert.deepEqual(controller.getState().pinnedDrafts, { [session.id]: "client-new" });
+
+  controller.applyPlacementState(
+    createApiState({
+      mode: "active-overlay",
+      pinnedSessionIds: [session.id],
+      pinnedDrafts: { [session.id]: "client-new" }
+    })
+  );
+
+  assert.equal(pinnedTextarea.value, "client-new");
+  assert.deepEqual(controller.getState().pinnedDrafts, { [session.id]: "client-new" });
+  controller.dispose();
+});
