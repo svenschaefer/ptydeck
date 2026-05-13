@@ -76,7 +76,12 @@ export function createWsClient(url, handlers, options = {}) {
       return;
     }
 
-    socket.addEventListener("open", () => {
+    const currentSocket = socket;
+
+    currentSocket.addEventListener("open", () => {
+      if (closed || generation !== connectGeneration || socket !== currentSocket) {
+        return;
+      }
       reconnectAttempts = 0;
       if (debug) {
         log("ws.open", { url });
@@ -84,7 +89,10 @@ export function createWsClient(url, handlers, options = {}) {
       handlers.onState("connected");
     });
 
-    socket.addEventListener("message", (event) => {
+    currentSocket.addEventListener("message", (event) => {
+      if (closed || generation !== connectGeneration || socket !== currentSocket) {
+        return;
+      }
       try {
         const message = JSON.parse(event.data);
         if (debug) {
@@ -99,20 +107,27 @@ export function createWsClient(url, handlers, options = {}) {
       }
     });
 
-    socket.addEventListener("error", () => {
+    currentSocket.addEventListener("error", () => {
+      if (closed || generation !== connectGeneration || socket !== currentSocket) {
+        return;
+      }
       if (debug) {
         log("ws.error", { url });
       }
       handlers.onState("error");
     });
 
-    socket.addEventListener("close", () => {
+    currentSocket.addEventListener("close", () => {
       if (closed) {
         if (debug) {
           log("ws.closed.manual", { url });
         }
         return;
       }
+      if (generation !== connectGeneration || socket !== currentSocket) {
+        return;
+      }
+      socket = null;
       scheduleReconnect();
     });
   }

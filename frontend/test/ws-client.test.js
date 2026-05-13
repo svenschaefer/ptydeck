@@ -133,7 +133,7 @@ test("ws client close stops reconnect and clears scheduled timer", (t) => {
 
   client.close();
   assert.equal(timers[0].cleared, true);
-  assert.equal(first.closeCalls, 1);
+  assert.equal(first.closeCalls, 0);
 
   first.emit("close");
   assert.deepEqual(states, ["connecting", "reconnecting"]);
@@ -268,6 +268,31 @@ test("ws client retries when the WebSocket constructor throws and avoids duplica
 
   assert.equal(timers.length, 2);
   assert.deepEqual(states, ["connecting", "error", "reconnecting", "connecting", "reconnecting"]);
+});
+
+test("ws client ignores stale close and error events from an earlier socket after a reconnect succeeds", (t) => {
+  const { timers } = withMockedGlobals(t);
+  const states = [];
+  createWsClient("ws://localhost:18080/ws", {
+    onState: (state) => states.push(state),
+    onMessage: () => {}
+  });
+
+  const first = MockWebSocket.instances[0];
+  first.emit("close");
+  assert.deepEqual(states, ["connecting", "reconnecting"]);
+  assert.equal(timers.length, 1);
+
+  timers[0].fn();
+  const second = MockWebSocket.instances[1];
+  second.emit("open");
+  assert.deepEqual(states, ["connecting", "reconnecting", "connecting", "connected"]);
+
+  first.emit("error");
+  first.emit("close");
+
+  assert.deepEqual(states, ["connecting", "reconnecting", "connecting", "connected"]);
+  assert.equal(timers.length, 1);
 });
 
 test("ws client logs debug lifecycle events and ignores malformed messages", (t) => {

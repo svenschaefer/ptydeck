@@ -64,6 +64,9 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
 - Stopped session visibility now has one matching sidebar affordance:
   - `frontend/src/public/ui/deck-sidebar-controller.js` applies a `stopped` class to stopped sidebar session entries
   - `frontend/src/public/styles.css` dims only the sidebar quick id and session display name to `50%` opacity for that state, so stopped sessions are discoverable in the sidebar without changing the row layout or making the click target harder to hit
+- The frontend WS lifecycle now has one additional fail-closed invariant:
+  - `frontend/src/public/ws-client.js` must treat each connection attempt as a generation and ignore `open`, `message`, `error`, and `close` events from older sockets once a newer generation has taken over
+  - without that guard, a late `close` or `error` from an earlier socket can incorrectly push the UI back into `reconnecting` and schedule extra reconnect work after a newer socket has already connected
 - Restored stopped secret-backed SSH sessions now surface an explicit fail-closed restart status:
   - the backend API can publish `startBlockedReason: remote-secret-unavailable`
   - the session-view-model maps that to a concrete operator-facing explanation
