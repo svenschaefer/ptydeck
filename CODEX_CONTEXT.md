@@ -75,8 +75,8 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
 - The composer-placement runtime now also exposes one explicit conservative whitespace-normalization action before `Send`:
   - the shared footer composer now has a `Normalize` button above the primary `Send` button
   - pinned overlay composers now expose the same `Normalize` action inside their action column
-  - the normalize action must normalize CRLF to LF, strip trailing horizontal whitespace on each line, and trim outer whitespace only
-  - it must not rewrite internal indentation or otherwise attempt structure-aware repair
+  - the normalize action must normalize CRLF to LF, trim leading and trailing horizontal whitespace on each line, and trim outer whitespace after that line-wise cleanup
+  - it must not attempt structure-aware repair beyond that whitespace cleanup
   - shared normalize persists through the same server-side `sharedDraft` authority, and pinned normalize persists through the same server-side `pinnedDrafts` authority
   - regression coverage now locks down both the shared-footer normalize path and the pinned-overlay normalize path in `frontend/test/operator-composer-placement-runtime-controller.test.js`
 - The composer-placement runtime now also exposes an explicit opt-in `Repair` action beside `Normalize` for the shared footer composer and pinned overlay composers:

@@ -565,7 +565,7 @@ test("operator composer placement controller normalizes shared footer drafts and
     }
   });
 
-  commandInput.value = "  echo ok  \r\nls -la  \n";
+  commandInput.value = "  echo ok  \r\n  ls -la  \n";
   normalizeBtn.dispatch("click");
 
   await waitForTurn();
@@ -866,7 +866,7 @@ test("operator composer placement controller normalizes pinned drafts and persis
     createApiState({
       mode: "active-overlay",
       pinnedSessionIds: [session.id],
-      pinnedDrafts: { [session.id]: "  echo ok  \r\npwd  \n" }
+      pinnedDrafts: { [session.id]: "  echo ok  \r\n  pwd  \n" }
     })
   );
 

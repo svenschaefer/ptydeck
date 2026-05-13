@@ -135,7 +135,7 @@ function appendText(node, text) {
 
 function normalizeComposerDraftWhitespace(value) {
   const normalized = String(value ?? "").replace(/\r\n?/g, "\n");
-  const lines = normalized.split("\n").map((line) => line.replace(/[ \t\u00a0]+$/g, ""));
+  const lines = normalized.split("\n").map((line) => line.replace(/^[ \t\u00a0]+|[ \t\u00a0]+$/g, ""));
   return lines.join("\n").trim();
 }
 

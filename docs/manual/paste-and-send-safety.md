@@ -22,10 +22,10 @@ The composer now also exposes a `Normalize` action above `Send` in the shared fo
 `Normalize` is intentionally conservative:
 
 - normalize CRLF to LF
-- strip trailing horizontal whitespace on each line
-- trim outer whitespace
+- trim leading and trailing horizontal whitespace on each line
+- trim outer whitespace after the line-wise cleanup
 
-It does not try to repair structure or rewrite internal indentation.
+It does not try to repair structure beyond that line-wise whitespace cleanup.
 
 ## Composer Repair
 

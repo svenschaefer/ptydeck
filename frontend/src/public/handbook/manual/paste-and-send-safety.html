@@ -58,11 +58,11 @@
 
 <ul>
 <li>normalize CRLF to LF</li>
-<li>strip trailing horizontal whitespace on each line</li>
-<li>trim outer whitespace</li>
+<li>trim leading and trailing horizontal whitespace on each line</li>
+<li>trim outer whitespace after the line-wise cleanup</li>
 </ul>
 
-<p>It does not try to repair structure or rewrite internal indentation.</p>
+<p>It does not try to repair structure beyond that line-wise whitespace cleanup.</p>
 
 <h2 id="composer-repair">Composer Repair</h2>
 
