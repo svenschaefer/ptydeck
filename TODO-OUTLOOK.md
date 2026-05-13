@@ -62,3 +62,8 @@ Notes:
 ### Composer Input Repair
 
 - [ ] `CMP-405` Owner `FE`: Add an opt-in structure-aware composer repair action on top of the conservative `Normalize` action. The feature must fail closed unless it can confidently recognize a specific format such as shell command blocks, JSON, or XML, and it must never silently rewrite ambiguous multiline input.
+
+Notes:
+
+- The retained design frame for this deferred feature now lives in `docs/Composer Input Repair Design.md`.
+- The current product terminology is intentionally split into `Normalize` (already shipped conservative whitespace cleanup), future `Repair` (opt-in syntax-aware reconstruction), and optional later `Format` (canonical formatting only after valid syntax exists).

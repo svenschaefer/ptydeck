@@ -79,6 +79,11 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - it must not rewrite internal indentation or otherwise attempt structure-aware repair
   - shared normalize persists through the same server-side `sharedDraft` authority, and pinned normalize persists through the same server-side `pinnedDrafts` authority
   - regression coverage now locks down both the shared-footer normalize path and the pinned-overlay normalize path in `frontend/test/operator-composer-placement-runtime-controller.test.js`
+- Future structure-aware composer repair remains intentionally deferred behind `CMP-405` in `TODO-OUTLOOK.md`:
+  - `Normalize` is the shipped conservative cleanup path and must remain deterministic and safe
+  - the future feature is explicitly `Repair`, not classic linting, because the target problem is damaged technical syntax reconstruction rather than rule checking on already valid input
+  - any future `Repair` action must stay opt-in, fail closed on ambiguity, preserve the original draft until operator acceptance, and validate family-specific repair candidates before applying them
+  - the retained design frame for that deferred feature now lives in `docs/Composer Input Repair Design.md`
 
 ## Current Quality Baseline
 

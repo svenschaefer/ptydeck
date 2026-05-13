@@ -30,6 +30,9 @@ Authoritative repository documents remain:
 - `Terminal App Identity Foundation Design.md`
   - role: terminal app identity design reference
   - status: active design note
+- `Composer Input Repair Design.md`
+  - role: retained design frame for the deferred opt-in syntax-aware composer repair feature on top of the shipped conservative `Normalize` action
+  - status: active design note for deferred future work
 - `PTY EINTR Write Error Analysis.md`
   - role: PTY async write retry analysis
   - status: active analysis note
