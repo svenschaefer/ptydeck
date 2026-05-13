@@ -64,6 +64,10 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - `frontend/src/public/operator-composer-placement-runtime-controller.js` must not clear and re-append the active shared overlay host or an unchanged pinned overlay host when the effective placement target has not changed
   - this preserves textarea focus while the composer preview/suggestion/runtime render loop updates on input
   - regression coverage for that focus-preserving mount contract now lives in `frontend/test/operator-composer-placement-runtime-controller.test.js`
+- The composer-placement runtime now also treats local draft mutation as authoritative until the same state comes back from the server:
+  - local updates to `mode`, `pinnedSessionIds`, `sharedDraft`, and `pinnedDrafts` are held as pending local placement authority
+  - `frontend/src/public/operator-composer-placement-runtime-controller.js` must not overwrite a newer local footer or overlay draft with a stale REST `PATCH` response or `composer-placement.updated` echo from older state
+  - the current shipped regression coverage explicitly locks down the stale shared-footer draft echo case in `frontend/test/operator-composer-placement-runtime-controller.test.js`
 
 ## Current Quality Baseline
 

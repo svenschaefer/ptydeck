@@ -30,6 +30,47 @@ function clonePinnedDrafts(value) {
   return normalized;
 }
 
+function areStringArraysEqual(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function arePinnedDraftMapsEqual(left, right) {
+  const normalizedLeft = clonePinnedDrafts(left);
+  const normalizedRight = clonePinnedDrafts(right);
+  const leftKeys = Object.keys(normalizedLeft).sort();
+  const rightKeys = Object.keys(normalizedRight).sort();
+  if (!areStringArraysEqual(leftKeys, rightKeys)) {
+    return false;
+  }
+  for (const key of leftKeys) {
+    if (normalizedLeft[key] !== normalizedRight[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function filterPinnedDraftsBySessionIds(pinnedDrafts, pinnedSessionIds) {
+  const normalizedPinnedDrafts = clonePinnedDrafts(pinnedDrafts);
+  const allowed = new Set(Array.isArray(pinnedSessionIds) ? pinnedSessionIds : []);
+  const filtered = {};
+  for (const [sessionId, draft] of Object.entries(normalizedPinnedDrafts)) {
+    if (!allowed.has(sessionId)) {
+      continue;
+    }
+    filtered[sessionId] = draft;
+  }
+  return filtered;
+}
+
 function clonePlacementState(value) {
   const pinnedSessionIds = Array.isArray(value?.pinnedSessionIds)
     ? Array.from(new Set(value.pinnedSessionIds.map((entry) => normalizeText(entry)).filter(Boolean)))
@@ -583,6 +624,12 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
   let pendingPersistPatch = {};
   let initializePromise = null;
   const pinnedSurfaces = new Map();
+  const pendingPlacementState = {
+    mode: null,
+    pinnedSessionIds: null,
+    sharedDraft: null,
+    pinnedDrafts: null
+  };
 
   function getPlacementState() {
     return clonePlacementState(placementState);
@@ -591,6 +638,22 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
   function isPinnedSession(sessionId) {
     const normalizedSessionId = normalizeText(sessionId);
     return normalizedSessionId ? placementState.pinnedSessionIds.includes(normalizedSessionId) : false;
+  }
+
+  function setPendingMode(value) {
+    pendingPlacementState.mode = normalizeText(value) === ACTIVE_OVERLAY_MODE ? ACTIVE_OVERLAY_MODE : SHARED_FOOTER_MODE;
+  }
+
+  function setPendingPinnedSessionIds(value) {
+    pendingPlacementState.pinnedSessionIds = Array.isArray(value) ? [...value] : [];
+  }
+
+  function setPendingSharedDraft(value) {
+    pendingPlacementState.sharedDraft = typeof value === "string" ? value : "";
+  }
+
+  function setPendingPinnedDrafts(value) {
+    pendingPlacementState.pinnedDrafts = clonePinnedDrafts(value);
   }
 
   function setSharedComposerDraftLocally(value, { scheduleRefresh = false } = {}) {
@@ -715,6 +778,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       runWorkflowDetailed,
       onDraftChange: (draft) => {
         setPinnedDraftLocally(normalizedSessionId, draft);
+        setPendingPinnedDrafts(placementState.pinnedDrafts);
         queuePersistPatch({ pinnedDrafts: placementState.pinnedDrafts });
       },
       onUnpin: () => {
@@ -873,7 +937,47 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
   }
 
   function applyPlacementState(nextState, { scheduleSharedRefresh = true } = {}) {
-    placementState = clonePlacementState(nextState);
+    const currentLocalState = clonePlacementState(placementState);
+    const mergedState = clonePlacementState(nextState);
+
+    if (pendingPlacementState.mode !== null) {
+      if (mergedState.mode === pendingPlacementState.mode) {
+        pendingPlacementState.mode = null;
+      } else {
+        mergedState.mode = currentLocalState.mode;
+      }
+    }
+
+    if (pendingPlacementState.pinnedSessionIds !== null) {
+      if (areStringArraysEqual(mergedState.pinnedSessionIds, pendingPlacementState.pinnedSessionIds)) {
+        pendingPlacementState.pinnedSessionIds = null;
+      } else {
+        mergedState.pinnedSessionIds = [...currentLocalState.pinnedSessionIds];
+      }
+    }
+
+    if (pendingPlacementState.sharedDraft !== null) {
+      if (mergedState.sharedDraft === pendingPlacementState.sharedDraft) {
+        pendingPlacementState.sharedDraft = null;
+      } else {
+        mergedState.sharedDraft = currentLocalState.sharedDraft;
+      }
+    }
+
+    if (pendingPlacementState.pinnedDrafts !== null) {
+      const normalizedPendingPinnedDrafts = filterPinnedDraftsBySessionIds(
+        pendingPlacementState.pinnedDrafts,
+        mergedState.pinnedSessionIds
+      );
+      if (arePinnedDraftMapsEqual(mergedState.pinnedDrafts, normalizedPendingPinnedDrafts)) {
+        pendingPlacementState.pinnedDrafts = null;
+      } else {
+        mergedState.pinnedDrafts = filterPinnedDraftsBySessionIds(currentLocalState.pinnedDrafts, mergedState.pinnedSessionIds);
+      }
+    }
+
+    mergedState.pinnedDrafts = filterPinnedDraftsBySessionIds(mergedState.pinnedDrafts, mergedState.pinnedSessionIds);
+    placementState = mergedState;
     setSharedComposerDraftLocally(placementState.sharedDraft, { scheduleRefresh: scheduleSharedRefresh });
     render();
   }
@@ -888,6 +992,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       ...placementState,
       mode: nextMode
     };
+    setPendingMode(nextMode);
     render();
     clearError();
     setCommandFeedback(
@@ -920,6 +1025,9 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       pinnedDrafts: nextPinnedDrafts,
       sharedDraft: nextSharedDraft
     };
+    setPendingPinnedSessionIds(placementState.pinnedSessionIds);
+    setPendingPinnedDrafts(placementState.pinnedDrafts);
+    setPendingSharedDraft(placementState.sharedDraft);
     setSharedComposerDraftLocally(nextSharedDraft, { scheduleRefresh: true });
     render();
     setCommandFeedback(`Pinned overlay input for [${formatSessionToken(normalizedSessionId)}].`);
@@ -954,6 +1062,9 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       pinnedDrafts: nextPinnedDrafts,
       sharedDraft: nextSharedDraft
     };
+    setPendingPinnedSessionIds(placementState.pinnedSessionIds);
+    setPendingPinnedDrafts(placementState.pinnedDrafts);
+    setPendingSharedDraft(placementState.sharedDraft);
     setSharedComposerDraftLocally(nextSharedDraft, { scheduleRefresh: true });
     disposePinnedSurface(normalizedSessionId);
     render();
@@ -997,6 +1108,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       return;
     }
     placementState.sharedDraft = nextValue;
+    setPendingSharedDraft(placementState.sharedDraft);
     queuePersistPatch({ sharedDraft: placementState.sharedDraft });
   }
 

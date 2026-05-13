@@ -164,6 +164,10 @@ function createApiState(payload = {}) {
   };
 }
 
+async function waitForTurn() {
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+}
+
 test("operator composer placement controller moves the shared composer into the active overlay host", async () => {
   const patchCalls = [];
   const documentRef = createDocumentRef();
@@ -416,5 +420,60 @@ test("operator composer placement controller isolates pinned drafts from the sha
     sharedDraft: "pwd",
     pinnedDrafts: {}
   });
+  controller.dispose();
+});
+
+test("operator composer placement controller ignores stale shared-draft echoes while local footer input is newer", async () => {
+  const patchCalls = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const commandInput = new FakeElement("textarea");
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState({
+          sharedDraft: "server-old"
+        });
+      }
+    },
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput,
+    terminals: new Map(),
+    getState: () => ({ sessions: [], activeSessionId: "" }),
+    getSessionById: () => null
+  });
+
+  controller.applyPlacementState(
+    createApiState({
+      sharedDraft: "server-old"
+    })
+  );
+
+  commandInput.value = "client-new";
+  commandInput.dispatch("input");
+
+  await waitForTurn();
+  await waitForTurn();
+
+  assert.deepEqual(patchCalls, [{ sharedDraft: "client-new" }]);
+  assert.equal(commandInput.value, "client-new");
+  assert.equal(controller.getState().sharedDraft, "client-new");
+
+  controller.applyPlacementState(
+    createApiState({
+      sharedDraft: "client-new"
+    })
+  );
+
+  assert.equal(commandInput.value, "client-new");
+  assert.equal(controller.getState().sharedDraft, "client-new");
   controller.dispose();
 });
