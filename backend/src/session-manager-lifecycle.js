@@ -17,6 +17,7 @@ const DEFAULT_SSH_CLIENT = "ssh";
 const SESSION_KIND_LOCAL = "local";
 const SESSION_KIND_SSH = "ssh";
 const SESSION_STATE_STOPPED = "stopped";
+const SESSION_START_BLOCKED_REASON_REMOTE_SECRET_UNAVAILABLE = "remote-secret-unavailable";
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_NOTE_MAX_LENGTH = 512;
@@ -139,6 +140,17 @@ function normalizeQuickIdToken(value) {
   }
   const normalized = value.trim();
   return normalized ? normalized : undefined;
+}
+
+function resolveSessionStartBlockedReason({ state, remoteAuth, remoteSecret }) {
+  if (
+    state === SESSION_STATE_STOPPED &&
+    remoteAuthRequiresSecret(remoteAuth) &&
+    (remoteSecret === undefined || remoteSecret === null || remoteSecret === "")
+  ) {
+    return SESSION_START_BLOCKED_REASON_REMOTE_SECRET_UNAVAILABLE;
+  }
+  return undefined;
 }
 
 export function normalizeReplayShellBlocks(shellBlocks, maxLength) {
@@ -335,6 +347,11 @@ export function buildSessionRecord(
     throw new TypeError("buildSessionRecord requires a valid launchSpec.");
   }
   const initialReplayOutput = buildReplayRetentionResult(replayOutput, sessionReplayMemoryMaxChars);
+  const startBlockedReason = resolveSessionStartBlockedReason({
+    state: normalizedInitialState,
+    remoteAuth: normalizedRemoteAuth,
+    remoteSecret: normalizedRemoteSecret
+  });
   const identityRuntime = createInitialIdentityRuntime(
     {
       kind: normalizedKind,
@@ -400,6 +417,7 @@ export function buildSessionRecord(
         activeThemeProfile: normalizedThemeSlots.activeThemeProfile,
         inactiveThemeProfile: normalizedThemeSlots.inactiveThemeProfile,
         appIdentity: initialAppIdentity,
+        ...(startBlockedReason ? { startBlockedReason } : {}),
         state: normalizedInitialState,
         activityState: SESSION_ACTIVITY_STATE_INACTIVE,
         activityUpdatedAt: initialActivityTimestamp,
@@ -506,6 +524,16 @@ export function applySessionPatch(
     );
   } else if (!remoteAuthRequiresSecret(nextRemoteAuth)) {
     session.remoteSecret = undefined;
+  }
+  const nextStartBlockedReason = resolveSessionStartBlockedReason({
+    state: session.meta.state,
+    remoteAuth: session.meta.remoteAuth,
+    remoteSecret: session.remoteSecret
+  });
+  if (nextStartBlockedReason) {
+    session.meta.startBlockedReason = nextStartBlockedReason;
+  } else {
+    delete session.meta.startBlockedReason;
   }
   if (patch.env !== undefined) {
     session.meta.env = normalizeSessionEnv(patch.env);

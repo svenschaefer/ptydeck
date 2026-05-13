@@ -28,10 +28,19 @@ export function createSessionCardInteractionsController(options = {}) {
   const isSessionSettingsDirty = options.isSessionSettingsDirty || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
   const isSessionStopped = options.isSessionStopped || (() => false);
+  const isSessionStartBlocked = options.isSessionStartBlocked || (() => false);
   const getSessionRuntimeState = options.getSessionRuntimeState || ((session) => String(session?.state || "").trim().toLowerCase());
+  const getSessionStartBlockedMessage = options.getSessionStartBlockedMessage || (() => "Session start is unavailable.");
   const setActiveSettingsTab = options.setActiveSettingsTab || (() => "startup");
   const stabilizeSettingsLayout = options.stabilizeSettingsLayout || (() => 0);
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
+  const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
+  const getSessionWriteBlockedMessage =
+    typeof options.getSessionWriteBlockedMessage === "function"
+      ? options.getSessionWriteBlockedMessage
+      : () => "This client cannot send input to the selected session.";
+  const showBlockedWriteReclaimUi =
+    typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
   const getErrorMessage = options.getErrorMessage || ((error, fallback) => (error instanceof Error && error.message ? error.message : fallback));
   const writeClipboardText = typeof options.writeClipboardText === "function" ? options.writeClipboardText : async () => false;
 
@@ -169,6 +178,23 @@ export function createSessionCardInteractionsController(options = {}) {
       const currentSession = getSession() || session;
       if (!api?.startSession || !api?.stopSession) {
         setError("Session start/stop is unavailable.");
+        return;
+      }
+      if (isSessionStartBlocked(currentSession)) {
+        setError(getSessionStartBlockedMessage(currentSession));
+        return;
+      }
+      if (!canWriteToSession(currentSession)) {
+        const message = getSessionWriteBlockedMessage(currentSession);
+        setError(message);
+        showBlockedWriteReclaimUi(currentSession, {
+          source: "session-start-stop",
+          message,
+          retryAction: {
+            kind: isSessionStopped(currentSession) ? "session-start" : "session-stop",
+            sessionId: session.id
+          }
+        });
         return;
       }
       if (isSessionStopped(currentSession)) {

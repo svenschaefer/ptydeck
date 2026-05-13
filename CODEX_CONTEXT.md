@@ -49,6 +49,16 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - ptydeck still does not persist runtime SSH secrets
   - password or keyboard-interactive SSH sessions can be restored into persisted `stopped` state without the original secret
   - starting such a stopped session later requires a fresh launch path with an available runtime secret instead of silently resurrecting with missing credentials
+- The persisted start/stop contract now also inherits the existing session-control ownership model instead of bypassing it:
+  - `POST /api/v1/sessions/{sessionId}/start` and `POST /api/v1/sessions/{sessionId}/stop` now enforce the same controller-access gate as direct terminal input and resize
+  - the session-card start/stop button now routes blocked cross-client clicks into the normal reclaim/error path instead of allowing silent lifecycle mutation from a spectator or non-controller client
+- Restored stopped secret-backed SSH sessions now surface an explicit fail-closed restart status:
+  - the backend API can publish `startBlockedReason: remote-secret-unavailable`
+  - the session-view-model maps that to a concrete operator-facing explanation
+  - the session-card toolbar disables `Start` for that case until the session is relaunched with a fresh secret or updated through the API with a new `remoteSecret`
+- Stopped-session rendering must now stay visually empty in all composer-placement modes:
+  - `active-overlay` and pinned overlay composers are hidden for stopped sessions even though their draft state remains persisted server-side for later restart
+  - the card layout slot still remains occupied while the session is stopped
 
 ## Custom Command Scope Contract
 
@@ -109,6 +119,7 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - it must not attempt structure-aware repair beyond that whitespace cleanup
   - shared normalize persists through the same server-side `sharedDraft` authority, and pinned normalize persists through the same server-side `pinnedDrafts` authority
   - regression coverage now locks down both the shared-footer normalize path and the pinned-overlay normalize path in `frontend/test/operator-composer-placement-runtime-controller.test.js`
+  - the `Normalize`, `Repair`, and `Send` action stack now stretches against the shared composer min-height instead of using taller fixed button heights, so the footer and overlay action column stays vertically aligned with the input box
 - The composer-placement runtime now also exposes an explicit opt-in `Repair` action beside `Normalize` for the shared footer composer and pinned overlay composers:
   - `Repair` must open a preview/apply shell instead of mutating the current draft immediately
   - the original draft must remain recoverable until the operator explicitly clicks `Apply Repair`

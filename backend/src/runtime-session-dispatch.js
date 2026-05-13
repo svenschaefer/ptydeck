@@ -461,6 +461,9 @@ export function createRuntimeSessionDispatch(dependencies = {}) {
     }
 
     if (match.kind === "start") {
+      setAuditContext({ target: { sessionId: match.params.sessionId } });
+      getApiSessionOrThrow(match.params.sessionId, auth);
+      ensureSessionControllerAccess(match.params.sessionId, auth, req, "start this terminal");
       const payload = manager.start(match.params.sessionId, {
         trace: {
           ...requestTraceContext,
@@ -475,6 +478,9 @@ export function createRuntimeSessionDispatch(dependencies = {}) {
     }
 
     if (match.kind === "stop") {
+      setAuditContext({ target: { sessionId: match.params.sessionId } });
+      getApiSessionOrThrow(match.params.sessionId, auth);
+      ensureSessionControllerAccess(match.params.sessionId, auth, req, "stop this terminal");
       const payload = manager.stop(match.params.sessionId, {
         trace: {
           ...requestTraceContext,

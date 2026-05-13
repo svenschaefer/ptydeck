@@ -770,6 +770,12 @@ body {
   display: grid;
   gap: 6px;
   min-width: 0;
+  --command-composer-font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
+  --command-composer-font-size: 14px;
+  --command-composer-line-height: 1.35;
+  --command-composer-border-width: 1px;
+  --command-composer-padding: 10px;
+  --command-composer-min-height: 7.25rem;
 }
 
 .command-meta {
@@ -899,22 +905,17 @@ body {
 }
 
 .command-actions-column {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-self: stretch;
   min-width: 96px;
+  min-height: var(--command-composer-min-height);
 }
 
 .command-input-wrap {
   position: relative;
   min-width: 0;
-  --command-composer-font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
-  --command-composer-font-size: 14px;
-  --command-composer-line-height: 1.35;
-  --command-composer-border-width: 1px;
-  --command-composer-padding: 10px;
-  --command-composer-min-height: 7.25rem;
   font-family: var(--command-composer-font-family);
   font-size: var(--command-composer-font-size);
   line-height: var(--command-composer-line-height);
@@ -965,13 +966,14 @@ body {
 
 .command-actions-column button {
   width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .command-normalize-btn,
 .command-repair-btn,
 .session-composer-overlay-normalize,
 .session-composer-overlay-repair {
-  min-height: 38px;
   padding: 6px 10px;
   font-size: 12px;
   line-height: 1.2;
@@ -979,8 +981,8 @@ body {
 
 .command-send-btn,
 .session-composer-overlay-send {
-  flex: 1 1 auto;
-  min-height: 56px;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .status-message {
@@ -1829,6 +1831,10 @@ button:hover {
   padding: 0;
   overflow: visible;
   gap: 10px;
+}
+
+.session-composer-overlay-shell .command-input-column {
+  --command-composer-min-height: 6.25rem;
 }
 
 .session-composer-overlay-command-row {

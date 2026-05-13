@@ -39,6 +39,20 @@ test("session runtime helpers expose stopped lifecycle messaging", () => {
   assert.match(model.getStoppedSessionMessage(session), /is stopped/i);
 });
 
+test("session runtime helpers expose blocked start messaging for restored secret-backed ssh sessions", () => {
+  const session = {
+    id: "sshstop1",
+    name: "carpo",
+    state: "stopped",
+    startBlockedReason: "remote-secret-unavailable"
+  };
+
+  assert.equal(model.isSessionStartBlocked(session), true);
+  assert.match(model.getSessionStateHintText(session), /cannot be started after backend restore/i);
+  assert.match(model.getStoppedSessionMessage(session), /remoteSecret/i);
+  assert.match(model.getSessionStartBlockedMessage(session), /Delete and relaunch/i);
+});
+
 test("session runtime helpers prefer formal lifecycle state and expose starting badge", () => {
   const startingSession = { id: "abcd1234", name: "build", state: "running", lifecycleState: "starting" };
   const busySession = { id: "efgh5678", name: "ops", state: "running", lifecycleState: "busy" };

@@ -1133,6 +1133,11 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       host.hidden = true;
       return;
     }
+    if (isSessionStopped(session)) {
+      clearNodeChildren(host);
+      host.hidden = true;
+      return;
+    }
 
     const sessionId = normalizeText(session?.id);
     const pinned = isPinnedSession(sessionId);
@@ -1170,6 +1175,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     const state = getState() || {};
     const sessions = Array.isArray(state.sessions) ? state.sessions : [];
     const activeSessionId = normalizeText(state.activeSessionId);
+    const activeSession = sessions.find((session) => normalizeText(session?.id) === activeSessionId) || null;
     const overlayMode = placementState.mode === ACTIVE_OVERLAY_MODE;
 
     if (composerPlacementModeSelectEl) {
@@ -1226,7 +1232,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     }
 
     const activeEntry = activeSessionId ? terminals.get(activeSessionId) : null;
-    if (!activeEntry || isPinnedSession(activeSessionId)) {
+    if (!activeEntry || !activeSession || isSessionStopped(activeSession) || isPinnedSession(activeSessionId)) {
       moveSharedComposerBody(hiddenParkingEl);
       sharedOverlay.shell.hidden = true;
       return;

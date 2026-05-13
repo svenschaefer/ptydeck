@@ -71,6 +71,22 @@ export function createSessionViewModel(options = {}) {
     return getSessionRuntimeState(session) === "stopped";
   }
 
+  function getSessionStartBlockedReason(session) {
+    return typeof session?.startBlockedReason === "string" ? session.startBlockedReason.trim().toLowerCase() : "";
+  }
+
+  function isSessionStartBlocked(session) {
+    return isSessionStopped(session) && Boolean(getSessionStartBlockedReason(session));
+  }
+
+  function getSessionStartBlockedMessage(session) {
+    const label = `[${formatSessionToken(session.id)}] ${displayName(session)}`;
+    if (getSessionStartBlockedReason(session) === "remote-secret-unavailable") {
+      return `Session ${label} cannot be started after backend restore because its secret-backed ssh runtime secret is unavailable. Delete and relaunch it with a fresh secret, or update it through the API with a new remoteSecret.`;
+    }
+    return `Session ${label} cannot be started in its current state.`;
+  }
+
   function isSessionActionBlocked(session) {
     return isSessionUnrestored(session) || isSessionExited(session);
   }
@@ -128,6 +144,9 @@ export function createSessionViewModel(options = {}) {
     if (isSessionUnrestored(session)) {
       return "Session could not be restored after backend restart. Update settings or delete this session.";
     }
+    if (isSessionStartBlocked(session)) {
+      return `${getSessionStartBlockedMessage(session)} The reserved terminal space stays visible while stopped.`;
+    }
     if (isSessionStopped(session)) {
       return "Session is stopped. Start it to launch the terminal again. The reserved terminal space stays visible while stopped.";
     }
@@ -148,6 +167,9 @@ export function createSessionViewModel(options = {}) {
   }
 
   function getStoppedSessionMessage(session) {
+    if (isSessionStartBlocked(session)) {
+      return getSessionStartBlockedMessage(session);
+    }
     const label = `[${formatSessionToken(session.id)}] ${displayName(session)}`;
     return `Session ${label} is stopped. Start it before sending input or resizing it.`;
   }
@@ -296,6 +318,8 @@ export function createSessionViewModel(options = {}) {
     isSessionUnrestored,
     isSessionExited,
     isSessionStopped,
+    getSessionStartBlockedReason,
+    isSessionStartBlocked,
     isSessionActionBlocked,
     hasSessionLiveActivity,
     hasSessionUnreadActivity,
@@ -306,6 +330,7 @@ export function createSessionViewModel(options = {}) {
     getUnrestoredSessionMessage,
     getExitedSessionMessage,
     getStoppedSessionMessage,
+    getSessionStartBlockedMessage,
     getBlockedSessionActionMessage,
     formatSessionEnv,
     normalizeSessionTags,

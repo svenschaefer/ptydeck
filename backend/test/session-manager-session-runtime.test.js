@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { ApiError } from "../src/errors.js";
 import { createSessionManagerSessionRuntime } from "../src/session-manager-session-runtime.js";
 
 function createFakePty() {
@@ -267,4 +268,34 @@ test("session-manager session runtime stops and restarts sessions while preservi
   assert.equal(harness.sessions.get("session-stop").ptyProcess.killed, false);
   assert.equal(harness.attached.length, 2);
   assert.equal(harness.started.length, 2);
+});
+
+test("session-manager session runtime marks restored stopped secret-backed ssh sessions as start-blocked", () => {
+  const harness = createHarness();
+
+  const stopped = harness.runtime.createSession({
+    id: "session-secret-stop",
+    kind: "ssh",
+    shell: "ssh",
+    cwd: "/tmp/work",
+    startCwd: "/tmp/work",
+    remoteConnection: { host: "example.internal", port: 22, username: "ops" },
+    remoteAuth: { method: "password" },
+    initialState: "stopped"
+  });
+
+  assert.equal(stopped.state, "stopped");
+  assert.equal(stopped.startBlockedReason, "remote-secret-unavailable");
+
+  assert.throws(
+    () => harness.runtime.startSession("session-secret-stop", {
+      trace: { requestId: "req-secret-restart", source: "rest" }
+    }),
+    (error) => {
+      assert.ok(error instanceof ApiError);
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.error, "SessionStartSecretRequired");
+      return true;
+    }
+  );
 });

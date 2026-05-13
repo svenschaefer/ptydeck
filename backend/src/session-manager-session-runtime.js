@@ -255,7 +255,7 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
       throw new ApiError(
         409,
         "SessionStartSecretRequired",
-        "This stopped ssh session requires a secret that is no longer available after restore. Update the session and provide the secret again before starting it."
+        "This stopped ssh session requires a secret that is no longer available after restore. Provide a new remoteSecret through the session update API or delete and relaunch the session before starting it."
       );
     }
     const trace = normalizeTraceSeed(options.trace);

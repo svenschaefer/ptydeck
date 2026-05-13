@@ -1155,3 +1155,89 @@ test("session-card-interactions controller routes start-stop actions through the
     ["feedback", "Stopped [1] Alpha."]
   ]);
 });
+
+test("session-card-interactions controller blocks start-stop when this client cannot write to the session", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController({
+    isSessionStopped: () => false,
+    getSessionRuntimeState: (session) => session?.state || "running",
+    canWriteToSession: () => false,
+    getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
+    showBlockedWriteReclaimUi: (session, options) => calls.push(["reclaim", session.id, options.source, options.retryAction.kind])
+  });
+  const refs = {
+    focusBtn: createEventTarget(),
+    startStopBtn: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("off")
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s2", name: "Bravo" },
+    refs,
+    api: {
+      startSession: async () => {
+        calls.push(["unexpected-start"]);
+        return null;
+      },
+      stopSession: async () => {
+        calls.push(["unexpected-stop"]);
+        return null;
+      }
+    },
+    getSession: () => ({ id: "s2", name: "Bravo", state: "running" }),
+    getEntry: () => ({ id: "entry-2" }),
+    sessionThemeDrafts: new Map(),
+    setError: (message) => calls.push(["error", message])
+  });
+
+  await refs.startStopBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    ["error", "This session is currently controlled by another client. Input and resize are disabled."],
+    ["reclaim", "s2", "session-start-stop", "session-stop"]
+  ]);
+});
+
+test("session-card-interactions controller blocks start-stop for start-blocked stopped sessions", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController({
+    isSessionStopped: (session) => session?.state === "stopped",
+    isSessionStartBlocked: (session) => session?.startBlockedReason === "remote-secret-unavailable",
+    getSessionStartBlockedMessage: () =>
+      "Session [3] Charlie cannot be started after backend restore because its secret-backed ssh runtime secret is unavailable.",
+    getSessionRuntimeState: (session) => session?.state || "running"
+  });
+  const refs = {
+    focusBtn: createEventTarget(),
+    startStopBtn: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("off")
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s3", name: "Charlie" },
+    refs,
+    api: {
+      startSession: async () => {
+        calls.push(["unexpected-start"]);
+        return null;
+      },
+      stopSession: async () => {
+        calls.push(["unexpected-stop"]);
+        return null;
+      }
+    },
+    getSession: () => ({ id: "s3", name: "Charlie", state: "stopped", startBlockedReason: "remote-secret-unavailable" }),
+    getEntry: () => ({ id: "entry-3" }),
+    sessionThemeDrafts: new Map(),
+    setError: (message) => calls.push(["error", message])
+  });
+
+  await refs.startStopBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    [
+      "error",
+      "Session [3] Charlie cannot be started after backend restore because its secret-backed ssh runtime secret is unavailable."
+    ]
+  ]);
+});

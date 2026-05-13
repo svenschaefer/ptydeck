@@ -71,8 +71,9 @@ The stopped state is intentionally stronger than a local hide or pause:
 - direct terminal typing is blocked
 - composer sends and quick-send actions are blocked
 - the card remains visible so deck/layout structure does not collapse
+- the same session-control ownership gate still applies, so a non-controller client must reclaim control before it can start or stop the session
 
-For secret-backed SSH sessions, ptydeck still does not persist the runtime secret itself. If you stop a password-based or keyboard-interactive SSH session and later start it again after the original secret is gone, the backend fails closed and requires a fresh authenticated launch instead of silently restoring with missing credentials.
+For secret-backed SSH sessions, ptydeck still does not persist the runtime secret itself. If you restore a stopped password-based or keyboard-interactive SSH session after backend restart and the original runtime secret is no longer available, ptydeck now keeps the card in the stopped state but disables `Start` with an explicit explanation. Recover that case by deleting and relaunching the session with a fresh secret, or by updating it through the API with a new `remoteSecret`.
 
 When you work from the session cards, hover the toolbar area to reveal quick actions for that specific session:
 

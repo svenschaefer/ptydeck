@@ -3,9 +3,11 @@ export function createSessionCardRenderController(options = {}) {
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
   const isSessionStopped = options.isSessionStopped || (() => false);
+  const isSessionStartBlocked = options.isSessionStartBlocked || (() => false);
   const getSessionRuntimeState = options.getSessionRuntimeState || ((session) => String(session?.state || "").trim().toLowerCase());
   const getSessionStateBadgeText = options.getSessionStateBadgeText || (() => "");
   const getSessionStateHintText = options.getSessionStateHintText || (() => "");
+  const getSessionStartBlockedMessage = options.getSessionStartBlockedMessage || (() => "Session start is unavailable.");
   const isTerminalAtBottom = options.isTerminalAtBottom || (() => true);
   const setSessionCardVisibility = options.setSessionCardVisibility || (() => {});
   const syncTerminalViewportAfterShow = options.syncTerminalViewportAfterShow || (() => {});
@@ -97,6 +99,8 @@ export function createSessionCardRenderController(options = {}) {
     if (entry.startStopBtn) {
       const runtimeState = getSessionRuntimeState(session);
       const sessionStopped = isSessionStopped(session);
+      const startBlocked = isSessionStartBlocked(session);
+      const startBlockedMessage = startBlocked ? getSessionStartBlockedMessage(session) : "";
       const interactiveToggleState =
         runtimeState === "created" ||
         runtimeState === "starting" ||
@@ -105,9 +109,15 @@ export function createSessionCardRenderController(options = {}) {
         runtimeState === "idle" ||
         sessionStopped;
       const startMode = sessionStopped;
-      entry.startStopBtn.disabled = readOnlyMode || !interactiveToggleState;
-      entry.startStopBtn.setAttribute("aria-label", startMode ? "Start session" : "Stop session");
-      entry.startStopBtn.setAttribute("title", readOnlyMessage || (startMode ? "Start session" : "Stop session"));
+      entry.startStopBtn.disabled = readOnlyMode || !interactiveToggleState || startBlocked;
+      entry.startStopBtn.setAttribute(
+        "aria-label",
+        startBlocked ? "Start session unavailable" : startMode ? "Start session" : "Stop session"
+      );
+      entry.startStopBtn.setAttribute(
+        "title",
+        readOnlyMessage || startBlockedMessage || (startMode ? "Start session" : "Stop session")
+      );
       if (entry.startStopIconEl) {
         entry.startStopIconEl.classList.toggle("icon-tabler-player-play-filled", startMode);
         entry.startStopIconEl.classList.toggle("icon-tabler-player-stop-filled", !startMode);

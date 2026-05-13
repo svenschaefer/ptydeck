@@ -317,6 +317,60 @@ test("operator composer placement controller initializes from the server-side pl
   controller.dispose();
 });
 
+test("operator composer placement controller keeps stopped sessions visually empty in overlay mode", async () => {
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const workspaceShellEl = new FakeElement("section");
+  const controlPaneEl = new FakeElement("section");
+  const controlPaneBodyEl = new FakeElement("div");
+  const controlPaneResizeHandleEl = new FakeElement("div");
+  const composerPlacementModeSelectEl = new FakeElement("select");
+  const commandInput = new FakeElement("textarea");
+  const session = { id: "s-stopped", name: "Stopped", state: "stopped" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 40 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+  controlPaneEl.appendChild(controlPaneBodyEl);
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    workspaceShellEl,
+    controlPaneEl,
+    controlPaneBodyEl,
+    controlPaneResizeHandleEl,
+    composerPlacementModeSelectEl,
+    commandInput,
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session,
+    isSessionStopped: (entry) => entry?.state === "stopped",
+    formatSessionToken: () => "T",
+    formatSessionDisplayName: (entry) => entry?.name || ""
+  });
+
+  await controller.setMode("active-overlay");
+
+  assert.equal(overlayHostEl.hidden, true);
+  assert.equal(overlayHostEl.children.length, 0);
+
+  await controller.pinSession(session.id);
+
+  assert.equal(overlayHostEl.hidden, true);
+  assert.equal(overlayHostEl.children.length, 0);
+  controller.dispose();
+});
+
 test("operator composer placement controller keeps the shared overlay mounted across stable rerenders", async () => {
   const documentRef = createDocumentRef();
   const windowRef = createWindowRef();

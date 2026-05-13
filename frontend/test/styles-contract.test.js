@@ -119,6 +119,14 @@ test("active-overlay composer mode collapses the footer body and uses non-resizi
     stylesCss,
     /\.session-composer-overlay-shell \.control-pane-body \{[\s\S]*padding: 0;[\s\S]*overflow: visible;[\s\S]*\}/m
   );
+  assert.match(
+    stylesCss,
+    /\.command-actions-column \{[\s\S]*display: grid;[\s\S]*grid-template-rows: repeat\(3, minmax\(0, 1fr\)\);[\s\S]*min-height: var\(--command-composer-min-height\);[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell \.command-input-column \{[\s\S]*--command-composer-min-height: 6\.25rem;[\s\S]*\}/m
+  );
 });
 
 test("stopped terminal cards keep their reserved terminal space while hiding the inactive viewport", () => {

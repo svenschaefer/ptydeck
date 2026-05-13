@@ -220,3 +220,26 @@ test("session-card-render controller toggles the start-stop control for stopped 
   assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-play-filled"), true);
   assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-stop-filled"), false);
 });
+
+test("session-card-render controller disables start for start-blocked stopped sessions", () => {
+  const entry = createEntry();
+  const controller = createSessionCardRenderController({
+    setSessionCardVisibility: () => {},
+    getSessionRuntimeState: (session) => session.state,
+    isSessionStopped: (session) => session.state === "stopped",
+    isSessionStartBlocked: (session) => session.startBlockedReason === "remote-secret-unavailable",
+    getSessionStartBlockedMessage: () => "Start is unavailable until a new remote secret is provided."
+  });
+
+  controller.updateExistingSessionCard({
+    entry,
+    session: { id: "s11", name: "ssh", state: "stopped", startBlockedReason: "remote-secret-unavailable" },
+    activeSessionId: "other",
+    nextVisible: true
+  });
+
+  assert.equal(entry.startStopBtn.disabled, true);
+  assert.equal(entry.startStopBtn.getAttribute("aria-label"), "Start session unavailable");
+  assert.equal(entry.startStopBtn.getAttribute("title"), "Start is unavailable until a new remote secret is provided.");
+  assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-play-filled"), true);
+});

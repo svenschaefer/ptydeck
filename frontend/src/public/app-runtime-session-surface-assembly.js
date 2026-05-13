@@ -166,10 +166,15 @@ export function createAppRuntimeSessionSurfaceAssembly(options = {}) {
     isSessionSettingsDirty: sessionUiFacadeController?.isSessionSettingsDirty,
     isSessionExited: sessionUiFacadeController?.isSessionExited,
     isSessionStopped: sessionUiFacadeController?.isSessionStopped,
+    isSessionStartBlocked: sessionUiFacadeController?.isSessionStartBlocked,
     getSessionRuntimeState: sessionUiFacadeController?.getSessionRuntimeState,
+    getSessionStartBlockedMessage: sessionUiFacadeController?.getSessionStartBlockedMessage,
     setActiveSettingsTab: sessionUiFacadeController?.setActiveSettingsTab,
     stabilizeSettingsLayout: sessionUiFacadeController?.stabilizeSettingsLayout,
     getBlockedSessionActionMessage: sessionUiFacadeController?.getBlockedSessionActionMessage,
+    canWriteToSession: options.canWriteToSession,
+    getSessionWriteBlockedMessage: options.getSessionWriteBlockedMessage,
+    showBlockedWriteReclaimUi: options.showBlockedWriteReclaimUi,
     writeClipboardText: (text) => clipboardRuntimeController?.writeText?.(text),
     getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback
   });
@@ -178,9 +183,11 @@ export function createAppRuntimeSessionSurfaceAssembly(options = {}) {
     isSessionUnrestored: sessionUiFacadeController?.isSessionUnrestored,
     isSessionExited: sessionUiFacadeController?.isSessionExited,
     isSessionStopped: sessionUiFacadeController?.isSessionStopped,
+    isSessionStartBlocked: sessionUiFacadeController?.isSessionStartBlocked,
     getSessionRuntimeState: sessionUiFacadeController?.getSessionRuntimeState,
     getSessionStateBadgeText: sessionUiFacadeController?.getSessionStateBadgeText,
     getSessionStateHintText: sessionUiFacadeController?.getSessionStateHintText,
+    getSessionStartBlockedMessage: sessionUiFacadeController?.getSessionStartBlockedMessage,
     isTerminalAtBottom: options.isTerminalAtBottom,
     setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility?.(node, visible),
     syncTerminalViewportAfterShow: (sessionId, entry) =>

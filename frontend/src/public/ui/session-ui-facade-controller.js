@@ -98,6 +98,10 @@ export function createSessionUiFacadeController(options = {}) {
     return getSessionViewModel()?.isSessionStopped?.(session) === true;
   }
 
+  function isSessionStartBlocked(session) {
+    return getSessionViewModel()?.isSessionStartBlocked?.(session) === true;
+  }
+
   function isSessionActionBlocked(session) {
     return getSessionViewModel()?.isSessionActionBlocked?.(session) === true;
   }
@@ -128,6 +132,10 @@ export function createSessionUiFacadeController(options = {}) {
 
   function getStoppedSessionMessage(session) {
     return getSessionViewModel()?.getStoppedSessionMessage?.(session) || "";
+  }
+
+  function getSessionStartBlockedMessage(session) {
+    return getSessionViewModel()?.getSessionStartBlockedMessage?.(session) || "";
   }
 
   function getBlockedSessionActionMessage(sessions, actionLabel) {
@@ -363,6 +371,7 @@ export function createSessionUiFacadeController(options = {}) {
     isSessionUnrestored,
     isSessionExited,
     isSessionStopped,
+    isSessionStartBlocked,
     isSessionActionBlocked,
     getSessionStateBadgeText,
     getExitedSessionStatusSuffix,
@@ -371,6 +380,7 @@ export function createSessionUiFacadeController(options = {}) {
     getUnrestoredSessionMessage,
     getExitedSessionMessage,
     getStoppedSessionMessage,
+    getSessionStartBlockedMessage,
     getBlockedSessionActionMessage,
     getSessionThemeConfig,
     getSessionThemeSelectedSlot,

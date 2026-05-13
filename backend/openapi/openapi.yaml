@@ -2179,6 +2179,10 @@ components:
           type: integer
           format: int64
           nullable: true
+        startBlockedReason:
+          type: string
+          enum:
+            - remote-secret-unavailable
         exitCode:
           type: integer
           nullable: true

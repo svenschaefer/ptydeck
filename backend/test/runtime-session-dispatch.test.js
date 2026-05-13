@@ -420,9 +420,14 @@ test("runtime session dispatch persists start and stop payloads through the extr
   const persistReasons = [];
   const responseCalls = [];
   const managerCalls = [];
+  const controllerChecks = [];
+  const auditCalls = [];
 
   const { dispatch } = createDispatchHarness({
     validateResponse: (value) => validateCalls.push(value),
+    getApiSessionOrThrow: (sessionId) => ({ id: sessionId, deckId: "ops", kind: "local" }),
+    ensureSessionControllerAccess: (sessionId, auth, req, actionLabel) =>
+      controllerChecks.push({ sessionId, auth, req, actionLabel }),
     manager: {
       start: (sessionId, options) => {
         managerCalls.push(["start", sessionId, options]);
@@ -434,7 +439,8 @@ test("runtime session dispatch persists start and stop payloads through the extr
       }
     },
     toApiSession: (value) => ({ ...value, api: true }),
-    persistNow: async (reason) => persistReasons.push(reason)
+    persistNow: async (reason) => persistReasons.push(reason),
+    setAuditContext: (value) => auditCalls.push(value)
   });
 
   const startHandled = await dispatch.dispatchSessionRequest({
@@ -467,6 +473,21 @@ test("runtime session dispatch persists start and stop payloads through the extr
       ["stop", "session-7"]
     ]
   );
+  assert.deepEqual(controllerChecks, [
+    {
+      sessionId: "session-7",
+      auth: { subject: "operator-5" },
+      req: null,
+      actionLabel: "start this terminal"
+    },
+    {
+      sessionId: "session-7",
+      auth: { subject: "operator-5" },
+      req: null,
+      actionLabel: "stop this terminal"
+    }
+  ]);
+  assert.deepEqual(auditCalls, [{ target: { sessionId: "session-7" } }, { target: { sessionId: "session-7" } }]);
   assert.deepEqual(persistReasons, ["session.start", "session.stop"]);
   assert.deepEqual(validateCalls, [
     { statusCode: 200, body: responseCalls[0].body, expect: "session" },
