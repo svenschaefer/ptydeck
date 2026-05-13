@@ -690,6 +690,11 @@ body {
   background: #152116;
 }
 
+.deck-session-btn.stopped .session-quick-id,
+.deck-session-btn.stopped .deck-session-name {
+  opacity: 0.5;
+}
+
 .deck-session-btn .session-quick-id {
   min-width: 1.75rem;
   font-size: 11px;

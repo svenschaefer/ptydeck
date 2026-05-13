@@ -12,6 +12,7 @@ export function createDeckSidebarController(options = {}) {
     typeof options.formatSessionDisplayName === "function" ? options.formatSessionDisplayName : (session) => String(session?.name || session?.id || "");
   const getSessionActivityIndicatorState =
     typeof options.getSessionActivityIndicatorState === "function" ? options.getSessionActivityIndicatorState : () => "";
+  const isSessionStopped = typeof options.isSessionStopped === "function" ? options.isSessionStopped : () => false;
   const onActivateDeck = typeof options.onActivateDeck === "function" ? options.onActivateDeck : () => {};
   const onActivateSession = typeof options.onActivateSession === "function" ? options.onActivateSession : () => {};
   const onRenameDeck = typeof options.onRenameDeck === "function" ? options.onRenameDeck : () => Promise.resolve();
@@ -251,6 +252,9 @@ export function createDeckSidebarController(options = {}) {
           sessionButton.setAttribute("data-session-id", session.id);
           if (activeSessionId === session.id) {
             sessionButton.classList.add("active");
+          }
+          if (isSessionStopped(session)) {
+            sessionButton.classList.add("stopped");
           }
 
           const quickIdEl = documentRef.createElement("span");

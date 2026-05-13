@@ -358,6 +358,7 @@ export function createAppRuntimeSessionSurfaceAssembly(options = {}) {
       (Array.isArray(sessions) ? sessions.slice() : []),
     formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
     getSessionActivityIndicatorState: sessionUiFacadeController?.getSessionActivityIndicatorState,
+    isSessionStopped: sessionUiFacadeController?.isSessionStopped,
     onActivateDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId),
     onActivateSession: (session) => getCommandTargetRuntimeController()?.activateSessionTarget?.(session),
     onRenameDeck: appRuntimeSessionGridActions?.onRenameDeck,

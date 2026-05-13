@@ -220,6 +220,48 @@ test("deck-sidebar controller applies deck session group resolution before rende
   );
 });
 
+test("deck-sidebar controller marks stopped sessions for dimmed sidebar rendering", () => {
+  const container = new FakeElement("div");
+  const documentRef = {
+    createElement(tag) {
+      return new FakeElement(tag);
+    }
+  };
+
+  const controller = createDeckSidebarController({
+    containerEl: container,
+    documentRef,
+    resolveSessionDeckId: (session) => session.deckId,
+    ensureQuickId: (sessionId) => String(sessionId || ""),
+    formatSessionDisplayName: (session) => session.name,
+    isSessionStopped: (session) => session.state === "stopped"
+  });
+
+  controller.render({
+    decks: [{ id: "default", name: "Default" }],
+    sessions: [
+      { id: "s-1", name: "One", deckId: "default", state: "running" },
+      { id: "s-2", name: "Two", deckId: "default", state: "stopped" }
+    ],
+    activeDeckId: "default",
+    activeSessionId: "s-1"
+  });
+
+  const runningButton = findFirst(
+    container,
+    (el) => el.className === "deck-session-btn" && el.getAttribute("data-session-id") === "s-1"
+  );
+  const stoppedButton = findFirst(
+    container,
+    (el) => el.className === "deck-session-btn" && el.getAttribute("data-session-id") === "s-2"
+  );
+
+  assert.ok(runningButton);
+  assert.ok(stoppedButton);
+  assert.equal(runningButton.classList.contains("stopped"), false);
+  assert.equal(stoppedButton.classList.contains("stopped"), true);
+});
+
 test("deck-sidebar controller exposes active-deck settings and routes rename/delete through the settings panel", async () => {
   const container = new FakeElement("div");
   const documentRef = {

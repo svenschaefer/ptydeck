@@ -61,6 +61,9 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - `frontend/src/public/ui/session-card-render-controller.js` must continue to mirror that same contract on subsequent session updates
   - `frontend/src/public/styles.css` now keeps `.session-start-stop` in the same sizing/color group as `.session-refresh` and `.session-settings`, so lifecycle, refresh, and settings actions stay visually aligned in the header
   - the same stylesheet must also provide real Tabler mask mappings for `.icon-tabler-player-play-filled` and `.icon-tabler-player-stop-filled`; class toggling alone is not enough because ptydeck's icon system is local CSS-mask-based, not a remote icon font
+- Stopped session visibility now has one matching sidebar affordance:
+  - `frontend/src/public/ui/deck-sidebar-controller.js` applies a `stopped` class to stopped sidebar session entries
+  - `frontend/src/public/styles.css` dims only the sidebar quick id and session display name to `50%` opacity for that state, so stopped sessions are discoverable in the sidebar without changing the row layout or making the click target harder to hit
 - Restored stopped secret-backed SSH sessions now surface an explicit fail-closed restart status:
   - the backend API can publish `startBlockedReason: remote-secret-unavailable`
   - the session-view-model maps that to a concrete operator-facing explanation

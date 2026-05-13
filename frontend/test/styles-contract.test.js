@@ -138,6 +138,14 @@ test("stopped terminal cards keep their reserved terminal space while hiding the
   );
 });
 
+test("stopped sidebar sessions dim the quick id and display name without changing button layout", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(
+    stylesCss,
+    /\.deck-session-btn\.stopped \.session-quick-id,\s*\.deck-session-btn\.stopped \.deck-session-name \{[\s\S]*opacity: 0\.5;[\s\S]*\}/m
+  );
+});
+
 test("session header lifecycle toggle shares the same button sizing and icon color contract as refresh and settings", () => {
   const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
   assert.match(
