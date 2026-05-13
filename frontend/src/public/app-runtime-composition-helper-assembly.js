@@ -67,6 +67,9 @@ export function createAppRuntimeCompositionHelperAssembly(options = {}) {
       setSessionsForTest(sessions) {
         store.setSessions(Array.isArray(sessions) ? sessions : []);
       },
+      setConnectionState(connectionState) {
+        store.setConnectionState(connectionState);
+      },
       setCommandFeedbackActionSessionId(sessionId) {
         uiState.commandFeedbackActionSessionId = normalizeCommandFeedbackActionSessionId(sessionId);
       },

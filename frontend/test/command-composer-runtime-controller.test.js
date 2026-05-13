@@ -269,6 +269,7 @@ test("command-composer runtime controller sends command input via configured ter
   await controller.submitCommand();
 
   assert.deepEqual(calls, [
+    ["clearError"],
     ["debug", "command.send.start", "s1"],
     ["send", "s1", "ls -al", "CRLF", 75],
     ["api", "s1", "ls -al"],
@@ -277,7 +278,6 @@ test("command-composer runtime controller sends command input via configured ter
     ["value", ""],
     ["preview", ""],
     ["clearSuggestions"],
-    ["clearError"],
     ["historyReset"],
     ["debug", "command.send.ok", "s1"],
     ["render"]
@@ -405,6 +405,7 @@ test("command-composer runtime controller records terminal paste observations af
 
   assert.equal(result, true);
   assert.deepEqual(calls, [
+    ["clearError"],
     ["debug", "command.send.start", "s1"],
     ["send", "s1", "echo hi\n", "CR"],
     ["api", "s1", "echo hi\n"],
@@ -412,7 +413,6 @@ test("command-composer runtime controller records terminal paste observations af
     ["record", "s1", "paste", "echo hi\n"],
     ["preview", ""],
     ["clearSuggestions"],
-    ["clearError"],
     ["debug", "command.send.ok", "s1"],
     ["render"]
   ]);
@@ -490,6 +490,7 @@ test("command-composer runtime controller retries a blocked send after control i
 
   assert.equal(result, true);
   assert.deepEqual(calls, [
+    ["clearError"],
     ["debug", "command.send.start", "s1"],
     ["send", "s1", "uname -a", "CR"],
     ["api", "s1", "uname -a"],
@@ -498,7 +499,6 @@ test("command-composer runtime controller retries a blocked send after control i
     ["value", ""],
     ["preview", ""],
     ["clearSuggestions"],
-    ["clearError"],
     ["debug", "command.send.ok", "s1"],
     ["render"]
   ]);
@@ -534,12 +534,12 @@ test("command-composer runtime controller sends only the configured terminator w
 
   assert.equal(result, true);
   assert.deepEqual(calls, [
+    ["clearError"],
     ["debug", "command.send.start", "s1"],
     ["send", "s1", "", "CRLF"],
     ["api", "s1", ""],
     ["preview", ""],
     ["clearSuggestions"],
-    ["clearError"],
     ["debug", "command.send.ok", "s1"],
     ["render"]
   ]);
@@ -859,12 +859,12 @@ test("command-composer runtime controller guards risky sends until confirmed or 
   const confirmed = await controller.confirmPendingSend();
   assert.equal(confirmed, true);
   assert.deepEqual(calls, [
+    ["clear-error"],
     ["send", "s1", "please fix the tests"],
     ["record", "s1", "please fix the tests"],
     ["clear-guard", false],
     ["value", ""],
     ["clear-suggestions"],
-    ["clear-error"],
     ["history-reset"],
     ["render"]
   ]);
@@ -981,12 +981,12 @@ test("command-composer runtime controller sends terminal pastes without clearing
   const sent = await controller.submitTerminalPaste("s1", "echo hi");
   assert.equal(sent, true);
   assert.deepEqual(calls, [
+    ["clear-error"],
     ["active", "s1"],
     ["send", "s1", "echo hi"],
     ["record", "s1", "paste", "echo hi"],
     ["preview", ""],
     ["clear-suggestions"],
-    ["clear-error"],
     ["render"]
   ]);
 });

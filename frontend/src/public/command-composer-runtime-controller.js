@@ -311,6 +311,10 @@ export function createCommandComposerRuntimeController(options = {}) {
       return;
     }
 
+    // Clear unrelated stale UI errors before the async transport path begins so the
+    // status area reflects the current send attempt instead of the prior action.
+    clearError();
+
     const submittedAt = Date.now();
     for (const session of plan.targetSessions) {
       if (plan.activateTargetBeforeSend === true) {
@@ -351,7 +355,6 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
     setCommandPreview("");
     clearCommandSuggestions();
-    clearError();
     if (plan.routeFeedback) {
       setCommandFeedback(plan.routeFeedback);
     }
@@ -465,6 +468,7 @@ export function createCommandComposerRuntimeController(options = {}) {
       return;
     }
     if (plan.error) {
+      clearError();
       setCommandFeedback(plan.error);
       if (plan.blockedSession) {
         showBlockedWriteReclaimUi(plan.blockedSession, {
@@ -541,6 +545,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     });
     if (!plan || plan.error) {
       if (plan?.error) {
+        clearError();
         setCommandFeedback(plan.error);
         if (plan.blockedSession) {
           showBlockedWriteReclaimUi(plan.blockedSession, {
@@ -620,6 +625,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     });
     if (!plan || plan.error) {
       if (plan?.error) {
+        clearError();
         setCommandFeedback(plan.error);
       }
       return false;
@@ -650,6 +656,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     });
     if (!plan || plan.error) {
       if (plan?.error) {
+        clearError();
         setCommandFeedback(plan.error);
         if (plan.blockedSession) {
           showBlockedWriteReclaimUi(plan.blockedSession, {

@@ -39,7 +39,11 @@ export function createAppRuntimeStateController(options = {}) {
   }
 
   function clearError() {
+    const hadError = Boolean(uiState.error);
     uiState.error = "";
+    if (hadError) {
+      requestRender();
+    }
   }
 
   function setError(message) {

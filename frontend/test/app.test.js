@@ -1637,24 +1637,39 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   fixture.elements.commandInput.value = "pwd";
   fixture.elements.sendCommand.click();
-  await tick();
-  assert.match(fixture.elements.statusMessage.textContent, /^(Failed to send command\.|Connection state: connecting)$/);
-  assert.equal(inputPayloads.length, 1);
-  assert.equal(inputPayloads[0].sessionId, "s-1");
-  assert.equal(inputPayloads[0].data, "pwd\r");
+  await waitFor(
+    () => fixture.elements.statusMessage.textContent === "Connection state: connecting",
+    { timeoutMs: 1200 }
+  );
+  assert.equal(fixture.elements.statusMessage.textContent, "Connection state: connecting");
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Connection state: connecting. Wait for the session UI to establish session control before sending input or resizing."
+  );
+  assert.equal(inputPayloads.length, 0);
 
   fixture.elements.commandInput.value = "/noop";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /noop");
-  assert.equal(inputPayloads.length, 1);
+  assert.equal(inputPayloads.length, 0);
 
   fixture.elements.commandInput.value = "/list";
   fixture.elements.sendCommand.click();
-  await tick();
+  await waitFor(() => /\[1\]/.test(fixture.elements.commandFeedback.textContent), { timeoutMs: 1200 });
+  await waitFor(
+    () => fixture.elements.statusMessage.textContent === "Connection state: connecting",
+    { timeoutMs: 1200 }
+  );
   assert.match(fixture.elements.commandFeedback.textContent, /\[1\]/);
-  assert.match(fixture.elements.statusMessage.textContent, /^(Failed to send command\.|Connection state: connecting)?$/);
-  assert.equal(inputPayloads.length, 1);
+  assert.equal(fixture.elements.statusMessage.textContent, "Connection state: connecting");
+  assert.equal(inputPayloads.length, 0);
+
+  assert.equal(MockWebSocket.instances.length, 1);
+  const connectedWs = MockWebSocket.instances[0];
+  connectedWs.emit("open", {});
+  await waitFor(() => fixture.elements.connectionState.textContent === "connected", { timeoutMs: 1200 });
+  assert.equal(fixture.elements.connectionState.textContent, "connected");
 
   fixture.elements.commandInput.value = "/help";
   fixture.elements.sendCommand.click();
@@ -1790,23 +1805,23 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(getCustomCommandCalls, 0);
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 2);
-  assert.equal(inputPayloads[1].data, "echo verify\r");
+  assert.equal(inputPayloads.length, 1);
+  assert.equal(inputPayloads[0].data, "echo verify\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/docu on \[1\]\./);
   assert.equal(fixture.elements.commandPreview.textContent, "");
 
   fixture.elements.commandInput.value = "/blockcmd";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 3);
-  assert.equal(inputPayloads[2].data, "line 1\nline 2\r");
+  assert.equal(inputPayloads.length, 2);
+  assert.equal(inputPayloads[1].data, "line 1\nline 2\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/blockcmd on \[1\]\./);
 
   fixture.elements.commandInput.value = "/go";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 4);
-  assert.equal(inputPayloads[3].data, "Take care of md\\'s and quotes.\r");
+  assert.equal(inputPayloads.length, 3);
+  assert.equal(inputPayloads[2].data, "Take care of md\\'s and quotes.\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/go on \[1\]\./);
 
   fixture.elements.commandInput.value = "/custom template deploy echo {{param:env}} from {{var:session.cwd}}";
@@ -1834,8 +1849,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandPreview.textContent, "echo prod from ~");
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 5);
-  assert.equal(inputPayloads[4].data, "echo prod from ~\r");
+  assert.equal(inputPayloads.length, 4);
+  assert.equal(inputPayloads[3].data, "echo prod from ~\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/deploy on \[1\]\./);
 
   fixture.elements.commandInput.value = "/custom remove docu";
@@ -1850,7 +1865,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await sleep(160);
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 5);
+  assert.equal(inputPayloads.length, 4);
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /docu");
 
   fixture.elements.commandInput.value = "/longpreview";

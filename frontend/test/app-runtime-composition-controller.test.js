@@ -532,6 +532,7 @@ test("app-runtime composition controller exposes reclaim-and-retry state with th
     }
   };
 
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.setCollaborators({
     appRuntimeStateController: {
@@ -576,6 +577,7 @@ test("app-runtime composition controller auto-reclaims control after a canonical
   const harness = createControllerHarness();
   const takeCalls = [];
   const feedbackMessages = [];
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.setTrustedLocalClientLabel("Laptop");
   harness.hooks.setRuntimeClientIdentityCreatedOnThisOrigin(true);
@@ -673,6 +675,7 @@ test("app-runtime composition controller retries a blocked action immediately wh
     payload: "uname -a"
   };
 
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.setCommandFeedbackActionSessionId("s-1");
   harness.hooks.setCommandFeedbackActionMeta({
@@ -733,6 +736,7 @@ test("app-runtime composition controller replays trusted-local layouts through t
   windowRef.localStorage = localStorageRef;
   const harness = createControllerHarness({ windowRef });
 
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.setSessionsForTest([
     {
@@ -864,6 +868,7 @@ test("app-runtime composition controller throws deterministically when this devi
     }
   };
 
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.setCommandFeedbackActionSessionId("s-1");
   harness.hooks.setCommandFeedbackActionMeta({
@@ -922,6 +927,7 @@ test("app-runtime composition controller takes control and replays resize retrie
     }
   };
 
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.setCommandFeedbackActionSessionId("s-1");
   harness.hooks.setCommandFeedbackActionMeta({
@@ -994,6 +1000,7 @@ test("app-runtime composition controller exposes reclaim badge and summary for r
     }
   };
 
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.setTrustedLocalClientLabel("Laptop");
 
@@ -1043,6 +1050,7 @@ test("app-runtime composition controller renders transfer and forget actions for
     }
   };
 
+  harness.hooks.setConnectionState("connected");
   harness.hooks.setRuntimeClientId("client-local");
   harness.hooks.renderSessionControlClients(container, session);
 

@@ -60,6 +60,7 @@ test("app-runtime state controller updates ui state and formats errors", () => {
     ["render"],
     ["render"],
     ["render"],
+    ["render"],
     ["render"]
   ]);
 });
