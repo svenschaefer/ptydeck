@@ -12,7 +12,8 @@
   },
   "scripts": {
     "dev": "bash -lc 'npm --prefix backend run dev & npm --prefix frontend run dev & wait'",
-    "dev:light": "bash -lc 'PTYDECK_BACKEND_SKIP_LOCAL_ENV=1 npm --prefix backend run dev & npm --prefix frontend run dev & wait'",
+    "dev:light": "npm run dev",
+    "dev:env": "bash -lc 'PTYDECK_BACKEND_LOAD_LOCAL_ENV=1 npm --prefix backend run dev & npm --prefix frontend run dev & wait'",
     "build": "npm run docs:generate && npm --prefix backend run build && npm --prefix frontend run build",
     "scripts:log:check": "./scripts/check-script-logging.sh",
     "lint": "npm run docs:check && npm run scripts:log:check && ./scripts/check-adr-process.sh && npm --prefix backend run lint && npm --prefix frontend run lint",

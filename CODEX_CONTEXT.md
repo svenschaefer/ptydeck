@@ -68,6 +68,10 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - local updates to `mode`, `pinnedSessionIds`, `sharedDraft`, and `pinnedDrafts` are held as pending local placement authority
   - `frontend/src/public/operator-composer-placement-runtime-controller.js` must not overwrite a newer local footer or overlay draft with a stale REST `PATCH` response or `composer-placement.updated` echo from older state
   - the current shipped regression coverage explicitly locks down the stale shared-footer draft echo case in `frontend/test/operator-composer-placement-runtime-controller.test.js`
+- The composer-placement runtime must also preserve the browser's native undo/redo stack while the operator is actively editing:
+  - focused shared-footer and pinned-overlay textareas must not be programmatically rewritten from server placement state while they still hold focus
+  - deliberate local semantic transitions such as pin/unpin draft transfer may still move or clear the shared draft explicitly
+  - regression coverage now locks down the focused shared-footer no-overwrite contract in `frontend/test/operator-composer-placement-runtime-controller.test.js`
 
 ## Current Quality Baseline
 
@@ -106,7 +110,7 @@ Current active tasks:
 
 ## Local Dev Runtime Cost Baseline
 
-- The backend dev startup path in `backend/scripts/run-dev.sh` auto-loads the gitignored `local-config/ptydeck/backend.env.local` file when it exists.
+- The backend dev startup path in `backend/scripts/run-dev.sh` is now lightweight by default and does not auto-load the gitignored `local-config/ptydeck/backend.env.local` file unless explicitly requested.
 - That auto-loaded env file is intentionally suitable for focused local diagnostics, but it is not a neutral performance baseline. In particular, enabling any combination of:
   - `BACKEND_DEBUG_LOGS=1`
   - `BACKEND_DEBUG_LOG_FILE=...`
@@ -118,12 +122,15 @@ Current active tasks:
   - sustained growth in `/tmp/ptydeck-session-stream-analysis.jsonl` directly from the PTY `onData` path
   - large accumulated backend debug logging with high-frequency `http.request.*`, `session.input.write`, `persist.save.*`, and `session.event` entries
   - Telegram inbound/outbound runtime support also active in the same local dev process
-- The repo now ships an explicit lightweight local backend-dev path:
-  - root: `npm run dev:light`
-  - backend only: `npm --prefix backend run dev:light`
-- Those light commands set `PTYDECK_BACKEND_SKIP_LOCAL_ENV=1`, and `backend/scripts/run-dev.sh` now treats that flag as the authority to skip sourcing `local-config/ptydeck/backend.env.local`.
+- The repo now ships a lightweight local backend-dev default plus an explicit env-backed opt-in path:
+  - root default: `npm run dev`
+  - root explicit env-backed: `npm run dev:env`
+  - backend default: `npm --prefix backend run dev`
+  - backend explicit env-backed: `npm --prefix backend run dev:env`
+  - compatibility alias: `npm run dev:light` and `npm --prefix backend run dev:light`
+- `backend/scripts/run-dev.sh` now treats `PTYDECK_BACKEND_LOAD_LOCAL_ENV=1` as the positive authority to source `local-config/ptydeck/backend.env.local`, while the older `PTYDECK_BACKEND_SKIP_LOCAL_ENV=1` flag still remains available as a fail-closed override.
 - Product implication:
-  - ordinary local interactive development should prefer the `dev:light` path unless a concrete debug/capture/messaging investigation is in progress
+  - ordinary local interactive development should use the default `dev` path unless a concrete debug/capture/messaging investigation is in progress
   - the auto-loaded backend env file remains the right place for repeated diagnostics, but not for the baseline "always on" local runtime
 
 ## H181 Frontend Closeout

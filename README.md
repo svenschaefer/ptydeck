@@ -60,10 +60,10 @@ Start backend and frontend together:
 
 ```bash
 npm run dev
-npm run dev:light
+npm run dev:env
 ```
 
-When the gitignored local file `local-config/ptydeck/backend.env.local` exists, the backend dev startup path now loads it automatically. That is the intended place for machine-specific local analysis and debug settings such as:
+`npm run dev` is now the normal lightweight local path. The gitignored local file `local-config/ptydeck/backend.env.local` is only loaded when you opt in through `npm run dev:env` or `PTYDECK_BACKEND_LOAD_LOCAL_ENV=1`. That file is the intended place for machine-specific local analysis and debug settings such as:
 
 ```env
 BACKEND_DEBUG_LOGS=1
@@ -73,7 +73,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex
 SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432
 ```
 
-Those settings are intentionally diagnostic, not part of the normal lightweight dev baseline. On busy multi-session runs they can add substantial backend write, capture, and messaging overhead. Keep `backend.env.local` absent or minimal for ordinary interactive work, and use `npm run dev:light` when you want the default dev stack without auto-loading that backend-local analysis env file.
+Those settings are intentionally diagnostic, not part of the normal lightweight dev baseline. On busy multi-session runs they can add substantial backend write, capture, and messaging overhead. Use `npm run dev` for ordinary interactive work, and only use `npm run dev:env` when you intentionally want that backend-local diagnostic env file loaded.
 
 Useful validation commands:
 
@@ -90,6 +90,7 @@ Root workspace:
 ```bash
 npm run dev
 npm run dev:light
+npm run dev:env
 npm run build
 npm run lint
 npm run test
@@ -104,10 +105,11 @@ Backend only:
 ```bash
 npm --prefix backend run dev
 npm --prefix backend run dev:light
+npm --prefix backend run dev:env
 npm --prefix backend run test
 ```
 
-`npm --prefix backend run dev` uses the same local backend-env autoload behavior as the root `npm run dev` path. `npm --prefix backend run dev:light` skips that auto-loaded backend env file so one-off debug capture, debug logging, or messaging analysis settings in `local-config/ptydeck/backend.env.local` do not ride along in the default local runtime.
+`npm --prefix backend run dev` now uses the same lightweight default as the root `npm run dev` path, and `npm --prefix backend run dev:env` explicitly opts into loading `local-config/ptydeck/backend.env.local`. `npm --prefix backend run dev:light` remains as a compatibility alias for the same lightweight backend runtime.
 
 Frontend only:
 
@@ -253,10 +255,10 @@ The scaffold fails closed when target files already exist; add `--force` only wh
 Enable backend debug logging:
 
 ```bash
-BACKEND_DEBUG_LOGS=1 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log npm run dev
+BACKEND_DEBUG_LOGS=1 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log PTYDECK_BACKEND_LOAD_LOCAL_ENV=1 npm run dev
 ```
 
-For focused repeated analysis, prefer storing those values in the gitignored `local-config/ptydeck/backend.env.local` file instead of prefixing every `npm run dev` command manually. Do not leave high-volume debug or session-stream capture settings enabled for ordinary interactive work; use `npm run dev:light` or `npm --prefix backend run dev:light` when you want the normal local runtime without those backend-local overrides.
+For focused repeated analysis, prefer storing those values in the gitignored `local-config/ptydeck/backend.env.local` file instead of prefixing every `npm run dev` command manually, then start that env-backed runtime with `npm run dev:env` or `npm --prefix backend run dev:env`. Do not leave high-volume debug or session-stream capture settings enabled for ordinary interactive work; `npm run dev` and `npm --prefix backend run dev` now keep those backend-local overrides disabled by default.
 
 Frontend/browser debug notes:
 

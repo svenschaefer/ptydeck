@@ -353,8 +353,10 @@ function createPinnedSurfaceController(options = {}) {
   let inputListener = null;
   let changeListener = null;
   let blurListener = null;
+  let focusListener = null;
   let composerRuntimeController = null;
   let autocompleteController = null;
+  let textareaFocused = false;
 
   function getPinnedState() {
     const state = getState() || {};
@@ -502,10 +504,17 @@ function createPinnedSurfaceController(options = {}) {
 
   inputListener = () => persistDraft();
   changeListener = () => persistDraft();
-  blurListener = () => persistDraft();
+  blurListener = () => {
+    textareaFocused = false;
+    persistDraft();
+  };
+  focusListener = () => {
+    textareaFocused = true;
+  };
   refs.textarea.addEventListener?.("input", inputListener);
   refs.textarea.addEventListener?.("change", changeListener);
   refs.textarea.addEventListener?.("blur", blurListener);
+  refs.textarea.addEventListener?.("focus", focusListener);
   refs.sendBtn.addEventListener?.("click", () => {
     composerRuntimeController?.submitCommand?.().catch((error) => {
       setError(getErrorMessage(error, "Failed to send command."));
@@ -531,6 +540,14 @@ function createPinnedSurfaceController(options = {}) {
     setDraft(value, { scheduleRefresh = true } = {}) {
       const nextValue = String(value || "");
       if (refs.textarea.value !== nextValue) {
+        if (textareaFocused) {
+          if (scheduleRefresh) {
+            composerRuntimeController?.scheduleCommandPreview?.();
+            autocompleteController?.scheduleSuggestions?.();
+          }
+          render();
+          return;
+        }
         suppressDraftSync = true;
         refs.textarea.value = nextValue;
         suppressDraftSync = false;
@@ -548,6 +565,7 @@ function createPinnedSurfaceController(options = {}) {
       refs.textarea.removeEventListener?.("input", inputListener);
       refs.textarea.removeEventListener?.("change", changeListener);
       refs.textarea.removeEventListener?.("blur", blurListener);
+      refs.textarea.removeEventListener?.("focus", focusListener);
       autocompleteController?.dispose?.();
       composerRuntimeController?.dispose?.();
       removeNode(refs.root);
@@ -619,11 +637,13 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
   let sharedInputListener = null;
   let sharedChangeListener = null;
   let sharedBlurListener = null;
+  let sharedFocusListener = null;
   let modeChangeListener = null;
   let persistTimer = null;
   let pendingPersistPatch = {};
   let initializePromise = null;
   const pinnedSurfaces = new Map();
+  let sharedInputFocused = false;
   const pendingPlacementState = {
     mode: null,
     pinnedSessionIds: null,
@@ -660,6 +680,9 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     const nextValue = typeof value === "string" ? value : "";
     placementState.sharedDraft = nextValue;
     if (commandInput && commandInput.value !== nextValue) {
+      if (sharedInputFocused) {
+        return;
+      }
       commandInput.value = nextValue;
       if (scheduleRefresh) {
         scheduleSharedCommandRefresh();
@@ -1028,7 +1051,10 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     setPendingPinnedSessionIds(placementState.pinnedSessionIds);
     setPendingPinnedDrafts(placementState.pinnedDrafts);
     setPendingSharedDraft(placementState.sharedDraft);
+    const hadSharedFocus = sharedInputFocused;
+    sharedInputFocused = false;
     setSharedComposerDraftLocally(nextSharedDraft, { scheduleRefresh: true });
+    sharedInputFocused = hadSharedFocus;
     render();
     setCommandFeedback(`Pinned overlay input for [${formatSessionToken(normalizedSessionId)}].`);
     await queuePersistPatch(
@@ -1065,7 +1091,10 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     setPendingPinnedSessionIds(placementState.pinnedSessionIds);
     setPendingPinnedDrafts(placementState.pinnedDrafts);
     setPendingSharedDraft(placementState.sharedDraft);
+    const hadSharedFocus = sharedInputFocused;
+    sharedInputFocused = false;
     setSharedComposerDraftLocally(nextSharedDraft, { scheduleRefresh: true });
+    sharedInputFocused = hadSharedFocus;
     disposePinnedSurface(normalizedSessionId);
     render();
     setCommandFeedback(`Unpinned overlay input for [${formatSessionToken(normalizedSessionId)}].`);
@@ -1116,10 +1145,17 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     if (!sharedInputListener && commandInput) {
       sharedInputListener = () => setSharedDraftFromInput();
       sharedChangeListener = () => setSharedDraftFromInput();
-      sharedBlurListener = () => setSharedDraftFromInput();
+      sharedBlurListener = () => {
+        sharedInputFocused = false;
+        setSharedDraftFromInput();
+      };
+      sharedFocusListener = () => {
+        sharedInputFocused = true;
+      };
       commandInput.addEventListener?.("input", sharedInputListener);
       commandInput.addEventListener?.("change", sharedChangeListener);
       commandInput.addEventListener?.("blur", sharedBlurListener);
+      commandInput.addEventListener?.("focus", sharedFocusListener);
     }
     if (!modeChangeListener && composerPlacementModeSelectEl && typeof composerPlacementModeSelectEl.addEventListener === "function") {
       modeChangeListener = () => {
@@ -1155,6 +1191,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     commandInput?.removeEventListener?.("input", sharedInputListener);
     commandInput?.removeEventListener?.("change", sharedChangeListener);
     commandInput?.removeEventListener?.("blur", sharedBlurListener);
+    commandInput?.removeEventListener?.("focus", sharedFocusListener);
     composerPlacementModeSelectEl?.removeEventListener?.("change", modeChangeListener);
     for (const sessionId of Array.from(pinnedSurfaces.keys())) {
       disposePinnedSurface(sessionId);

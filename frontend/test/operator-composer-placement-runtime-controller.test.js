@@ -477,3 +477,40 @@ test("operator composer placement controller ignores stale shared-draft echoes w
   assert.equal(controller.getState().sharedDraft, "client-new");
   controller.dispose();
 });
+
+test("operator composer placement controller does not rewrite the focused shared footer input from server state", () => {
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const commandInput = new FakeElement("textarea");
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput,
+    terminals: new Map(),
+    getState: () => ({ sessions: [], activeSessionId: "" }),
+    getSessionById: () => null
+  });
+
+  controller.applyPlacementState(
+    createApiState({
+      sharedDraft: "before-focus"
+    })
+  );
+
+  commandInput.dispatch("focus");
+  controller.applyPlacementState(
+    createApiState({
+      sharedDraft: "server-overwrite"
+    })
+  );
+
+  assert.equal(commandInput.value, "before-focus");
+  assert.equal(controller.getState().sharedDraft, "server-overwrite");
+  controller.dispose();
+});
