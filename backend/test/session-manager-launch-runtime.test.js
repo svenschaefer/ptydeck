@@ -141,6 +141,19 @@ test("session-manager launch runtime fails closed for degraded and offline recon
   assert.equal(offlineError.statusCode, 409);
   assert.equal(offlineError.error, "RemoteSessionOffline");
   assert.match(offlineError.message, /offline/);
+
+  const stoppedError = runtime.buildReconnectUnavailableError({
+    id: "session-3",
+    meta: {
+      state: "stopped",
+      remoteRuntime: {
+        connectivityState: "offline"
+      }
+    }
+  });
+  assert.equal(stoppedError.statusCode, 409);
+  assert.equal(stoppedError.error, "SessionStopped");
+  assert.match(stoppedError.message, /Start it before sending input/i);
 });
 
 test("session-manager launch runtime updates ssh remote availability state deterministically", () => {
@@ -558,4 +571,27 @@ test("session-manager launch runtime schedules ssh reconnects on unexpected tran
     state: "exited"
   });
   assert.equal(sessions.has(localSession.id), false);
+});
+
+test("session-manager launch runtime ignores intentional stopped exits", () => {
+  const { runtime, sessions, sessionExits } = createLaunchRuntimeHarness();
+  const stoppedSession = {
+    id: "session-stopped",
+    ptyProcess: null,
+    expectedExitReason: "stopped",
+    meta: {
+      id: "session-stopped",
+      kind: "local",
+      state: "stopped",
+      updatedAt: 1700000000000
+    }
+  };
+  sessions.set(stoppedSession.id, stoppedSession);
+
+  runtime.handlePtyExit(stoppedSession, { exitCode: 0, signal: "" });
+
+  assert.equal(stoppedSession.expectedExitReason, "");
+  assert.deepEqual(sessionExits, []);
+  assert.equal(stoppedSession.meta.state, "stopped");
+  assert.equal(sessions.has(stoppedSession.id), true);
 });

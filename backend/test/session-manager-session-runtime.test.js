@@ -21,6 +21,7 @@ function createHarness(overrides = {}) {
   const armed = [];
   const started = [];
   const createdEvents = [];
+  const sessionUpdates = [];
   const closedEvents = [];
   const traceUpdates = [];
   const runtime = createSessionManagerSessionRuntime({
@@ -85,6 +86,9 @@ function createHarness(overrides = {}) {
     emitSessionCreated(event) {
       createdEvents.push(event);
     },
+    emitSessionUpdated(session, options) {
+      sessionUpdates.push({ sessionId: session.id, state: session.meta.state, options });
+    },
     emitSessionClosed(event) {
       closedEvents.push(event);
     },
@@ -114,6 +118,7 @@ function createHarness(overrides = {}) {
     armed,
     started,
     createdEvents,
+    sessionUpdates,
     closedEvents,
     traceUpdates,
     setNow(value) {
@@ -224,4 +229,42 @@ test("session-manager session runtime enforces concurrency and closes idle and o
   harness.runtime.enforceGuardrails(5300);
   assert.equal(harness.sessions.has(second.id), false);
   assert.equal(harness.closedEvents.at(-1).reason, "max-lifetime");
+});
+
+test("session-manager session runtime stops and restarts sessions while preserving identity", () => {
+  const harness = createHarness();
+
+  harness.runtime.createSession({
+    id: "session-stop",
+    cwd: "/tmp/work",
+    shell: "bash",
+    name: "ops-shell",
+    quickIdToken: "A7",
+    trace: { requestId: "req-start" }
+  });
+
+  const firstRecord = harness.sessions.get("session-stop");
+  const firstPty = firstRecord.ptyProcess;
+
+  const stopped = harness.runtime.stopSession("session-stop", {
+    trace: { requestId: "req-stop", source: "rest" }
+  });
+
+  assert.equal(firstPty.killed, true);
+  assert.equal(stopped.id, "session-stop");
+  assert.equal(stopped.state, "stopped");
+  assert.equal(harness.sessions.get("session-stop").ptyProcess, null);
+  assert.equal(harness.sessions.get("session-stop").meta.state, "stopped");
+  assert.equal(harness.sessionUpdates.at(-1).state, "stopped");
+
+  const restarted = harness.runtime.startSession("session-stop", {
+    trace: { requestId: "req-restart", source: "rest" }
+  });
+
+  assert.equal(restarted.id, "session-stop");
+  assert.equal(restarted.state, "running");
+  assert.equal(harness.sessions.get("session-stop").meta.state, "running");
+  assert.equal(harness.sessions.get("session-stop").ptyProcess.killed, false);
+  assert.equal(harness.attached.length, 2);
+  assert.equal(harness.started.length, 2);
 });

@@ -365,6 +365,22 @@
 
 <p>Operation ID: <code>restartSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Session restarted; <code>404</code> Session not found; <code>426</code> TLS required</p>
 
+<h3 id="sessions-sessionid-start"><code>/sessions/{sessionId}/start</code></h3>
+
+<ul>
+<li><strong>POST</strong> Start a stopped session and launch its PTY process again.</li>
+</ul>
+
+<p>Operation ID: <code>startSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Session started; <code>404</code> Session not found; <code>409</code> Session cannot be started in its current state; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-stop"><code>/sessions/{sessionId}/stop</code></h3>
+
+<ul>
+<li><strong>POST</strong> Stop a running session while preserving the session card and persisted startup configuration.</li>
+</ul>
+
+<p>Operation ID: <code>stopSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Session stopped; <code>404</code> Session not found; <code>409</code> Session cannot be stopped in its current state; <code>426</code> TLS required</p>
+
 <h3 id="sessions-sessionid-swap-quick-id"><code>/sessions/{sessionId}/swap-quick-id</code></h3>
 
 <ul>
@@ -521,6 +537,8 @@
 <li><a class="handbook-page-toc-link" href="#sessions-sessionid-replay-export">`/sessions/{sessionId}/replay-export`</a></li>
 <li><a class="handbook-page-toc-link" href="#sessions-sessionid-resize">`/sessions/{sessionId}/resize`</a></li>
 <li><a class="handbook-page-toc-link" href="#sessions-sessionid-restart">`/sessions/{sessionId}/restart`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-start">`/sessions/{sessionId}/start`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-stop">`/sessions/{sessionId}/stop`</a></li>
 <li><a class="handbook-page-toc-link" href="#sessions-sessionid-swap-quick-id">`/sessions/{sessionId}/swap-quick-id`</a></li>
 <li><a class="handbook-page-toc-link" href="#sessions-sessionid-terminate">`/sessions/{sessionId}/terminate`</a></li>
 <li><a class="handbook-page-toc-link" href="#shares">Shares</a></li>

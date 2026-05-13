@@ -312,6 +312,14 @@ export function createSessionManagerRuntimeFacade(dependencies = {}) {
       return sessionRuntime.restartSession(sessionId, options);
     },
 
+    start(sessionId, options = {}) {
+      return sessionRuntime.startSession(sessionId, options);
+    },
+
+    stop(sessionId, options = {}) {
+      return sessionRuntime.stopSession(sessionId, options);
+    },
+
     closeWithReason(sessionId, reason, options = {}) {
       return sessionRuntime.closeSessionWithReason(sessionId, reason, options);
     },

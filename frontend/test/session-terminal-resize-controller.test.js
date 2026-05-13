@@ -167,6 +167,36 @@ test("session-terminal-resize controller clears pending resize timers for blocke
   assert.equal(terminalSizes.has("s1"), false);
 });
 
+test("session-terminal-resize controller clears pending resize timers for stopped sessions", () => {
+  const windowRef = createFakeWindow();
+  const resizeTimers = new Map([["s1", 77]]);
+  const terminalSizes = new Map();
+  const controller = createSessionTerminalResizeController({
+    windowRef,
+    terminals: new Map([
+      [
+        "s1",
+        {
+          mount: { clientWidth: 640, clientHeight: 320, style: {} },
+          element: { style: {} },
+          terminal: { resize() {} }
+        }
+      ]
+    ]),
+    resizeTimers,
+    terminalSizes,
+    getSessionById: (sessionId) => ({ id: sessionId, state: "stopped" }),
+    isSessionActionBlocked: () => false,
+    isSessionStopped: (session) => session?.state === "stopped"
+  });
+
+  controller.applyResizeForSession("s1");
+
+  assert.deepEqual(windowRef.cleared, [77]);
+  assert.equal(resizeTimers.has("s1"), false);
+  assert.equal(terminalSizes.has("s1"), false);
+});
+
 test("session-terminal-resize controller offers reclaim UI instead of remote resize when this client is not writable", () => {
   const windowRef = createFakeWindow();
   const reclaimCalls = [];

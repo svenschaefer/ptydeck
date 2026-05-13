@@ -10,6 +10,7 @@ function normalizeRawSessionState(value) {
     state === "running" ||
     state === "busy" ||
     state === "idle" ||
+    state === "stopped" ||
     state === "unrestored" ||
     state === "exited" ||
     state === "closed"
@@ -33,7 +34,12 @@ export function normalizeSessionActivityState(value) {
 
 export function deriveSessionLifecycleState(rawState, session) {
   const normalizedRawState = normalizeRawSessionState(rawState || session?.state);
-  if (normalizedRawState === "unrestored" || normalizedRawState === "exited" || normalizedRawState === "closed") {
+  if (
+    normalizedRawState === "stopped" ||
+    normalizedRawState === "unrestored" ||
+    normalizedRawState === "exited" ||
+    normalizedRawState === "closed"
+  ) {
     return normalizedRawState;
   }
   if (normalizedRawState === "created" || normalizedRawState === "starting") {

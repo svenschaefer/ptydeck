@@ -603,3 +603,23 @@ test("session quick-send controller reports blocked write targets and missing cl
     ["clipboard-missing-session", "Clipboard send target is unavailable."]
   ]);
 });
+
+test("session quick-send controller blocks stopped session targets explicitly", async () => {
+  const sessions = [{ id: "s1", name: "Alpha", state: "stopped", deckId: "default", quickSendUsage: [] }];
+  const errors = [];
+  const controller = createSessionQuickSendRuntimeController({
+    documentRef: createDocumentRef(),
+    listCustomCommands: () => [{ name: "deploy", scope: "project", content: "echo deploy" }],
+    getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
+    isSessionStopped: (session) => session?.state === "stopped",
+    getBlockedSessionActionMessage: (blockedSessions, actionLabel) => `${actionLabel} blocked for ${blockedSessions[0].state}.`,
+    setError: (message) => errors.push(message)
+  });
+
+  assert.deepEqual(await controller.sendCustomCommand("s1", "project::deploy"), {
+    ok: false,
+    status: "blocked",
+    feedback: "Quick send blocked for stopped."
+  });
+  assert.deepEqual(errors, ["Quick send blocked for stopped."]);
+});

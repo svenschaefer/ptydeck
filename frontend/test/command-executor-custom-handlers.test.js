@@ -25,6 +25,7 @@ function createHandlers(overrides = {}) {
         }))
       })),
     isSessionActionBlocked: overrides.isSessionActionBlocked || (() => false),
+    isSessionStopped: overrides.isSessionStopped || (() => false),
     getBlockedSessionActionMessage:
       overrides.getBlockedSessionActionMessage ||
       ((sessions, actionLabel) => `${actionLabel} blocked: ${sessions.map((session) => session.id).join(",")}`),
@@ -214,4 +215,23 @@ test("custom command handlers route multiline shell payloads through configured 
   });
 
   assert.deepEqual(calls, [["send", "s1", "echo first\necho second", "CRLF", "configured"]]);
+});
+
+test("custom command handlers block stopped targets explicitly", async () => {
+  const handlers = createHandlers({
+    isSessionStopped: (session) => session?.state === "stopped",
+    getBlockedSessionActionMessage: (blockedSessions, actionLabel) => `${actionLabel} blocked: ${blockedSessions[0].state}`
+  });
+
+  assert.equal(
+    await handlers.executeCustomCommand({
+      commandRaw: "deploy",
+      interpreted: { raw: "/deploy" },
+      sessions: [{ id: "s1", name: "one", state: "stopped" }],
+      decks: [],
+      activeSessionId: "s1",
+      allCustomCommands: [{ name: "deploy", content: "echo hi", kind: "plain", scope: "project" }]
+    }),
+    "Custom command execution blocked: stopped"
+  );
 });

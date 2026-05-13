@@ -1,7 +1,9 @@
 import { ApiError } from "./errors.js";
+import { remoteAuthRequiresSecret } from "./session-launch-spec.js";
 import { buildRestartSessionCreatePayload, buildSessionRecord } from "./session-manager-lifecycle.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
+const SESSION_STATE_STOPPED = "stopped";
 
 export function createSessionManagerSessionRuntime(dependencies = {}) {
   const sessions = dependencies.sessions instanceof Map ? dependencies.sessions : new Map();
@@ -41,6 +43,8 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
   const createTraceEnvelope = typeof dependencies.createTraceEnvelope === "function" ? dependencies.createTraceEnvelope : () => ({});
   const updateSessionTraceSeed =
     typeof dependencies.updateSessionTraceSeed === "function" ? dependencies.updateSessionTraceSeed : () => null;
+  const emitSessionUpdated =
+    typeof dependencies.emitSessionUpdated === "function" ? dependencies.emitSessionUpdated : () => null;
   const transitionToRunning = typeof dependencies.transitionToRunning === "function" ? dependencies.transitionToRunning : () => null;
   const attachPtyProcess = typeof dependencies.attachPtyProcess === "function" ? dependencies.attachPtyProcess : () => {};
   const armLaunchPostStartInput =
@@ -92,8 +96,10 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
     inactiveThemeProfile,
     createdAt,
     updatedAt,
-    trace
+    trace,
+    initialState = undefined
   } = {}) {
+    const normalizedInitialState = initialState === SESSION_STATE_STOPPED ? SESSION_STATE_STOPPED : undefined;
     if (sessionMaxConcurrent > 0 && sessions.size >= sessionMaxConcurrent) {
       throw new ApiError(
         409,
@@ -129,7 +135,8 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
         inactiveThemeProfile,
         createdAt,
         updatedAt,
-        traceSeed: normalizeTraceSeed(trace)
+        traceSeed: normalizeTraceSeed(trace),
+        initialState: normalizedInitialState
       },
       {
         defaultShell,
@@ -143,16 +150,144 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
     );
 
     sessions.set(session.id, session);
-    attachPtyProcess(session, launchBundle);
     const createdTrace = createTraceEnvelope(session.traceSeed, {
       sessionId: session.id,
       source: session.traceSeed?.source || "rest"
     });
     updateSessionTraceSeed(session, createdTrace, { source: session.traceSeed?.source || "rest" });
     emitSessionCreated({ session: session.meta, trace: createdTrace });
-    transitionToRunning(session);
-    armLaunchPostStartInput(session, launchBundle.launchSpec, { trace: createdTrace });
+    if (launchBundle) {
+      attachPtyProcess(session, launchBundle);
+      transitionToRunning(session);
+      armLaunchPostStartInput(session, launchBundle.launchSpec, { trace: createdTrace });
+    }
     return session.meta;
+  }
+
+  function buildExistingSessionCreatePayload(session, { trace = null, updatedAt = nowFn(), initialState = undefined } = {}) {
+    return {
+      id: session.id,
+      quickIdToken: session.meta.quickIdToken,
+      kind: session.meta.kind,
+      remoteConnection: session.meta.remoteConnection,
+      remoteAuth: session.meta.remoteAuth,
+      remoteSecret: session.remoteSecret,
+      cwd: session.meta.startCwd || session.meta.cwd,
+      shell: session.meta.shell,
+      name: session.meta.name,
+      deckId: session.meta.deckId,
+      startCwd: session.meta.startCwd || session.meta.cwd,
+      startCommand: session.meta.startCommand || "",
+      env: session.meta.env || {},
+      replayOutput: "",
+      replayOutputTruncated: false,
+      note: session.meta.note,
+      mouseForwardingMode: session.meta.mouseForwardingMode,
+      inputSafetyProfile: session.meta.inputSafetyProfile,
+      tags: session.meta.tags || [],
+      quickSendUsage: session.meta.quickSendUsage || [],
+      themeProfile: session.meta.themeProfile || {},
+      activeThemeProfile: session.meta.activeThemeProfile,
+      inactiveThemeProfile: session.meta.inactiveThemeProfile,
+      createdAt: session.meta.createdAt,
+      updatedAt,
+      trace,
+      initialState
+    };
+  }
+
+  function stopSession(sessionId, options = {}) {
+    const session = getSessionOrThrow(sessionId);
+    if (session.meta.state === SESSION_STATE_STOPPED) {
+      throw new ApiError(409, "SessionAlreadyStopped", `Session '${sessionId}' is already stopped.`);
+    }
+    const trace = normalizeTraceSeed(options.trace);
+    const updatedAt = nowFn();
+    updateSessionTraceSeed(session, trace, {
+      sessionId,
+      source: options.trace?.source || "rest"
+    });
+    const { session: stoppedSession } = buildSessionRecord(
+      buildExistingSessionCreatePayload(session, {
+        trace: session.traceSeed,
+        updatedAt,
+        initialState: SESSION_STATE_STOPPED
+      }),
+      {
+        defaultShell,
+        buildLaunchBundle,
+        createInitialIdentityRuntime,
+        remoteReconnectMaxAttempts,
+        remoteReconnectDelayMs,
+        sessionReplayMemoryMaxChars,
+        nowFn
+      }
+    );
+    clearSessionActivityTimer(session);
+    clearLaunchPostStartInputTimer(session);
+    clearForegroundProcessRefreshTimer(session);
+    clearRemoteReconnectTimers(session);
+    clearExpectedExitReason(session);
+    session.expectedExitReason = "stopped";
+    sessions.set(sessionId, stoppedSession);
+    if (session.ptyProcess) {
+      const ptyProcess = session.ptyProcess;
+      session.ptyProcess = null;
+      ptyProcess.kill();
+    }
+    updateSessionTraceSeed(stoppedSession, trace, {
+      sessionId,
+      source: options.trace?.source || "rest"
+    });
+    emitSessionUpdated(stoppedSession, {
+      trace,
+      updatedAt
+    });
+    return stoppedSession.meta;
+  }
+
+  function startSession(sessionId, options = {}) {
+    const session = getSessionOrThrow(sessionId);
+    if (session.meta.state !== SESSION_STATE_STOPPED) {
+      throw new ApiError(409, "SessionAlreadyRunning", `Session '${sessionId}' is already running.`);
+    }
+    if (remoteAuthRequiresSecret(session.meta.remoteAuth) && !session.remoteSecret) {
+      throw new ApiError(
+        409,
+        "SessionStartSecretRequired",
+        "This stopped ssh session requires a secret that is no longer available after restore. Update the session and provide the secret again before starting it."
+      );
+    }
+    const trace = normalizeTraceSeed(options.trace);
+    const updatedAt = nowFn();
+    const { session: startedSession, launchBundle } = buildSessionRecord(
+      buildExistingSessionCreatePayload(session, {
+        trace,
+        updatedAt
+      }),
+      {
+        defaultShell,
+        buildLaunchBundle,
+        createInitialIdentityRuntime,
+        remoteReconnectMaxAttempts,
+        remoteReconnectDelayMs,
+        sessionReplayMemoryMaxChars,
+        nowFn
+      }
+    );
+    sessions.set(sessionId, startedSession);
+    attachPtyProcess(startedSession, launchBundle);
+    const startTrace = createTraceEnvelope(startedSession.traceSeed, {
+      sessionId,
+      source: startedSession.traceSeed?.source || "rest"
+    });
+    updateSessionTraceSeed(startedSession, startTrace, {
+      sessionId,
+      source: startedSession.traceSeed?.source || "rest"
+    });
+    transitionToRunning(startedSession);
+    armLaunchPostStartInput(startedSession, launchBundle.launchSpec, { trace: startTrace });
+    return startedSession.meta;
   }
 
   function closeSessionWithReason(sessionId, reason, options = {}) {
@@ -204,6 +339,9 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
 
     const toClose = [];
     for (const session of sessions.values()) {
+      if (session.meta.state === SESSION_STATE_STOPPED || !session.ptyProcess || session.expectedExitReason === "stopped") {
+        continue;
+      }
       if (
         sessionIdleTimeoutMs > 0 &&
         Number.isInteger(session.lastActivityAt) &&
@@ -233,6 +371,8 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
     createSession,
     enforceGuardrails,
     getSessionOrThrow,
-    restartSession
+    restartSession,
+    startSession,
+    stopSession
   };
 }

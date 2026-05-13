@@ -290,6 +290,8 @@ export function createRuntimeStartupRestore(dependencies = {}) {
               : defaultShell;
         const restoredCreatedAt = Number.isInteger(session.createdAt) ? session.createdAt : nowFn();
         const restoredUpdatedAt = Number.isInteger(session.updatedAt) ? session.updatedAt : restoredCreatedAt;
+        const persistedSessionState =
+          typeof session.state === "string" && session.state.trim() ? session.state.trim().toLowerCase() : "";
         const normalizedUnrestoredSession = {
           id: typeof session.id === "string" && session.id ? session.id : "",
           kind,
@@ -326,6 +328,40 @@ export function createRuntimeStartupRestore(dependencies = {}) {
           createdAt: restoredCreatedAt,
           updatedAt: restoredUpdatedAt
         };
+        if (persistedSessionState === "stopped") {
+          tryCreateRestoredSession({
+            session,
+            kind,
+            remoteConnection,
+            remoteAuth,
+            shell: requestedShell,
+            cwd:
+              typeof session.cwd === "string" && session.cwd.trim()
+                ? session.cwd
+                : startupConfig.startCwd,
+            startCwd: startupConfig.startCwd,
+            startCommand: startupConfig.startCommand,
+            replayOutput: "",
+            replayOutputTruncated: false,
+            remoteSecret: undefined,
+            env: startupConfig.env,
+            quickIdToken,
+            note,
+            mouseForwardingMode,
+            inputSafetyProfile,
+            tags,
+            quickSendUsage,
+            themeProfile: themeSlots.themeProfile,
+            activeThemeProfile: themeSlots.activeThemeProfile,
+            inactiveThemeProfile: themeSlots.inactiveThemeProfile,
+            initialState: "stopped"
+          });
+          unrestoredSessions.delete(normalizedUnrestoredSession.id);
+          logDebug("runtime.restore.session_restored_stopped", {
+            sessionId: normalizedUnrestoredSession.id
+          });
+          continue;
+        }
         const requestedCwd = startupConfig.startCwd;
         const fallbackCwd = kind === sessionKindSsh ? "~" : homedir();
         const fallbackShell = kind === sessionKindSsh ? defaultSshClient : defaultShell;

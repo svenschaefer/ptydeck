@@ -35,6 +35,7 @@ export function createSessionViewModel(options = {}) {
       lifecycleState === "running" ||
       lifecycleState === "busy" ||
       lifecycleState === "idle" ||
+      lifecycleState === "stopped" ||
       lifecycleState === "unrestored" ||
       lifecycleState === "exited" ||
       lifecycleState === "closed"
@@ -48,6 +49,7 @@ export function createSessionViewModel(options = {}) {
       state === "running" ||
       state === "busy" ||
       state === "idle" ||
+      state === "stopped" ||
       state === "unrestored" ||
       state === "exited" ||
       state === "closed"
@@ -65,6 +67,10 @@ export function createSessionViewModel(options = {}) {
     return getSessionRuntimeState(session) === "exited";
   }
 
+  function isSessionStopped(session) {
+    return getSessionRuntimeState(session) === "stopped";
+  }
+
   function isSessionActionBlocked(session) {
     return isSessionUnrestored(session) || isSessionExited(session);
   }
@@ -75,6 +81,9 @@ export function createSessionViewModel(options = {}) {
     }
     if (isSessionUnrestored(session)) {
       return "UNRESTORED";
+    }
+    if (isSessionStopped(session)) {
+      return "STOPPED";
     }
     if (isSessionExited(session)) {
       return "EXITED";
@@ -119,6 +128,9 @@ export function createSessionViewModel(options = {}) {
     if (isSessionUnrestored(session)) {
       return "Session could not be restored after backend restart. Update settings or delete this session.";
     }
+    if (isSessionStopped(session)) {
+      return "Session is stopped. Start it to launch the terminal again. The reserved terminal space stays visible while stopped.";
+    }
     if (isSessionExited(session)) {
       return `Session process exited${getExitedSessionStatusSuffix(session)}. Rename, restart, input, resize, and settings changes are disabled. Delete this session to remove the card.`;
     }
@@ -133,6 +145,11 @@ export function createSessionViewModel(options = {}) {
   function getExitedSessionMessage(session) {
     const label = `[${formatSessionToken(session.id)}] ${displayName(session)}`;
     return `Session ${label} has exited${getExitedSessionStatusSuffix(session)}. Rename, restart, input, resize, and settings changes are disabled. Delete this session to remove the card.`;
+  }
+
+  function getStoppedSessionMessage(session) {
+    const label = `[${formatSessionToken(session.id)}] ${displayName(session)}`;
+    return `Session ${label} is stopped. Start it before sending input or resizing it.`;
   }
 
   function getBlockedSessionActionMessage(sessions, actionLabel) {
@@ -278,6 +295,7 @@ export function createSessionViewModel(options = {}) {
     getSessionRuntimeState,
     isSessionUnrestored,
     isSessionExited,
+    isSessionStopped,
     isSessionActionBlocked,
     hasSessionLiveActivity,
     hasSessionUnreadActivity,
@@ -287,6 +305,7 @@ export function createSessionViewModel(options = {}) {
     getSessionStateHintText,
     getUnrestoredSessionMessage,
     getExitedSessionMessage,
+    getStoppedSessionMessage,
     getBlockedSessionActionMessage,
     formatSessionEnv,
     normalizeSessionTags,

@@ -816,6 +816,30 @@ test("api client calls restart session endpoint", async () => {
   assert.equal(calls[0].options.headers["content-type"], "application/json");
 });
 
+test("api client calls start and stop session endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "abc", state: "running", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 3 })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.startSession("abc");
+  await api.stopSession("abc");
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/start");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/sessions/abc/stop");
+  for (const call of calls) {
+    assert.equal(call.options.method, "POST");
+    assert.equal(call.options.headers["content-type"], "application/json");
+  }
+});
+
 test("api client calls session signal control endpoints", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

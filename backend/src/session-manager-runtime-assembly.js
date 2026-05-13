@@ -202,6 +202,7 @@ export function createSessionManagerRuntimeAssembly(dependencies = {}) {
     clearForegroundProcessRefreshTimer,
     clearRemoteReconnectTimers,
     clearExpectedExitReason,
+    emitSessionUpdated,
     emitSessionCreated: (event) => emitEvent("session.created", event),
     emitSessionClosed: (event) => emitEvent("session.closed", event)
   });

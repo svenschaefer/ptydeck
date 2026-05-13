@@ -1303,7 +1303,11 @@ function isSession(value) {
     typeof value.id === "string" &&
     typeof value.deckId === "string" &&
     typeof value.quickIdToken === "string" &&
-    (value.state === "starting" || value.state === "running" || value.state === "unrestored") &&
+    (value.state === "starting" ||
+      value.state === "running" ||
+      value.state === "unrestored" ||
+      value.state === "stopped" ||
+      value.state === "exited") &&
     SESSION_KIND_VALUES.has(value.kind) &&
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&
@@ -1446,6 +1450,7 @@ function isSessionReplayExport(value) {
     (
       value.sessionState === "starting" ||
       value.sessionState === "running" ||
+      value.sessionState === "stopped" ||
       value.sessionState === "exited" ||
       value.sessionState === "unrestored"
     ) &&
@@ -1469,6 +1474,7 @@ function isSessionReplayExcerpt(value) {
     (
       value.sessionState === "starting" ||
       value.sessionState === "running" ||
+      value.sessionState === "stopped" ||
       value.sessionState === "exited" ||
       value.sessionState === "unrestored"
     ) &&

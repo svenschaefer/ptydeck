@@ -1467,6 +1467,60 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/start:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: startSession
+      summary: Start a stopped session and launch its PTY process again.
+      responses:
+        '200':
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Session cannot be started in its current state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/stop:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: stopSession
+      summary: Stop a running session while preserving the session card and persisted startup configuration.
+      responses:
+        '200':
+          description: Session stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Session cannot be stopped in its current state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions/{sessionId}/interrupt:
     parameters:
       - $ref: '#/components/parameters/sessionId'
@@ -2053,6 +2107,8 @@ components:
             - starting
             - running
             - unrestored
+            - stopped
+            - exited
         activityState:
           type: string
           enum:
@@ -2298,6 +2354,7 @@ components:
           enum:
             - starting
             - running
+            - stopped
             - exited
             - unrestored
         scope:
@@ -2351,6 +2408,7 @@ components:
           enum:
             - starting
             - running
+            - stopped
             - exited
             - unrestored
         scope:

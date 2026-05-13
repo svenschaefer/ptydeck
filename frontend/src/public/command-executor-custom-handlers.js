@@ -15,6 +15,7 @@ export function createCommandExecutorCustomHandlers(options = {}) {
       ? options.renderCustomCommandForTargets
       : () => ({ error: "Custom command rendering unavailable.", entries: [] });
   const isSessionActionBlocked = typeof options.isSessionActionBlocked === "function" ? options.isSessionActionBlocked : () => false;
+  const isSessionStopped = typeof options.isSessionStopped === "function" ? options.isSessionStopped : () => false;
   const getBlockedSessionActionMessage =
     typeof options.getBlockedSessionActionMessage === "function"
       ? options.getBlockedSessionActionMessage
@@ -77,7 +78,7 @@ export function createCommandExecutorCustomHandlers(options = {}) {
     }
 
     const targetSessions = targetResolution.sessions;
-    const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
+    const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session) || isSessionStopped(session));
     if (blockedSessions.length > 0) {
       return getBlockedSessionActionMessage(blockedSessions, "Custom command execution");
     }

@@ -30,6 +30,8 @@ export function createRuntimeEventController(options = {}) {
   const getUnrestoredSessionMessage = options.getUnrestoredSessionMessage || (() => "");
   const isSessionExited = options.isSessionExited || (() => false);
   const getExitedSessionMessage = options.getExitedSessionMessage || (() => "");
+  const isSessionStopped = options.isSessionStopped || (() => false);
+  const getStoppedSessionMessage = options.getStoppedSessionMessage || (() => "");
   const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
   const getSessionWriteBlockedMessage =
     typeof options.getSessionWriteBlockedMessage === "function"
@@ -93,6 +95,10 @@ export function createRuntimeEventController(options = {}) {
     }
     if (isSessionExited(latestSession)) {
       setError(getExitedSessionMessage(latestSession));
+      return;
+    }
+    if (isSessionStopped(latestSession)) {
+      setError(getStoppedSessionMessage(latestSession));
       return;
     }
     if (!canWriteToSession(latestSession)) {

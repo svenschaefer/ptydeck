@@ -2,6 +2,8 @@ export function createSessionCardRenderController(options = {}) {
   const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
+  const isSessionStopped = options.isSessionStopped || (() => false);
+  const getSessionRuntimeState = options.getSessionRuntimeState || ((session) => String(session?.state || "").trim().toLowerCase());
   const getSessionStateBadgeText = options.getSessionStateBadgeText || (() => "");
   const getSessionStateHintText = options.getSessionStateHintText || (() => "");
   const isTerminalAtBottom = options.isTerminalAtBottom || (() => true);
@@ -61,6 +63,7 @@ export function createSessionCardRenderController(options = {}) {
 
     entry.element.classList.toggle("active", activeSessionId === session.id);
     entry.element.classList.toggle("unrestored", isSessionUnrestored(session));
+    entry.element.classList.toggle("stopped", isSessionStopped(session));
     entry.element.classList.toggle("exited", isSessionExited(session));
     applyThemeForSession(session.id, { active: activeSessionId === session.id });
     if (wasVisible && !nextVisible) {
@@ -90,6 +93,26 @@ export function createSessionCardRenderController(options = {}) {
     renderSessionNote(entry, session);
     renderSessionQuickSend(entry, session);
     renderSessionControl(entry, session);
+
+    if (entry.startStopBtn) {
+      const runtimeState = getSessionRuntimeState(session);
+      const sessionStopped = isSessionStopped(session);
+      const interactiveToggleState =
+        runtimeState === "created" ||
+        runtimeState === "starting" ||
+        runtimeState === "running" ||
+        runtimeState === "busy" ||
+        runtimeState === "idle" ||
+        sessionStopped;
+      const startMode = sessionStopped;
+      entry.startStopBtn.disabled = readOnlyMode || !interactiveToggleState;
+      entry.startStopBtn.setAttribute("aria-label", startMode ? "Start session" : "Stop session");
+      entry.startStopBtn.setAttribute("title", readOnlyMessage || (startMode ? "Start session" : "Stop session"));
+      if (entry.startStopIconEl) {
+        entry.startStopIconEl.classList.toggle("icon-tabler-player-play-filled", startMode);
+        entry.startStopIconEl.classList.toggle("icon-tabler-player-stop-filled", !startMode);
+      }
+    }
 
     for (const control of [entry.settingsBtn, entry.renameBtn, entry.closeBtn, entry.settingsApplyBtn]) {
       if (!control) {

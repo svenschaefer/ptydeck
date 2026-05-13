@@ -37,6 +37,8 @@ export function createRuntimeSessionDispatch(dependencies = {}) {
       sendInput: () => {},
       delete: () => {},
       restart: () => null,
+      start: () => null,
+      stop: () => null,
       interrupt: () => {},
       terminate: () => {},
       kill: () => {},
@@ -454,6 +456,34 @@ export function createRuntimeSessionDispatch(dependencies = {}) {
       const apiPayload = toApiSession(payload);
       validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
       await persistNow("session.restart");
+      writeJsonResponse(200, apiPayload);
+      return true;
+    }
+
+    if (match.kind === "start") {
+      const payload = manager.start(match.params.sessionId, {
+        trace: {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        }
+      });
+      const apiPayload = toApiSession(payload);
+      validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
+      await persistNow("session.start");
+      writeJsonResponse(200, apiPayload);
+      return true;
+    }
+
+    if (match.kind === "stop") {
+      const payload = manager.stop(match.params.sessionId, {
+        trace: {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        }
+      });
+      const apiPayload = toApiSession(payload);
+      validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
+      await persistNow("session.stop");
       writeJsonResponse(200, apiPayload);
       return true;
     }

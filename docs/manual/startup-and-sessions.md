@@ -39,7 +39,7 @@ The active deck owns the visible session set, filter, and deck-level terminal si
 
 Use `Terminal Size` and `Saved Layouts` in the sidebar for the same operations through the UI.
 
-## Restart or Rename Safely
+## Restart, Stop, or Rename Safely
 
 Use slash commands when you already know the session selector, or use the session card toolbar when you are working visually.
 
@@ -56,6 +56,23 @@ Not every session-bound command uses the same targeting shape:
 ```
 
 If the session has startup settings, restart uses the current persisted startup contract from the session settings dialog.
+
+Each session header now also exposes a start/stop toggle beside `Refresh` and `Settings`.
+
+- Running sessions show `Stop`.
+- Stopped sessions show `Start`.
+- Stopping a session keeps the session card and layout slot on screen, but clears the terminal viewport so the reserved area stays visually empty until you start it again.
+- The stopped/running state is server-persisted across backend restart and restore:
+  - stopped sessions stay stopped
+  - running sessions are started again during restore
+
+The stopped state is intentionally stronger than a local hide or pause:
+
+- direct terminal typing is blocked
+- composer sends and quick-send actions are blocked
+- the card remains visible so deck/layout structure does not collapse
+
+For secret-backed SSH sessions, ptydeck still does not persist the runtime secret itself. If you stop a password-based or keyboard-interactive SSH session and later start it again after the original secret is gone, the backend fails closed and requires a fresh authenticated launch instead of silently restoring with missing credentials.
 
 When you work from the session cards, hover the toolbar area to reveal quick actions for that specific session:
 

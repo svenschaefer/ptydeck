@@ -29,6 +29,7 @@ test("session quick-send overlay keeps a minimal heading and session target cont
 
 test("composer placement mode selector and per-session overlay anchors are present", () => {
   const indexHtml = fs.readFileSync(indexHtmlPath, "utf8");
+  assert.match(indexHtml, /class="session-start-stop"/);
   assert.match(indexHtml, /id="composer-placement-mode"/);
   assert.match(indexHtml, /<option value="shared-footer">Footer<\/option>/);
   assert.match(indexHtml, /<option value="active-overlay">Overlay<\/option>/);

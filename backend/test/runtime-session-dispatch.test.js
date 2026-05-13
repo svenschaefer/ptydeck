@@ -41,6 +41,8 @@ function createBaseDependencies(overrides = {}) {
       sendInput: () => {},
       delete: () => {},
       restart: (sessionId) => ({ id: sessionId, quickIdToken: "R1", deckId: "default", kind: "local" }),
+      start: (sessionId) => ({ id: sessionId, quickIdToken: "R1", deckId: "default", kind: "local", state: "running" }),
+      stop: (sessionId) => ({ id: sessionId, quickIdToken: "R1", deckId: "default", kind: "local", state: "stopped" }),
       interrupt: () => {},
       terminate: () => {},
       kill: () => {},
@@ -411,6 +413,67 @@ test("runtime session dispatch persists restart payloads through the extracted s
       api: true
     }
   }]);
+});
+
+test("runtime session dispatch persists start and stop payloads through the extracted seam", async () => {
+  const validateCalls = [];
+  const persistReasons = [];
+  const responseCalls = [];
+  const managerCalls = [];
+
+  const { dispatch } = createDispatchHarness({
+    validateResponse: (value) => validateCalls.push(value),
+    manager: {
+      start: (sessionId, options) => {
+        managerCalls.push(["start", sessionId, options]);
+        return { id: sessionId, quickIdToken: "Q1", deckId: "ops", kind: "local", state: "running" };
+      },
+      stop: (sessionId, options) => {
+        managerCalls.push(["stop", sessionId, options]);
+        return { id: sessionId, quickIdToken: "Q1", deckId: "ops", kind: "local", state: "stopped" };
+      }
+    },
+    toApiSession: (value) => ({ ...value, api: true }),
+    persistNow: async (reason) => persistReasons.push(reason)
+  });
+
+  const startHandled = await dispatch.dispatchSessionRequest({
+    match: { kind: "start", params: { sessionId: "session-7" } },
+    parsedUrl: new URL("http://127.0.0.1/api/v1/sessions/session-7/start"),
+    body: {},
+    auth: { subject: "operator-5" },
+    req: null,
+    requestContext: { clientIp: "127.0.0.1" },
+    requestTraceContext: { traceId: "trace-start" },
+    writeJsonResponse: (statusCode, body) => responseCalls.push({ statusCode, body })
+  });
+  const stopHandled = await dispatch.dispatchSessionRequest({
+    match: { kind: "stop", params: { sessionId: "session-7" } },
+    parsedUrl: new URL("http://127.0.0.1/api/v1/sessions/session-7/stop"),
+    body: {},
+    auth: { subject: "operator-5" },
+    req: null,
+    requestContext: { clientIp: "127.0.0.1" },
+    requestTraceContext: { traceId: "trace-stop" },
+    writeJsonResponse: (statusCode, body) => responseCalls.push({ statusCode, body })
+  });
+
+  assert.equal(startHandled, true);
+  assert.equal(stopHandled, true);
+  assert.deepEqual(
+    managerCalls.map(([action, sessionId]) => [action, sessionId]),
+    [
+      ["start", "session-7"],
+      ["stop", "session-7"]
+    ]
+  );
+  assert.deepEqual(persistReasons, ["session.start", "session.stop"]);
+  assert.deepEqual(validateCalls, [
+    { statusCode: 200, body: responseCalls[0].body, expect: "session" },
+    { statusCode: 200, body: responseCalls[1].body, expect: "session" }
+  ]);
+  assert.equal(responseCalls[0].body.state, "running");
+  assert.equal(responseCalls[1].body.state, "stopped");
 });
 
 test("runtime session dispatch surfaces session-creation rate limit errors deterministically", async () => {

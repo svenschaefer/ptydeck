@@ -31,6 +31,14 @@ test("session runtime helpers produce exited messaging", () => {
   assert.match(model.getExitedSessionMessage(session), /exit code 2/);
 });
 
+test("session runtime helpers expose stopped lifecycle messaging", () => {
+  const session = { id: "abcd1234", name: "build", state: "stopped" };
+  assert.equal(model.isSessionStopped(session), true);
+  assert.equal(model.getSessionStateBadgeText(session), "STOPPED");
+  assert.match(model.getSessionStateHintText(session), /Start it to launch the terminal again/i);
+  assert.match(model.getStoppedSessionMessage(session), /is stopped/i);
+});
+
 test("session runtime helpers prefer formal lifecycle state and expose starting badge", () => {
   const startingSession = { id: "abcd1234", name: "build", state: "running", lifecycleState: "starting" };
   const busySession = { id: "efgh5678", name: "ops", state: "running", lifecycleState: "busy" };

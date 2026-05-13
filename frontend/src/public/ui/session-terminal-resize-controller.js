@@ -8,6 +8,7 @@ export function createSessionTerminalResizeController(options = {}) {
   const resolveSessionDeckId = options.resolveSessionDeckId || (() => "");
   const getSessionTerminalGeometry = options.getSessionTerminalGeometry || (() => ({ cols: 80, rows: 24 }));
   const isSessionActionBlocked = options.isSessionActionBlocked || (() => false);
+  const isSessionStopped = options.isSessionStopped || (() => false);
   const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
   const showBlockedWriteReclaimUi =
     typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
@@ -82,7 +83,7 @@ export function createSessionTerminalResizeController(options = {}) {
       return;
     }
     const session = getSessionById(sessionId);
-    if (isSessionActionBlocked(session)) {
+    if (isSessionActionBlocked(session) || isSessionStopped(session)) {
       const pendingTimer = resizeTimers.get(sessionId);
       if (pendingTimer) {
         clearTimer(pendingTimer);

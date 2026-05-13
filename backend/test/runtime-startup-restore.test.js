@@ -152,6 +152,7 @@ function createHarness(overrides = {}) {
         shell: payload.shell,
         cwd: payload.cwd,
         startCwd: payload.startCwd,
+        initialState: payload.initialState,
         replayOutput: payload.replayOutput,
         replayOutputTruncated: payload.replayOutputTruncated === true
       });
@@ -452,4 +453,42 @@ test("runtime startup restore fails closed for secret-backed and unrecoverable s
   assert.equal(harness.consoleErrors[0][1], "local-fail");
   assert.equal(harness.sessionDeckAssignments.get("ssh-secret"), "default");
   assert.equal(harness.sessionQuickIdAssignments.get("local-ok"), "O1");
+});
+
+test("runtime startup restore recreates persisted stopped sessions without launching them", async () => {
+  const harness = createHarness({
+    persistedState: {
+      sessions: [
+        {
+          id: "stopped-1",
+          deckId: "default",
+          kind: "ssh",
+          state: "stopped",
+          cwd: "/srv/app",
+          startCwd: "/srv/app",
+          shell: "ssh",
+          quickIdToken: "S1",
+          remoteConnection: { host: "example.internal", port: 22, username: "ops" },
+          remoteAuth: { method: "password" },
+          createdAt: 10,
+          updatedAt: 20
+        }
+      ]
+    }
+  });
+
+  await harness.startupRestore.restorePersistedRuntimeState();
+
+  assert.equal(harness.restoreAttempts.length, 1);
+  assert.deepEqual(harness.restoreAttempts[0], {
+    sessionId: "stopped-1",
+    shell: "ssh",
+    cwd: "/srv/app",
+    startCwd: "/srv/app",
+    initialState: "stopped",
+    replayOutput: "",
+    replayOutputTruncated: false
+  });
+  assert.equal(harness.unrestoredSessions.has("stopped-1"), false);
+  assert.equal(harness.sessionQuickIdAssignments.get("stopped-1"), "S1");
 });

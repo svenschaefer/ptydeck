@@ -2066,6 +2066,27 @@ button:hover {
   opacity: 0.8;
 }
 
+.terminal-card.stopped {
+  border-color: #4d6a52;
+}
+
+.terminal-card.stopped .terminal-mount {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.terminal-card.stopped .session-state-badge {
+  border-color: #40624a;
+  color: #b9e6c1;
+  background: #17241b;
+}
+
+.terminal-card.stopped .session-unrestored-hint {
+  border-bottom-color: #304636;
+  background: #111914;
+  color: #bbd8c1;
+}
+
 .terminal-card.exited {
   border-color: #6b3f7f;
 }

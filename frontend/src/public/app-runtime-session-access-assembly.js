@@ -118,6 +118,8 @@ export function createAppRuntimeSessionAccessAssembly(options = {}) {
         : () => {};
   const isSessionActionBlocked =
     typeof options.isSessionActionBlocked === "function" ? options.isSessionActionBlocked : () => false;
+  const isSessionStopped =
+    typeof options.isSessionStopped === "function" ? options.isSessionStopped : () => false;
   const getBlockedSessionActionMessage =
     typeof options.getBlockedSessionActionMessage === "function"
       ? options.getBlockedSessionActionMessage
@@ -179,6 +181,7 @@ export function createAppRuntimeSessionAccessAssembly(options = {}) {
     recordCommandSubmission,
     canWriteToSession,
     isSessionActionBlocked,
+    isSessionStopped,
     getBlockedSessionActionMessage,
     isReadOnlyMode,
     getReadOnlyModeMessage,

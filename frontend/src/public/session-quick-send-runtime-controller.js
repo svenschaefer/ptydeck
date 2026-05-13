@@ -99,6 +99,7 @@ export function createSessionQuickSendRuntimeController(options = {}) {
   const recordCommandSubmission = typeof options.recordCommandSubmission === "function" ? options.recordCommandSubmission : () => null;
   const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
   const isSessionActionBlocked = typeof options.isSessionActionBlocked === "function" ? options.isSessionActionBlocked : () => false;
+  const isSessionStopped = typeof options.isSessionStopped === "function" ? options.isSessionStopped : () => false;
   const getBlockedSessionActionMessage =
     typeof options.getBlockedSessionActionMessage === "function"
       ? options.getBlockedSessionActionMessage
@@ -152,7 +153,7 @@ export function createSessionQuickSendRuntimeController(options = {}) {
     if (isReadOnlyMode()) {
       return getReadOnlyModeMessage();
     }
-    if (isSessionActionBlocked(session)) {
+    if (isSessionActionBlocked(session) || isSessionStopped(session)) {
       return getBlockedSessionActionMessage([session], "Quick send");
     }
     if (!canWriteToSession(session)) {

@@ -641,6 +641,7 @@ const appRuntimeAccessControlComposition = createAppRuntimeAccessControlComposit
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   recordCommandSubmission: (sessionId, submission) => store.recordSessionCommandSubmission(sessionId, submission),
   isSessionActionBlocked: (session) => sessionUiFacadeController?.isSessionActionBlocked?.(session) === true,
+  isSessionStopped: (session) => sessionUiFacadeController?.isSessionStopped?.(session) === true,
   getBlockedSessionActionMessage: (sessions, actionLabel) =>
     sessionUiFacadeController?.getBlockedSessionActionMessage?.(sessions, actionLabel) || "",
   defaultDeckId: DEFAULT_DECK_ID,
@@ -946,6 +947,7 @@ sessionRuntimeController = createSessionRuntimeController({
   streamAdapter,
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
   getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
+  getStoppedSessionMessage: sessionUiFacadeController.getStoppedSessionMessage,
   getRuntimeEventController: () => runtimeEventController,
   getSessionViewModel: () => sessionViewModel,
   windowRef: window
@@ -991,6 +993,8 @@ sessionRuntimeController = createSessionRuntimeController({
   getUnrestoredSessionMessage: sessionUiFacadeController.getUnrestoredSessionMessage,
   isSessionExited: sessionUiFacadeController.isSessionExited,
   getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
+  isSessionStopped: sessionUiFacadeController.isSessionStopped,
+  getStoppedSessionMessage: sessionUiFacadeController.getStoppedSessionMessage,
   canWriteToSession,
   getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
   showBlockedWriteReclaimUi,
@@ -1328,6 +1332,7 @@ operatorComposerPlacementRuntimeController = createOperatorComposerPlacementRunt
   getLastActiveSessionSwitchAt: () => commandTargetRuntimeController?.getLastActiveSessionSwitchAt?.() || 0,
   getBlockedSessionActionMessage: sessionUiFacadeController?.getBlockedSessionActionMessage,
   isSessionActionBlocked: sessionUiFacadeController?.isSessionActionBlocked,
+  isSessionStopped: sessionUiFacadeController?.isSessionStopped,
   canWriteToSession,
   getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
   showBlockedWriteReclaimUi,

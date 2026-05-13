@@ -1099,3 +1099,59 @@ test("session-card-interactions controller wires theme import, export, and copy 
     ["feedback", "Exported inactive theme as windows-terminal.", false]
   ]);
 });
+
+test("session-card-interactions controller routes start-stop actions through the session API", async () => {
+  const calls = [];
+  const sessions = new Map([["s1", { id: "s1", name: "Alpha", state: "stopped" }]]);
+  const controller = createSessionCardInteractionsController({
+    isSessionStopped: (session) => session?.state === "stopped",
+    getSessionRuntimeState: (session) => session?.state || "running"
+  });
+  const refs = {
+    focusBtn: createEventTarget(),
+    startStopBtn: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("off")
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "Alpha" },
+    refs,
+    api: {
+      startSession: async (sessionId) => {
+        calls.push(["start", sessionId]);
+        const next = { id: sessionId, name: "Alpha", state: "running" };
+        sessions.set(sessionId, next);
+        return next;
+      },
+      stopSession: async (sessionId) => {
+        calls.push(["stop", sessionId]);
+        const next = { id: sessionId, name: "Alpha", state: "stopped" };
+        sessions.set(sessionId, next);
+        return next;
+      }
+    },
+    getSession: () => sessions.get("s1"),
+    getEntry: () => ({ id: "entry-1" }),
+    sessionThemeDrafts: new Map(),
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name,
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.state]),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    clearError: () => calls.push(["clear-error"]),
+    setError: (message) => calls.push(["error", message])
+  });
+
+  await refs.startStopBtn.emit("click");
+  await refs.startStopBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    ["start", "s1"],
+    ["event", "session.updated", "running"],
+    ["clear-error"],
+    ["feedback", "Started [1] Alpha."],
+    ["stop", "s1"],
+    ["event", "session.updated", "stopped"],
+    ["clear-error"],
+    ["feedback", "Stopped [1] Alpha."]
+  ]);
+});

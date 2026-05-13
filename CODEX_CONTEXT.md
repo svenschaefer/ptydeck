@@ -20,6 +20,36 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - fallback: retain last known cwd
 - This means direct PowerShell sessions are first-class launch targets, but they intentionally reuse the same unsupported-shell observation fallback that already existed for non-bash local shells rather than pretending prompt-derived cwd tracking is available.
 
+## Persisted Session Start/Stop Baseline
+
+- Session cards now expose one additional lifecycle toggle in the terminal header beside `Refresh` and `Settings`:
+  - running sessions show a `Stop` action
+  - stopped sessions show a `Start` action
+- The session lifecycle state now includes one explicit persisted `stopped` state in addition to the existing running/startup/unrestored/exited states.
+- The backend contract now exposes:
+  - `POST /api/v1/sessions/{sessionId}/start`
+  - `POST /api/v1/sessions/{sessionId}/stop`
+- Stopping a session is intentionally not the same as deleting or hiding it:
+  - the session card remains in the grid/deck
+  - the reserved layout slot stays occupied
+  - the terminal viewport itself is cleared so the terminal area appears visually empty while stopped
+- Frontend write paths must fail closed for stopped sessions:
+  - direct terminal typing
+  - shared-footer or overlay composer sends
+  - quick-send actions
+  - remote resize dispatch
+- Backend restore semantics are now lifecycle-aware:
+  - persisted stopped sessions restore as stopped without launching a PTY
+  - persisted running sessions are started again through the existing restore path
+  - stopped sessions remain out of active-session metrics even though the session record still exists
+- The backend `SessionManager` now supports explicit stop/start lifecycle transitions instead of only restart/delete:
+  - `stop` tears down the live PTY, clears pending live runtime state, preserves the persisted session identity/settings, and emits `session.updated`
+  - `start` rebuilds a fresh live session from the persisted session contract and emits `session.updated`
+- Secret-backed SSH boundaries remain intentionally fail-closed:
+  - ptydeck still does not persist runtime SSH secrets
+  - password or keyboard-interactive SSH sessions can be restored into persisted `stopped` state without the original secret
+  - starting such a stopped session later requires a fresh launch path with an available runtime secret instead of silently resurrecting with missing credentials
+
 ## Custom Command Scope Contract
 
 - The slash-command definition form `/custom scope:<scope> <name> <content>` remains valid for non-session scopes such as `scope:global`.
@@ -95,18 +125,20 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
 
 ## Current Quality Baseline
 
-Validated evidence on the current post-`H183` tree:
+Validated evidence on the current persisted-session-start/stop feature tree:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
-- backend coverage: `97.40%` line / `90.97%` branch / `87.77%` funcs
-- frontend coverage: `97.21%` line / `90.85%` branch / `81.87%` funcs
+- backend coverage: `97.39%` line / `90.85%` branch / `87.59%` funcs
+- frontend changed-scope focused coverage: `82.67%` line / `80.61%` branch / `79.47%` funcs across the start/stop-related frontend test set
+- the last previously validated full frontend coverage baseline before this feature slice remains `97.21%` line / `90.85%` branch / `81.87%` funcs
 
 Current lane health:
 
 - `npm run test:root:coverage` is green on the current tree.
 - `npm --prefix backend run test:coverage` is green on the current tree.
-- `npm --prefix frontend run test:coverage` is green on the current tree.
-- `npm run docs:generate`, `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check` are green on the current tree.
+- the focused frontend validation set for the start/stop feature is green on the current tree, including focused coverage for the changed files.
+- `npm run docs:generate`, `npm run docs:check`, `npm run lint`, and `git diff --check` are green on the current tree.
+- `npm run test` and `npm run test:coverage:check` currently still hit the known frontend open-handle stall in the broad `frontend` lane after the backend lane succeeds; those processes must be terminated immediately when they stop making progress, and deterministic focused frontend validation remains the required fallback until that separate frontend lane issue is resolved.
 
 Current highest retained hotspots:
 

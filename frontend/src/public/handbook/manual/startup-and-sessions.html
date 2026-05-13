@@ -66,7 +66,7 @@
 
 <p>Use <code>Terminal Size</code> and <code>Saved Layouts</code> in the sidebar for the same operations through the UI.</p>
 
-<h2 id="restart-or-rename-safely">Restart or Rename Safely</h2>
+<h2 id="restart-stop-or-rename-safely">Restart, Stop, or Rename Safely</h2>
 
 <p>Use slash commands when you already know the session selector, or use the session card toolbar when you are working visually.</p>
 
@@ -83,6 +83,27 @@
 /restart 4</code></pre>
 
 <p>If the session has startup settings, restart uses the current persisted startup contract from the session settings dialog.</p>
+
+<p>Each session header now also exposes a start/stop toggle beside <code>Refresh</code> and <code>Settings</code>.</p>
+
+<ul>
+<li>Running sessions show <code>Stop</code>.</li>
+<li>Stopped sessions show <code>Start</code>.</li>
+<li>Stopping a session keeps the session card and layout slot on screen, but clears the terminal viewport so the reserved area stays visually empty until you start it again.</li>
+<li>The stopped/running state is server-persisted across backend restart and restore:</li>
+</ul>
+
+<p>- stopped sessions stay stopped - running sessions are started again during restore</p>
+
+<p>The stopped state is intentionally stronger than a local hide or pause:</p>
+
+<ul>
+<li>direct terminal typing is blocked</li>
+<li>composer sends and quick-send actions are blocked</li>
+<li>the card remains visible so deck/layout structure does not collapse</li>
+</ul>
+
+<p>For secret-backed SSH sessions, ptydeck still does not persist the runtime secret itself. If you stop a password-based or keyboard-interactive SSH session and later start it again after the original secret is gone, the backend fails closed and requires a fresh authenticated launch instead of silently restoring with missing credentials.</p>
 
 <p>When you work from the session cards, hover the toolbar area to reveal quick actions for that specific session:</p>
 
@@ -111,7 +132,7 @@
         <ul class="handbook-page-toc-list">
 <li><a class="handbook-page-toc-link" href="#create-a-session">Create a Session</a></li>
 <li><a class="handbook-page-toc-link" href="#shape-the-deck">Shape the Deck</a></li>
-<li><a class="handbook-page-toc-link" href="#restart-or-rename-safely">Restart or Rename Safely</a></li>
+<li><a class="handbook-page-toc-link" href="#restart-stop-or-rename-safely">Restart, Stop, or Rename Safely</a></li>
 <li><a class="handbook-page-toc-link" href="#when-to-use-session-settings">When to Use Session Settings</a></li>
 </ul>
       </aside>

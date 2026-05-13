@@ -27,6 +27,8 @@ export function createSessionCardInteractionsController(options = {}) {
   const detectThemePreset = options.detectThemePreset || (() => "custom");
   const isSessionSettingsDirty = options.isSessionSettingsDirty || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
+  const isSessionStopped = options.isSessionStopped || (() => false);
+  const getSessionRuntimeState = options.getSessionRuntimeState || ((session) => String(session?.state || "").trim().toLowerCase());
   const setActiveSettingsTab = options.setActiveSettingsTab || (() => "startup");
   const stabilizeSettingsLayout = options.stabilizeSettingsLayout || (() => 0);
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
@@ -162,6 +164,35 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.refreshBtn?.addEventListener("click", () => {
       refreshMountedTerminal(session.id);
       clearError();
+    });
+    refs.startStopBtn?.addEventListener("click", async () => {
+      const currentSession = getSession() || session;
+      if (!api?.startSession || !api?.stopSession) {
+        setError("Session start/stop is unavailable.");
+        return;
+      }
+      if (isSessionStopped(currentSession)) {
+        await applySessionControlUpdate(
+          () => api.startSession(session.id),
+          `Started [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
+          "Failed to start the session."
+        );
+        return;
+      }
+      const runtimeState = getSessionRuntimeState(currentSession);
+      if (
+        runtimeState === "created" ||
+        runtimeState === "starting" ||
+        runtimeState === "running" ||
+        runtimeState === "busy" ||
+        runtimeState === "idle"
+      ) {
+        await applySessionControlUpdate(
+          () => api.stopSession(session.id),
+          `Stopped [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
+          "Failed to stop the session."
+        );
+      }
     });
     refs.settingsBtn?.addEventListener("click", () => {
       const wasOpen = refs.settingsDialog?.open === true;

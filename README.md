@@ -10,6 +10,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Browser UI with `xterm.js`, session cards, deck switching, and split layouts
 - Persistent session metadata, notes, layout profiles, and workspace presets
 - Local and SSH-backed sessions through one shared session model
+- Server-persisted per-session start/stop lifecycle with a session-header toggle that preserves the card slot while stopped
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`, plus one-shot SSH launches through `/ssh ...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
 - Server-persisted operator-client composer placement modes with a shared footer, active-terminal overlay placement, and per-terminal pinned overlays

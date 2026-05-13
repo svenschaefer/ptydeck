@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { ApiError } from "./errors.js";
 import {
+  buildSessionLaunchSpec,
   normalizeRemoteAuth,
   normalizeRemoteConnection,
   normalizeRemoteSecret,
@@ -15,6 +16,7 @@ const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
 const DEFAULT_SSH_CLIENT = "ssh";
 const SESSION_KIND_LOCAL = "local";
 const SESSION_KIND_SSH = "ssh";
+const SESSION_STATE_STOPPED = "stopped";
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_NOTE_MAX_LENGTH = 512;
@@ -228,12 +230,14 @@ export function buildSessionRecord(
     inactiveThemeProfile,
     createdAt,
     updatedAt,
-    traceSeed = null
+    traceSeed = null,
+    initialState = undefined
   } = {},
   {
     defaultShell = "bash",
     defaultLocalCwd = homedir(),
     buildLaunchBundle,
+    buildSessionLaunchSpecFn = buildSessionLaunchSpec,
     createInitialIdentityRuntime,
     remoteReconnectMaxAttempts = 0,
     remoteReconnectDelayMs = 0,
@@ -241,8 +245,12 @@ export function buildSessionRecord(
     nowFn = Date.now
   } = {}
 ) {
-  if (typeof buildLaunchBundle !== "function") {
+  const normalizedInitialState = initialState === SESSION_STATE_STOPPED ? SESSION_STATE_STOPPED : SESSION_STATE_STARTING;
+  if (normalizedInitialState !== SESSION_STATE_STOPPED && typeof buildLaunchBundle !== "function") {
     throw new TypeError("buildSessionRecord requires a buildLaunchBundle function.");
+  }
+  if (typeof buildSessionLaunchSpecFn !== "function") {
+    throw new TypeError("buildSessionRecord requires a buildSessionLaunchSpec function.");
   }
   if (typeof createInitialIdentityRuntime !== "function") {
     throw new TypeError("buildSessionRecord requires a createInitialIdentityRuntime function.");
@@ -269,7 +277,13 @@ export function buildSessionRecord(
   const normalizedQuickIdToken = normalizeQuickIdToken(quickIdToken);
   const normalizedRemoteConnection = normalizeRemoteConnection(remoteConnection, normalizedKind);
   const normalizedRemoteAuth = normalizeRemoteAuth(remoteAuth, normalizedKind);
-  const normalizedRemoteSecret = normalizeRemoteSecret(remoteSecret, normalizedRemoteAuth, normalizedKind);
+  const allowMissingRemoteSecret =
+    normalizedInitialState === SESSION_STATE_STOPPED &&
+    remoteAuthRequiresSecret(normalizedRemoteAuth) &&
+    (remoteSecret === undefined || remoteSecret === null || remoteSecret === "");
+  const normalizedRemoteSecret = allowMissingRemoteSecret
+    ? undefined
+    : normalizeRemoteSecret(remoteSecret, normalizedRemoteAuth, normalizedKind);
   const normalizedShell =
     typeof shell === "string" && shell.trim()
       ? shell.trim()
@@ -287,19 +301,38 @@ export function buildSessionRecord(
       : typeof cwd === "string" && cwd.trim()
         ? cwd
         : normalizedStartCwd;
-  const launchBundle = buildLaunchBundle({
-    kind: normalizedKind,
-    shell: normalizedShell,
-    cwd: localSpawnCwd,
-    startCwd: normalizedStartCwd,
-    startCommand: normalizedStartCommand,
-    env: normalizedEnv,
-    remoteConnection: normalizedRemoteConnection,
-    remoteAuth: normalizedRemoteAuth,
-    remoteSecret: normalizedRemoteSecret
-  });
-  if (!launchBundle?.launchSpec || typeof launchBundle.launchSpec !== "object") {
-    throw new TypeError("buildLaunchBundle must return an object with a launchSpec.");
+  let launchBundle = null;
+  let launchSpec = null;
+  if (normalizedInitialState === SESSION_STATE_STOPPED) {
+    launchSpec = buildSessionLaunchSpecFn({
+      kind: normalizedKind,
+      shell: normalizedShell,
+      spawnCwd: localSpawnCwd,
+      startCwd: normalizedStartCwd,
+      startCommand: normalizedStartCommand,
+      remoteConnection: normalizedRemoteConnection,
+      remoteAuth: normalizedRemoteAuth,
+      remoteSecret: normalizedRemoteSecret
+    });
+  } else {
+    launchBundle = buildLaunchBundle({
+      kind: normalizedKind,
+      shell: normalizedShell,
+      cwd: localSpawnCwd,
+      startCwd: normalizedStartCwd,
+      startCommand: normalizedStartCommand,
+      env: normalizedEnv,
+      remoteConnection: normalizedRemoteConnection,
+      remoteAuth: normalizedRemoteAuth,
+      remoteSecret: normalizedRemoteSecret
+    });
+    if (!launchBundle?.launchSpec || typeof launchBundle.launchSpec !== "object") {
+      throw new TypeError("buildLaunchBundle must return an object with a launchSpec.");
+    }
+    launchSpec = launchBundle.launchSpec;
+  }
+  if (!launchSpec || typeof launchSpec !== "object") {
+    throw new TypeError("buildSessionRecord requires a valid launchSpec.");
   }
   const initialReplayOutput = buildReplayRetentionResult(replayOutput, sessionReplayMemoryMaxChars);
   const identityRuntime = createInitialIdentityRuntime(
@@ -342,8 +375,8 @@ export function buildSessionRecord(
         kind: normalizedKind,
         ...(normalizedRemoteConnection ? { remoteConnection: normalizedRemoteConnection } : {}),
         ...(normalizedRemoteAuth ? { remoteAuth: normalizedRemoteAuth } : {}),
-        cwd: launchBundle.launchSpec.metaCwd,
-        shell: launchBundle.launchSpec.command,
+        cwd: launchSpec.metaCwd,
+        shell: launchSpec.command,
         ...(typeof name === "string" ? { name } : {}),
         ...(normalizedQuickIdToken ? { quickIdToken: normalizedQuickIdToken } : {}),
         ...(typeof deckId === "string" && deckId.trim() ? { deckId: deckId.trim() } : {}),
@@ -367,7 +400,7 @@ export function buildSessionRecord(
         activeThemeProfile: normalizedThemeSlots.activeThemeProfile,
         inactiveThemeProfile: normalizedThemeSlots.inactiveThemeProfile,
         appIdentity: initialAppIdentity,
-        state: SESSION_STATE_STARTING,
+        state: normalizedInitialState,
         activityState: SESSION_ACTIVITY_STATE_INACTIVE,
         activityUpdatedAt: initialActivityTimestamp,
         activityCompletedAt: null,

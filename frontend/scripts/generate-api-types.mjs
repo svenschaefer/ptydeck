@@ -107,7 +107,7 @@ export type UpdateDeckRequest = {
 export type Session = {
   id: string;
   deckId: string;
-  state: "starting" | "running" | "unrestored";
+  state: "starting" | "running" | "unrestored" | "stopped" | "exited";
   activityState: "active" | "inactive";
   activityUpdatedAt: number;
   kind: "local" | "ssh";

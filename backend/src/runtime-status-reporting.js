@@ -8,6 +8,17 @@ export function countActiveRuntimeSessions(sessions = []) {
   return activeSessionCount;
 }
 
+function countProvisionedRuntimeSessions(sessions = []) {
+  let count = 0;
+  for (const session of sessions) {
+    const state = typeof session?.state === "string" ? session.state.trim().toLowerCase() : "";
+    if (state !== "stopped") {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 export function buildRuntimeHealthPayload({
   messagingStatusSummary,
   streamAnalysisStatusSummary
@@ -89,7 +100,7 @@ export function renderRuntimeMetrics({
   lines.push(`ptydeck_http_request_duration_ms_bucket{le="+Inf"} ${metrics.httpDurationMsCount}`);
   lines.push("# HELP ptydeck_sessions_active Number of active PTY sessions.");
   lines.push("# TYPE ptydeck_sessions_active gauge");
-  lines.push(`ptydeck_sessions_active ${sessions.length}`);
+  lines.push(`ptydeck_sessions_active ${countProvisionedRuntimeSessions(sessions)}`);
   lines.push("# HELP ptydeck_sessions_active_by_lifecycle Number of sessions grouped by lifecycle state.");
   lines.push("# TYPE ptydeck_sessions_active_by_lifecycle gauge");
   for (const [state, count] of sessionsByLifecycle.entries()) {

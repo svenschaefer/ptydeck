@@ -178,6 +178,14 @@ test("session manager runtime facade delegates launch, startup, replay, mutation
         calls.push(["createSession", options]);
         return { id: "created", ...options };
       },
+      startSession(sessionId, options) {
+        calls.push(["startSession", sessionId, options]);
+        return options;
+      },
+      stopSession(sessionId, options) {
+        calls.push(["stopSession", sessionId, options]);
+        return options;
+      },
       restartSession(sessionId, options) {
         calls.push(["restartSession", sessionId, options]);
         return options;
@@ -249,6 +257,8 @@ test("session manager runtime facade delegates launch, startup, replay, mutation
   assert.equal(facade.kill("session-1"), "SIGKILL");
   assert.deepEqual(facade.updateSession("session-1", { note: "hi" }), { note: "hi" });
   assert.equal(facade.rename("session-1", "ops"), "ops");
+  assert.deepEqual(facade.start("session-1", { trace: { source: "rest" } }), { trace: { source: "rest" } });
+  assert.deepEqual(facade.stop("session-1", { trace: { source: "rest" } }), { trace: { source: "rest" } });
   assert.deepEqual(facade.restart("session-1", { trace: { source: "rest" } }), { trace: { source: "rest" } });
   assert.equal(facade.delete("session-1"), "deleted");
   assert.equal(facade.closeWithReason("session-1", "cleanup"), "cleanup");

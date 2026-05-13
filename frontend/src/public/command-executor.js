@@ -52,6 +52,7 @@ export function createCommandExecutor(options = {}) {
   const getSessionRuntimeState = options.getSessionRuntimeState;
   const isSessionExited = options.isSessionExited;
   const isSessionActionBlocked = options.isSessionActionBlocked;
+  const isSessionStopped = options.isSessionStopped;
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage;
   const listCustomCommandState = options.listCustomCommandState;
   const getCustomCommandState = options.getCustomCommandState;
@@ -361,6 +362,7 @@ export function createCommandExecutor(options = {}) {
     resolveCustomCommandTargets,
     renderCustomCommandForTargets: customAdminHandlers.renderCustomCommandForTargets,
     isSessionActionBlocked,
+    isSessionStopped,
     getBlockedSessionActionMessage,
     sendInputWithConfiguredTerminator,
     getSessionSendTerminator,

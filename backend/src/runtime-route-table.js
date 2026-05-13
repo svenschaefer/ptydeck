@@ -264,6 +264,16 @@ export function matchRuntimeRoute(pathname, method) {
     return { kind: "restart", params: { sessionId: decodePathParam(restartMatch[1], "sessionId") } };
   }
 
+  const startMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/start$/);
+  if (startMatch && method === "POST") {
+    return { kind: "start", params: { sessionId: decodePathParam(startMatch[1], "sessionId") } };
+  }
+
+  const stopMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/stop$/);
+  if (stopMatch && method === "POST") {
+    return { kind: "stop", params: { sessionId: decodePathParam(stopMatch[1], "sessionId") } };
+  }
+
   const interruptMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/interrupt$/);
   if (interruptMatch && method === "POST") {
     return { kind: "interrupt", params: { sessionId: decodePathParam(interruptMatch[1], "sessionId") } };
@@ -354,6 +364,12 @@ export function normalizeRuntimeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/restart$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/restart";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/start$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/start";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/stop$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/stop";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/interrupt$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/interrupt";

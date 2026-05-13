@@ -6,6 +6,7 @@ export function createSessionCardFactoryController(options = {}) {
       : (session) => session?.name || String(session?.id || "").slice(0, 8);
   const getSessionStateBadgeText = options.getSessionStateBadgeText || (() => "");
   const getSessionStateHintText = options.getSessionStateHintText || (() => "");
+  const isSessionStopped = options.isSessionStopped || (() => false);
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
   const renderSessionAppIdentity = options.renderSessionAppIdentity || (() => {});
@@ -25,6 +26,8 @@ export function createSessionCardFactoryController(options = {}) {
     const sessionAppIdentityEl = node.querySelector(".session-app-identity");
     const sessionNoteEl = node.querySelector(".session-note-text");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
+    const startStopBtn = node.querySelector(".session-start-stop");
+    const startStopIconEl = node.querySelector(".session-start-stop-icon");
     const refreshBtn = node.querySelector(".session-refresh");
     const settingsBtn = node.querySelector(".session-settings");
     const composerPinBtn = node.querySelector(".session-composer-pin");
@@ -133,6 +136,7 @@ export function createSessionCardFactoryController(options = {}) {
     if (quickIdEl) {
       quickIdEl.textContent = quickId;
     }
+    node.classList.toggle("stopped", isSessionStopped(session));
     node.classList.toggle("unrestored", isSessionUnrestored(session));
     node.classList.toggle("exited", isSessionExited(session));
     node.classList.toggle("active", activeSessionId === session.id);
@@ -161,6 +165,8 @@ export function createSessionCardFactoryController(options = {}) {
       sessionAppIdentityEl,
       sessionNoteEl,
       unrestoredHintEl,
+      startStopBtn,
+      startStopIconEl,
       refreshBtn,
       settingsBtn,
       composerPinBtn,

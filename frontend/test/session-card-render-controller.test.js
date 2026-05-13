@@ -29,6 +29,7 @@ class ClassList {
 }
 
 function createEntry() {
+  const startStopAttrs = new Map();
   const mount = {
     contains(element) {
       return element === this.child;
@@ -46,6 +47,16 @@ function createEntry() {
     terminal,
     focusBtn: { textContent: "" },
     quickIdEl: { textContent: "" },
+    startStopBtn: {
+      disabled: false,
+      setAttribute(name, value) {
+        startStopAttrs.set(String(name), String(value));
+      },
+      getAttribute(name) {
+        return startStopAttrs.get(String(name)) || null;
+      }
+    },
+    startStopIconEl: { classList: new ClassList() },
     quickSendPanelEl: {},
     quickSendActionsEl: {},
     stateBadgeEl: { hidden: true, textContent: "" },
@@ -186,4 +197,26 @@ test("session-card-render controller falls back to the base session label when n
   });
 
   assert.equal(entry.focusBtn.textContent, "gamma");
+});
+
+test("session-card-render controller toggles the start-stop control for stopped sessions", () => {
+  const entry = createEntry();
+  const controller = createSessionCardRenderController({
+    setSessionCardVisibility: () => {},
+    getSessionRuntimeState: (session) => session.state,
+    isSessionStopped: (session) => session.state === "stopped"
+  });
+
+  controller.updateExistingSessionCard({
+    entry,
+    session: { id: "s10", name: "delta", state: "stopped" },
+    activeSessionId: "other",
+    nextVisible: true
+  });
+
+  assert.equal(entry.element.classList.contains("stopped"), true);
+  assert.equal(entry.startStopBtn.disabled, false);
+  assert.equal(entry.startStopBtn.getAttribute("aria-label"), "Start session");
+  assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-play-filled"), true);
+  assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-stop-filled"), false);
 });

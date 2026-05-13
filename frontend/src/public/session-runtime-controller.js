@@ -31,6 +31,8 @@ export function createSessionRuntimeController(options = {}) {
     typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const getExitedSessionMessage =
     typeof options.getExitedSessionMessage === "function" ? options.getExitedSessionMessage : () => "";
+  const getStoppedSessionMessage =
+    typeof options.getStoppedSessionMessage === "function" ? options.getStoppedSessionMessage : () => "";
   const getRuntimeEventController =
     typeof options.getRuntimeEventController === "function" ? options.getRuntimeEventController : () => null;
   const getSessionViewModel =
@@ -231,6 +233,12 @@ export function createSessionRuntimeController(options = {}) {
     store?.upsertSession(nextSession);
     const entry = terminals.get(nextSession?.id);
     if (!entry) {
+      if (String(nextSession?.state || nextSession?.lifecycleState || "").trim().toLowerCase() === "stopped") {
+        store?.clearSessionActivity?.(nextSession.id);
+        if (getActiveSessionId() === nextSession.id) {
+          setCommandFeedback(getStoppedSessionMessage(nextSession));
+        }
+      }
       return;
     }
     const nextMouseForwardingMode = normalizeSessionMouseForwardingMode(nextSession?.mouseForwardingMode);
@@ -240,6 +248,18 @@ export function createSessionRuntimeController(options = {}) {
       }
       entry.mouseForwardingMode = nextMouseForwardingMode;
       entry.mouseForwardingOutputPending = "";
+    }
+    if (String(nextSession?.state || nextSession?.lifecycleState || "").trim().toLowerCase() === "stopped") {
+      if (typeof entry.terminal?.reset === "function") {
+        entry.terminal.reset();
+      } else if (typeof entry.terminal?.clear === "function") {
+        entry.terminal.clear();
+      }
+      entry.pendingViewportSync = false;
+      store?.clearSessionActivity?.(nextSession.id);
+      if (getActiveSessionId() === nextSession.id) {
+        setCommandFeedback(getStoppedSessionMessage(nextSession));
+      }
     }
   }
 

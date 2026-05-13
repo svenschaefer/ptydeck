@@ -15,6 +15,7 @@ import { createShellAdapter } from "./shell-adapter.js";
 const SESSION_KIND_SSH = "ssh";
 const SESSION_ACTIVITY_STATE_INACTIVE = "inactive";
 const SESSION_STATE_EXITED = "exited";
+const SESSION_STATE_STOPPED = "stopped";
 
 function normalizeEnv(env) {
   return env && typeof env === "object" && !Array.isArray(env) ? env : {};
@@ -187,6 +188,13 @@ export function createSessionManagerLaunchRuntime(dependencies = {}) {
   }
 
   function buildReconnectUnavailableError(session) {
+    if (session?.meta?.state === SESSION_STATE_STOPPED) {
+      return new ApiError(
+        409,
+        "SessionStopped",
+        `Session '${session?.id || "unknown"}' is stopped. Start it before sending input, resizing, or signaling it.`
+      );
+    }
     const { errorCode, message } = buildReconnectUnavailableErrorDetails({
       sessionId: session?.id,
       connectivityState: session?.meta?.remoteRuntime?.connectivityState || "offline"
@@ -301,6 +309,10 @@ export function createSessionManagerLaunchRuntime(dependencies = {}) {
     session.lastActivityAt = exitTimestamp;
 
     const isExpectedExit = Boolean(session.expectedExitReason);
+    if (session.expectedExitReason === SESSION_STATE_STOPPED) {
+      clearExpectedExitReason(session);
+      return;
+    }
     const current = getSessionById(session.id);
     if (session.meta.kind === SESSION_KIND_SSH && !isExpectedExit && current === session) {
       session.ptyProcess = null;

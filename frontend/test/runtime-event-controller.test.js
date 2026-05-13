@@ -107,6 +107,27 @@ test("runtime-event controller guards direct terminal input for unrestored and e
   assert.deepEqual(sendCalls, [["s3", "pwd"]]);
 });
 
+test("runtime-event controller blocks direct terminal input for stopped sessions", async () => {
+  const errors = [];
+  const sendCalls = [];
+  const controller = createRuntimeEventController({
+    getSessionById: () => ({ id: "s1", state: "stopped" }),
+    isSessionStopped: (session) => session?.state === "stopped",
+    getStoppedSessionMessage: () => "stopped",
+    setError: (message) => errors.push(message),
+    sendInput: (sessionId, data) => {
+      sendCalls.push([sessionId, data]);
+      return Promise.resolve();
+    }
+  });
+
+  controller.handleSessionTerminalInput("s1", "pwd");
+  await Promise.resolve();
+
+  assert.deepEqual(errors, ["stopped"]);
+  assert.deepEqual(sendCalls, []);
+});
+
 test("runtime-event controller blocks direct terminal input in read-only spectator mode", async () => {
   const errors = [];
   const sendCalls = [];

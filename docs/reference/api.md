@@ -317,6 +317,22 @@ The operator API is served under `/api/v1`, REST calls use bearer auth, and WebS
   Auth note: Operator route under `/api/v1`; share spectators use share URLs instead of this route family.
   Responses: `200` Session restarted; `404` Session not found; `426` TLS required
 
+### `/sessions/{sessionId}/start`
+
+- **POST** Start a stopped session and launch its PTY process again.
+  Operation ID: `startSession`
+  Request body: optional or none
+  Auth note: Operator route under `/api/v1`; share spectators use share URLs instead of this route family.
+  Responses: `200` Session started; `404` Session not found; `409` Session cannot be started in its current state; `426` TLS required
+
+### `/sessions/{sessionId}/stop`
+
+- **POST** Stop a running session while preserving the session card and persisted startup configuration.
+  Operation ID: `stopSession`
+  Request body: optional or none
+  Auth note: Operator route under `/api/v1`; share spectators use share URLs instead of this route family.
+  Responses: `200` Session stopped; `404` Session not found; `409` Session cannot be stopped in its current state; `426` TLS required
+
 ### `/sessions/{sessionId}/swap-quick-id`
 
 - **POST** Swap persisted quick-id tokens between two sessions.

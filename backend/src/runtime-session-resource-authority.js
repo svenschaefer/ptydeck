@@ -332,7 +332,8 @@ export function createRuntimeSessionResourceAuthority(dependencies = {}) {
     quickSendUsage,
     themeProfile,
     activeThemeProfile,
-    inactiveThemeProfile
+    inactiveThemeProfile,
+    initialState
   }) {
     return manager.create({
       id: session.id,
@@ -358,7 +359,8 @@ export function createRuntimeSessionResourceAuthority(dependencies = {}) {
       activeThemeProfile,
       inactiveThemeProfile,
       createdAt: session.createdAt,
-      updatedAt: session.updatedAt
+      updatedAt: session.updatedAt,
+      ...(typeof initialState === "string" ? { initialState } : {})
     });
   }
 

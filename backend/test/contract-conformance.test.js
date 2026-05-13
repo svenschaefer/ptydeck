@@ -104,6 +104,8 @@ function runtimeOperationKeys() {
     "POST /sessions/{sessionId}/control/rename-client",
     "POST /sessions/{sessionId}/control/forget-client",
     "POST /sessions/{sessionId}/restart",
+    "POST /sessions/{sessionId}/start",
+    "POST /sessions/{sessionId}/stop",
     "POST /sessions/{sessionId}/interrupt",
     "POST /sessions/{sessionId}/terminate",
     "POST /sessions/{sessionId}/kill"
@@ -487,6 +489,18 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/restart").has(restartMissingRes.status));
+
+    const startMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/start`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/start").has(startMissingRes.status));
+
+    const stopMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/stop`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/stop").has(stopMissingRes.status));
 
     const interruptMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/interrupt`, {
       method: "POST",

@@ -71,6 +71,8 @@ export function requiredScopeForRoute(kind) {
     kind === "renameSessionControlClient" ||
     kind === "forgetSessionControlClient" ||
     kind === "restart" ||
+    kind === "start" ||
+    kind === "stop" ||
     kind === "interrupt" ||
     kind === "terminate" ||
     kind === "kill"

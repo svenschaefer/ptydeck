@@ -60,6 +60,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     typeof options.getLastActiveSessionSwitchAt === "function" ? options.getLastActiveSessionSwitchAt : () => 0;
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
   const isSessionActionBlocked = options.isSessionActionBlocked || (() => false);
+  const isSessionStopped = options.isSessionStopped || (() => false);
   const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
   const getSessionWriteBlockedMessage =
     typeof options.getSessionWriteBlockedMessage === "function"
@@ -231,7 +232,7 @@ export function createCommandComposerRuntimeController(options = {}) {
       return null;
     }
 
-    const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
+    const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session) || isSessionStopped(session));
     if (blockedSessions.length > 0) {
       return { error: getBlockedSessionActionMessage(blockedSessions, "Command send") };
     }
@@ -266,7 +267,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     if (!session) {
       return { error: "Unknown session target." };
     }
-    if (isSessionActionBlocked(session)) {
+    if (isSessionActionBlocked(session) || isSessionStopped(session)) {
       return { error: getBlockedSessionActionMessage([session], "Command send") };
     }
     if (!canWriteToSession(session)) {

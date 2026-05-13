@@ -428,6 +428,22 @@ export function createApiClient(baseUrl, options = {}) {
         body: "{}"
       });
     },
+    /** @returns {Promise<Session>} */
+    async startSession(sessionId) {
+      return request(`/sessions/${sessionId}/start`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+    },
+    /** @returns {Promise<Session>} */
+    async stopSession(sessionId) {
+      return request(`/sessions/${sessionId}/stop`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+    },
     async interruptSession(sessionId) {
       await request(`/sessions/${sessionId}/interrupt`, {
         method: "POST",

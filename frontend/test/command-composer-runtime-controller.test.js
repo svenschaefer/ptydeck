@@ -316,6 +316,27 @@ test("command-composer runtime controller surfaces reclaim UI when send is block
   ]);
 });
 
+test("command-composer runtime controller blocks sends to stopped sessions", async () => {
+  const calls = [];
+  let value = "ls -al";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    interpretComposerInput: () => ({ kind: "input", data: "ls -al" }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one", state: "stopped" }],
+      activeSessionId: "s1"
+    }),
+    isSessionActionBlocked: () => false,
+    isSessionStopped: (session) => session?.state === "stopped",
+    getBlockedSessionActionMessage: (sessions, actionLabel) => `${actionLabel} blocked: ${sessions[0].state}`,
+    setCommandFeedback: (message) => calls.push(message)
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, ["Command send blocked: stopped"]);
+});
+
 test("command-composer runtime controller surfaces reclaim UI when terminal paste is blocked by another controller", async () => {
   const calls = [];
   const controller = createCommandComposerRuntimeController({

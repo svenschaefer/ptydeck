@@ -8,6 +8,7 @@ import { createStore } from "../src/public/store.js";
 function createTerminal() {
   return {
     writes: [],
+    resetCalls: 0,
     clearSelectionCalls: 0,
     scrollToBottomCalls: 0,
     refreshCalls: [],
@@ -20,6 +21,9 @@ function createTerminal() {
     },
     refresh(start, end) {
       this.refreshCalls.push([start, end]);
+    },
+    reset() {
+      this.resetCalls += 1;
     },
     scrollToBottom() {
       this.scrollToBottomCalls += 1;
@@ -391,4 +395,32 @@ test("session-runtime controller fails closed for invalid inputs and falls back 
   );
   assert.deepEqual(removals, ["s1"]);
   assert.deepEqual(closures, ["s2"]);
+});
+
+test("session-runtime controller clears mounted terminal state when a session becomes stopped", () => {
+  const store = createStore();
+  const terminal = createTerminal();
+  const terminals = new Map([
+    [
+      "s1",
+      {
+        terminal,
+        isVisible: true,
+        pendingViewportSync: true,
+        followOnShow: true,
+        searchRevision: 0
+      }
+    ]
+  ]);
+  const controller = createSessionRuntimeController({
+    store,
+    terminals,
+    getActiveSessionId: () => "s1",
+    getStoppedSessionMessage: () => "stopped"
+  });
+
+  controller.upsertSession({ id: "s1", name: "one", deckId: "default", state: "stopped" });
+
+  assert.equal(terminal.resetCalls, 1);
+  assert.equal(terminals.get("s1").pendingViewportSync, false);
 });
