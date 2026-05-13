@@ -251,6 +251,8 @@ function createTerminalCardRefs(id = "mount") {
     sessionNoteEl: {},
     unrestoredHintEl: {},
     refreshBtn: {},
+    startStopBtn: {},
+    startStopIconEl: {},
     settingsDialog: {},
     settingsTabStartupBtn: {},
     settingsTabInputBtn: {},
@@ -321,6 +323,8 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
     unrestoredHintEl: {},
     sessionStatusEl: {},
     sessionArtifactsEl: {},
+    startStopBtn: {},
+    startStopIconEl: {},
     settingsDialog: {},
     settingsTabStartupBtn: {},
     settingsTabNoteBtn: {},
@@ -376,6 +380,8 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   assert.equal(entry.sessionNoteInput, refs.sessionNoteInput);
   assert.equal(entry.themeSlotSelect, refs.themeSlotSelect);
   assert.equal(entry.settingsCancelBtn, refs.settingsCancelBtn);
+  assert.equal(entry.startStopBtn, refs.startStopBtn);
+  assert.equal(entry.startStopIconEl, refs.startStopIconEl);
   assert.deepEqual(timers, [120, 400, 900]);
   assert.deepEqual(entry.terminal.refreshCalls, [[0, 23]]);
   assert.equal(entry.terminal.scrollToBottomCalls, 1);

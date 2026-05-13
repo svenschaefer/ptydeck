@@ -132,6 +132,8 @@ test("session-grid controller updates existing cards without creating new termin
 
 test("session-grid controller creates new cards and schedules resize passes", () => {
   const calls = [];
+  const startStopBtn = {};
+  const startStopIconEl = {};
   const controller = createSessionGridController({
     defaultDeckId: "default",
     terminals: new Map(),
@@ -163,6 +165,8 @@ test("session-grid controller creates new cards and schedules resize passes", ()
           quickIdEl: {},
           stateBadgeEl: {},
           unrestoredHintEl: {},
+          startStopBtn,
+          startStopIconEl,
           settingsBtn: {},
           renameBtn: {},
           closeBtn: {},
@@ -189,11 +193,16 @@ test("session-grid controller creates new cards and schedules resize passes", ()
       }
     },
     sessionCardInteractionsController: {
-      bindSessionCardInteractions: ({ session }) => calls.push(["bind", session.id])
+      bindSessionCardInteractions: ({ session, refs }) => {
+        assert.equal(refs.startStopBtn, startStopBtn);
+        calls.push(["bind", session.id]);
+      }
     },
     onSessionMounted: (session) => calls.push(["mounted-contract", session.id]),
     sessionTerminalRuntimeController: {
-      mountSessionTerminalCard: ({ session, onSessionMounted, onFirstTerminalMounted, afterEntryRegistered }) => {
+      mountSessionTerminalCard: ({ session, refs, onSessionMounted, onFirstTerminalMounted, afterEntryRegistered }) => {
+        assert.equal(refs.startStopBtn, startStopBtn);
+        assert.equal(refs.startStopIconEl, startStopIconEl);
         calls.push(["mount", session.id]);
         onSessionMounted(session);
         afterEntryRegistered({ id: "entry" }, session);

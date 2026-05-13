@@ -52,6 +52,10 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
 - The persisted start/stop contract now also inherits the existing session-control ownership model instead of bypassing it:
   - `POST /api/v1/sessions/{sessionId}/start` and `POST /api/v1/sessions/{sessionId}/stop` now enforce the same controller-access gate as direct terminal input and resize
   - the session-card start/stop button now routes blocked cross-client clicks into the normal reclaim/error path instead of allowing silent lifecycle mutation from a spectator or non-controller client
+- The frontend header lifecycle toggle depends on explicit ref forwarding through the live grid/runtime seam:
+  - `frontend/src/public/ui/session-grid-controller.js` must forward `startStopBtn` into `bindSessionCardInteractions(...)`
+  - the same grid seam must forward `startStopBtn` plus `startStopIconEl` into `mountSessionTerminalCard(...)`
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js` must retain those refs on the mounted entry so later session-card rerenders can update the live button/icon state instead of operating on a detached template-only control
 - Restored stopped secret-backed SSH sessions now surface an explicit fail-closed restart status:
   - the backend API can publish `startBlockedReason: remote-secret-unavailable`
   - the session-view-model maps that to a concrete operator-facing explanation

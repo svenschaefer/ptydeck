@@ -745,6 +745,8 @@ export function createSessionTerminalRuntimeController(options = {}) {
       quickSendActionsEl: refs.quickSendActionsEl,
       unrestoredHintEl: refs.unrestoredHintEl,
       refreshBtn: refs.refreshBtn,
+      startStopBtn: refs.startStopBtn,
+      startStopIconEl: refs.startStopIconEl,
       settingsDialog: refs.settingsDialog,
       settingsTabStartupBtn: refs.settingsTabStartupBtn,
       settingsTabInputBtn: refs.settingsTabInputBtn,

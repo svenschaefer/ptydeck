@@ -258,6 +258,7 @@ export function createSessionGridController(options = {}) {
         refs: {
           focusBtn: refs.focusBtn,
           refreshBtn: refs.refreshBtn,
+          startStopBtn: refs.startStopBtn,
           settingsBtn: refs.settingsBtn,
           renameBtn: refs.renameBtn,
           closeBtn: refs.closeBtn,
@@ -350,6 +351,8 @@ export function createSessionGridController(options = {}) {
           quickSendActionsEl: refs.quickSendActionsEl,
           unrestoredHintEl: refs.unrestoredHintEl,
           refreshBtn: refs.refreshBtn,
+          startStopBtn: refs.startStopBtn,
+          startStopIconEl: refs.startStopIconEl,
           settingsDialog: refs.settingsDialog,
           sessionControlTakeBtn: refs.sessionControlTakeBtn,
           sessionControlReleaseBtn: refs.sessionControlReleaseBtn,
