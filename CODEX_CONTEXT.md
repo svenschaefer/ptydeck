@@ -96,6 +96,28 @@ Current active tasks:
 
 - `None.`
 
+## Local Dev Runtime Cost Baseline
+
+- The backend dev startup path in `backend/scripts/run-dev.sh` auto-loads the gitignored `local-config/ptydeck/backend.env.local` file when it exists.
+- That auto-loaded env file is intentionally suitable for focused local diagnostics, but it is not a neutral performance baseline. In particular, enabling any combination of:
+  - `BACKEND_DEBUG_LOGS=1`
+  - `BACKEND_DEBUG_LOG_FILE=...`
+  - `SESSION_STREAM_ANALYSIS_CAPTURE_FILE=...`
+  - `SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=...`
+  - `MESSAGING_TELEGRAM_*`
+  can materially increase backend event-loop pressure and write-heavy runtime behavior during busy multi-session PTY work.
+- The current local runtime investigation on 2026-05-13 found that a live backend process with those flags enabled was carrying the primary WSL-side hotspot signature, with:
+  - sustained growth in `/tmp/ptydeck-session-stream-analysis.jsonl` directly from the PTY `onData` path
+  - large accumulated backend debug logging with high-frequency `http.request.*`, `session.input.write`, `persist.save.*`, and `session.event` entries
+  - Telegram inbound/outbound runtime support also active in the same local dev process
+- The repo now ships an explicit lightweight local backend-dev path:
+  - root: `npm run dev:light`
+  - backend only: `npm --prefix backend run dev:light`
+- Those light commands set `PTYDECK_BACKEND_SKIP_LOCAL_ENV=1`, and `backend/scripts/run-dev.sh` now treats that flag as the authority to skip sourcing `local-config/ptydeck/backend.env.local`.
+- Product implication:
+  - ordinary local interactive development should prefer the `dev:light` path unless a concrete debug/capture/messaging investigation is in progress
+  - the auto-loaded backend env file remains the right place for repeated diagnostics, but not for the baseline "always on" local runtime
+
 ## H181 Frontend Closeout
 
 - `QLT-354` extracted the retained startup/reclaim/trusted-local bootstrap helper bridge out of `frontend/src/public/app-runtime-composition-controller.js` into `frontend/src/public/app-runtime-startup-helper-assembly.js` without widening the shipped runtime contract.
