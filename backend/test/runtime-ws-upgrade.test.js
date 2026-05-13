@@ -60,7 +60,8 @@ function createBaseDependencies(overrides = {}) {
         scopes: ["ws:connect"]
       })
     },
-    resolveWsTicketFromProtocols: () => "ticket-1",
+    resolveWsTicketFromProtocols: () => "",
+    resolveTrustedLocalWsClientMetadataFromProtocols: () => null,
     ensureShareLinkAuthActive: () => {},
     ensureShareRouteAllowed: () => {},
     logDebug: (event, details, trace) => {
@@ -222,7 +223,49 @@ test("runtime ws upgrade handler authenticates upgrade requests and delegates ac
   assert.equal(observed.accepted[0].details.upgradeTraceContext.traceId, "trace-1");
 });
 
-test("runtime ws upgrade handler consumes trusted-local ws tickets even when auth is disabled", async () => {
+test("runtime ws upgrade handler accepts trusted-local client metadata even when auth is disabled", async () => {
+  const consumedTickets = [];
+  const { dependencies, observed } = createBaseDependencies({
+    config: {
+      trustedProxy: false,
+      enforceTlsIngress: false,
+      rateLimitWsConnectMax: 5,
+      authEnabled: false
+    },
+    wsTicketRegistry: {
+      consume: (ticket) => {
+        consumedTickets.push(ticket);
+        return null;
+      }
+    },
+    resolveTrustedLocalWsClientMetadataFromProtocols: () => ({
+      clientId: "trusted-local-1",
+      label: "Desk Browser"
+    })
+  });
+  const socket = createSocket();
+  const handler = createRuntimeWsUpgradeHandler(dependencies);
+
+  const accepted = await handler(
+    {
+      url: "/ws",
+      headers: {
+        origin: "https://ptydeck.local",
+        "sec-websocket-protocol": "ptydeck.v1, ptydeck.client.trusted-local"
+      }
+    },
+    socket,
+    Buffer.alloc(0)
+  );
+
+  assert.equal(accepted, true);
+  assert.deepEqual(consumedTickets, []);
+  assert.equal(observed.accepted.length, 1);
+  assert.equal(observed.accepted[0].details.auth.sessionControlClientId, "trusted-local-1");
+  assert.equal(observed.accepted[0].details.auth.sessionControlClientLabel, "Desk Browser");
+});
+
+test("runtime ws upgrade handler keeps auth-disabled ws-ticket compatibility when trusted-local metadata is absent", async () => {
   const consumedTickets = [];
   const { dependencies, observed } = createBaseDependencies({
     config: {

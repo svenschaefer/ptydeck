@@ -2,6 +2,7 @@ import { ApiError } from "./errors.js";
 
 const DEFAULT_ALLOWED_SPECTATOR_ROUTE_KINDS = new Set(["listSessions", "getSession", "listDecks", "getDeck", "wsTicket"]);
 const DEFAULT_WS_AUTH_PROTOCOL_PREFIX = "ptydeck.auth.";
+const DEFAULT_WS_TRUSTED_LOCAL_CLIENT_PROTOCOL_PREFIX = "ptydeck.client.";
 
 function parseRequestedProtocols(headerValue) {
   if (typeof headerValue !== "string" || !headerValue.trim()) {
@@ -13,12 +14,22 @@ function parseRequestedProtocols(headerValue) {
     .filter(Boolean);
 }
 
+function decodeBase64UrlUtf8(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+  const normalized = value.trim().replace(/-/gu, "+").replace(/_/gu, "/");
+  const padded = `${normalized}${"=".repeat((4 - (normalized.length % 4)) % 4)}`;
+  return Buffer.from(padded, "base64").toString("utf8");
+}
+
 export function createRuntimeAccessPolicy(dependencies = {}) {
   const {
     shareLinks = new Map(),
     shareLinkPermissionModeReadOnly = "read_only",
     allowedSpectatorRouteKinds = DEFAULT_ALLOWED_SPECTATOR_ROUTE_KINDS,
     wsAuthProtocolPrefix = DEFAULT_WS_AUTH_PROTOCOL_PREFIX,
+    wsTrustedLocalClientProtocolPrefix = DEFAULT_WS_TRUSTED_LOCAL_CLIENT_PROTOCOL_PREFIX,
     now = () => Date.now()
   } = dependencies;
 
@@ -84,11 +95,40 @@ export function createRuntimeAccessPolicy(dependencies = {}) {
     return "";
   }
 
+  function resolveTrustedLocalWsClientMetadataFromProtocols(request) {
+    const protocols = parseRequestedProtocols(request?.headers?.["sec-websocket-protocol"]);
+    for (const protocol of protocols) {
+      if (!protocol.startsWith(wsTrustedLocalClientProtocolPrefix)) {
+        continue;
+      }
+      try {
+        const rawPayload = decodeBase64UrlUtf8(protocol.slice(wsTrustedLocalClientProtocolPrefix.length));
+        const parsed = JSON.parse(rawPayload);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          continue;
+        }
+        const clientId = typeof parsed.clientId === "string" ? parsed.clientId.trim() : "";
+        const label = typeof parsed.label === "string" ? parsed.label.trim() : "";
+        if (!clientId) {
+          continue;
+        }
+        return {
+          clientId,
+          ...(label ? { label } : {})
+        };
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
   return {
     ensureShareLinkAuthActive,
     ensureShareRouteAllowed,
     getShareLinkOrThrow,
     isSpectatorAuth,
+    resolveTrustedLocalWsClientMetadataFromProtocols,
     resolveWsTicketFromProtocols
   };
 }

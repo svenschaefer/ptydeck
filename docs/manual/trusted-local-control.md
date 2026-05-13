@@ -36,13 +36,15 @@ That keeps desktop and laptop form factors usable without forcing one shared lay
 
 In local development, trusted-local session control must survive a frontend-only reload without requiring a backend restart.
 
-That is why the browser now prefers a short-lived WebSocket ticket bootstrap even when `AUTH_MODE=off`:
+That is why the browser now keeps two separate WebSocket bootstrap paths:
 
-- the HTTP-side trusted-local client id/label can be carried through the WebSocket upgrade
+- with bearer auth enabled, the browser uses the short-lived `/auth/ws-ticket` bootstrap
+- with `AUTH_MODE=off`, the browser carries the trusted-local client id/label directly in the WebSocket subprotocol instead of making an extra HTTP ticket fetch
 - the backend can reattach the same logical local device after a refresh
 - session-control writes do not drift onto an ephemeral connection id just because the frontend was reloaded
+- local frontend refreshes do not gain a new fetch/preflight failure mode just to preserve trusted-local control
 
-If no ws-ticket creator is wired at all, the runtime still falls back to a bare `ptydeck.v1` protocol, but that is only the bounded compatibility path.
+If no trusted-local metadata is available at all, the runtime still falls back to a bare `ptydeck.v1` protocol, but that is only the bounded compatibility path.
 
 ## Origin Discipline
 

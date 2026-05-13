@@ -104,4 +104,19 @@ test("runtime access policy enforces spectator route allowlist and extracts ws t
   );
   assert.equal(policy.resolveWsTicketFromProtocols({ headers: { "sec-websocket-protocol": "json,other" } }), "");
   assert.equal(policy.resolveWsTicketFromProtocols({ headers: {} }), "");
+  assert.deepEqual(
+    policy.resolveTrustedLocalWsClientMetadataFromProtocols({
+      headers: {
+        "sec-websocket-protocol":
+          `json,ptydeck.client.${Buffer.from(JSON.stringify({ clientId: "trusted-local-1", label: "Desk Browser" }), "utf8").toString("base64url")}`
+      }
+    }),
+    { clientId: "trusted-local-1", label: "Desk Browser" }
+  );
+  assert.equal(
+    policy.resolveTrustedLocalWsClientMetadataFromProtocols({
+      headers: { "sec-websocket-protocol": "json,ptydeck.client.not-base64" }
+    }),
+    null
+  );
 });

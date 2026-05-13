@@ -8,6 +8,7 @@ test("ws-runtime controller wires state transitions, session-data routing, and r
   const traceEntries = [];
   let capturedHandlers = null;
   let capturedOptions = null;
+  let wsTicketCalls = 0;
   const client = { close() {} };
   const controller = createWsRuntimeController({
     createWsClient(url, handlers, options) {
@@ -27,13 +28,24 @@ test("ws-runtime controller wires state transitions, session-data routing, and r
     pushSessionData: (sessionId, data) => calls.push(["data", sessionId, data]),
     applyRuntimeEvent: (event) => calls.push(["event", event.type]),
     getWsAuthToken: () => "",
-    createWsTicket: async () => ({ ticket: "ticket-local-1" })
+    createWsTicket: async () => {
+      wsTicketCalls += 1;
+      return { ticket: "ticket-local-1" };
+    },
+    getTrustedLocalWsClientMetadata: () => ({ clientId: "trusted-local-1", label: "Desk Browser" })
   });
 
   const started = controller.start();
   assert.equal(started, client);
   assert.equal(typeof capturedOptions.protocolsProvider, "function");
-  assert.deepEqual(await capturedOptions.protocolsProvider(), ["ptydeck.v1", "ptydeck.auth.ticket-local-1"]);
+  const protocols = await capturedOptions.protocolsProvider();
+  assert.equal(protocols[0], "ptydeck.v1");
+  assert.match(protocols[1], /^ptydeck\.client\./);
+  assert.deepEqual(
+    JSON.parse(Buffer.from(protocols[1].slice("ptydeck.client.".length), "base64url").toString("utf8")),
+    { clientId: "trusted-local-1", label: "Desk Browser" }
+  );
+  assert.equal(wsTicketCalls, 0);
 
   capturedHandlers.onState("connected");
   capturedHandlers.onMessage({

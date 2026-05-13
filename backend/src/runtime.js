@@ -1259,6 +1259,7 @@ export function createRuntime(config) {
     ensureShareRouteAllowed,
     getShareLinkOrThrow,
     isSpectatorAuth,
+    resolveTrustedLocalWsClientMetadataFromProtocols,
     resolveWsTicketFromProtocols
   } = runtimeAccessPolicy;
   const runtimeHttpHelpers = createRuntimeHttpHelpers({
@@ -1539,6 +1540,7 @@ export function createRuntime(config) {
     accessTokenVerifier,
     wsTicketRegistry,
     resolveWsTicketFromProtocols,
+    resolveTrustedLocalWsClientMetadataFromProtocols,
     ensureShareLinkAuthActive,
     ensureShareRouteAllowed,
     logDebug,

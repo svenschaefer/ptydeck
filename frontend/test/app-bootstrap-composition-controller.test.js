@@ -424,8 +424,10 @@ test("app bootstrap composition controller forwards trusted-local ws ticket payl
   controller.composeControllers();
   await controller.bootstrapUiAndRuntime();
   const payload = await wsFactoryOptions.createWsTicket();
+  const trustedLocalClientMetadata = wsFactoryOptions.getTrustedLocalWsClientMetadata();
 
   assert.deepEqual(payload, { ticket: "t1" });
+  assert.deepEqual(trustedLocalClientMetadata, { clientId: "trusted-device-1", label: "Desk Browser" });
   assert.deepEqual(
     calls.filter((entry) => entry[0] === "ticket"),
     [["ticket", { clientId: "trusted-device-1", label: "Desk Browser" }]]

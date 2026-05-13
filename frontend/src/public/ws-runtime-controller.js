@@ -19,7 +19,35 @@ export function createWsRuntimeController(options = {}) {
   const recordTrace = typeof options.recordTrace === "function" ? options.recordTrace : () => {};
   const getWsAuthToken = options.getWsAuthToken || (() => "");
   const createWsTicket = typeof options.createWsTicket === "function" ? options.createWsTicket : null;
+  const getTrustedLocalWsClientMetadata =
+    typeof options.getTrustedLocalWsClientMetadata === "function" ? options.getTrustedLocalWsClientMetadata : null;
   const bootstrapDevAuthToken = options.bootstrapDevAuthToken || (() => Promise.resolve(false));
+
+  function encodeBase64UrlUtf8(value = "") {
+    const source = String(value);
+    if (typeof TextEncoder === "function" && typeof btoa === "function") {
+      const bytes = new TextEncoder().encode(source);
+      let binary = "";
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+      return btoa(binary).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/u, "");
+    }
+    if (typeof btoa === "function") {
+      return btoa(unescape(encodeURIComponent(source))).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/u, "");
+    }
+    throw new Error("No base64 encoder is available for trusted-local WebSocket client metadata.");
+  }
+
+  function encodeTrustedLocalClientProtocol(value = {}) {
+    const clientId = typeof value.clientId === "string" ? value.clientId.trim() : "";
+    const label = typeof value.label === "string" ? value.label.trim() : "";
+    if (!clientId) {
+      return "";
+    }
+    const payload = JSON.stringify({ clientId, ...(label ? { label } : {}) });
+    return `ptydeck.client.${encodeBase64UrlUtf8(payload)}`;
+  }
 
   function normalizeInterpretationResult(result) {
     if (Array.isArray(result)) {
@@ -104,10 +132,14 @@ export function createWsRuntimeController(options = {}) {
       debug,
       log,
       protocolsProvider: async () => {
+        const authToken = getWsAuthToken();
+        if (!authToken) {
+          const trustedLocalProtocol = encodeTrustedLocalClientProtocol(getTrustedLocalWsClientMetadata?.() || {});
+          return trustedLocalProtocol ? ["ptydeck.v1", trustedLocalProtocol] : ["ptydeck.v1"];
+        }
         if (!createWsTicket) {
           return ["ptydeck.v1"];
         }
-        const authToken = getWsAuthToken();
         let payload;
         try {
           payload = await createWsTicket();

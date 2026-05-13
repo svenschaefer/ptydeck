@@ -22,6 +22,7 @@ export function createRuntimeWsUpgradeHandler(dependencies = {}) {
     accessTokenVerifier = { verifyAccessToken: async () => null },
     wsTicketRegistry = { consume: () => null },
     resolveWsTicketFromProtocols = () => "",
+    resolveTrustedLocalWsClientMetadataFromProtocols = () => null,
     ensureShareLinkAuthActive = () => {},
     ensureShareRouteAllowed = () => {},
     logDebug = () => {},
@@ -94,6 +95,7 @@ export function createRuntimeWsUpgradeHandler(dependencies = {}) {
 
       let auth = null;
       const wsTicket = resolveWsTicketFromProtocols(request);
+      const trustedLocalWsClientMetadata = resolveTrustedLocalWsClientMetadataFromProtocols(request);
       if (config.authEnabled) {
         try {
           const token = resolveBearerToken(request, requestUrl);
@@ -114,6 +116,11 @@ export function createRuntimeWsUpgradeHandler(dependencies = {}) {
           writeUpgradeErrorResponse(socket, mapped.statusCode, mapped.body.error, mapped.body);
           return false;
         }
+      } else if (trustedLocalWsClientMetadata?.clientId) {
+        auth = {
+          sessionControlClientId: trustedLocalWsClientMetadata.clientId,
+          sessionControlClientLabel: trustedLocalWsClientMetadata.label || ""
+        };
       } else if (wsTicket) {
         try {
           auth = wsTicketRegistry.consume(wsTicket);

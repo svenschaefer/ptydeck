@@ -356,6 +356,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
       getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
       createWsTicket: () => api?.createWsTicket?.(getWsTicketPayload()),
+      getTrustedLocalWsClientMetadata: () => getWsTicketPayload(),
       bootstrapDevAuthToken: (runtimeOptions) => appRuntimeStateController?.bootstrapDevAuthToken?.(runtimeOptions)
     });
 

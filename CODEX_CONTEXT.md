@@ -68,9 +68,10 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - `frontend/src/public/ws-client.js` must treat each connection attempt as a generation and ignore `open`, `message`, `error`, and `close` events from older sockets once a newer generation has taken over
   - without that guard, a late `close` or `error` from an earlier socket can incorrectly push the UI back into `reconnecting` and schedule extra reconnect work after a newer socket has already connected
 - Trusted-local session control now has one more local-dev transport invariant:
-  - when the app runtime has a `createWsTicket(...)` path available, `frontend/src/public/ws-runtime-controller.js` must prefer the ws-ticket bootstrap even without a bearer token so the browser can carry its stable trusted-local client id/label through the WebSocket upgrade
-  - `backend/src/runtime-ws-tickets.js` and `backend/src/runtime-ws-upgrade.js` must therefore accept and consume trusted-local ws tickets in `AUTH_MODE=off`, instead of falling back to ephemeral connection-id-only control attachment state on each frontend refresh
-  - the bare `ptydeck.v1` WebSocket protocol remains only as the bounded fallback when no ws-ticket creator is wired at all
+  - with bearer auth enabled, `frontend/src/public/ws-runtime-controller.js` must keep using the `/auth/ws-ticket` bootstrap so the browser can carry authenticated session-control identity through the WebSocket upgrade without exposing bearer material in the subprotocol
+  - with `AUTH_MODE=off`, that same runtime must not introduce an extra HTTP ticket fetch just to preserve trusted-local control; it now carries the stable trusted-local client id/label directly in a `ptydeck.client.<base64url-json>` WebSocket subprotocol instead
+  - `backend/src/runtime-access-policy.js` now parses that trusted-local metadata protocol, and `backend/src/runtime-ws-upgrade.js` consumes it in auth-disabled mode to restore the same logical local device after a frontend-only refresh without drifting back to an ephemeral connection id
+  - auth-disabled ws tickets remain only as a bounded compatibility path when an older client still presents them, and the bare `ptydeck.v1` protocol remains the final fallback when no trusted-local metadata is available at all
 - Restored stopped secret-backed SSH sessions now surface an explicit fail-closed restart status:
   - the backend API can publish `startBlockedReason: remote-secret-unavailable`
   - the session-view-model maps that to a concrete operator-facing explanation
