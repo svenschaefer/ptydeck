@@ -13,6 +13,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`, plus one-shot SSH launches through `/ssh ...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
 - Server-persisted operator-client composer placement modes with a shared footer, active-terminal overlay placement, and per-terminal pinned overlays
+- Conservative composer `Normalize` actions for the shared footer and pinned overlays before `Send`
 - Session-card hover quick actions with per-session top custom-command favorites plus direct `Clipboard` send
 - Session replay/export, replay-excerpt clipboard relay via `/replay ...` and `/ccp`, file transfer, read-only sharing, and saved connection profiles
 - Multi-device terminal-control foundation with visible control metadata, take/release/transfer control actions, trusted-local scope takeover (`all sessions`, `this deck`, `this session`), and automatic device-local layout recall on successful takeover

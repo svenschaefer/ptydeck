@@ -50,6 +50,20 @@
 
 <p>Use the <a href="/handbook/reference/session-settings.html#input-tab">session settings reference</a> for the exact input-safety switches and thresholds.</p>
 
+<h2 id="composer-normalize">Composer Normalize</h2>
+
+<p>The composer now also exposes a <code>Normalize</code> action above <code>Send</code> in the shared footer and in pinned overlay composers.</p>
+
+<p><code>Normalize</code> is intentionally conservative:</p>
+
+<ul>
+<li>normalize CRLF to LF</li>
+<li>strip trailing horizontal whitespace on each line</li>
+<li>trim outer whitespace</li>
+</ul>
+
+<p>It does not try to repair structure or rewrite internal indentation.</p>
+
 <h2 id="composer-placement-modes">Composer Placement Modes</h2>
 
 <p><code>ptydeck</code> now supports two server-persisted composer placement modes for each operator client:</p>
@@ -100,6 +114,7 @@
 <li>the session&#39;s send terminator</li>
 <li>whether the session has stricter send-safety rules enabled</li>
 <li>whether the operator client is using <code>shared-footer</code>, <code>active-overlay</code>, or one or more pinned overlays</li>
+<li>whether <code>Normalize</code> should be applied before sending copied multiline input</li>
 </ol>
 
 <p>The field-level truth stays in the <a href="/handbook/reference/session-settings.html#input-tab">generated input reference</a>.</p>
@@ -108,6 +123,7 @@
         <p class="handbook-page-toc-title">On This Page</p>
         <ul class="handbook-page-toc-list">
 <li><a class="handbook-page-toc-link" href="#guarded-sends">Guarded Sends</a></li>
+<li><a class="handbook-page-toc-link" href="#composer-normalize">Composer Normalize</a></li>
 <li><a class="handbook-page-toc-link" href="#composer-placement-modes">Composer Placement Modes</a></li>
 <li><a class="handbook-page-toc-link" href="#terminal-local-paste">Terminal-Local Paste</a></li>
 <li><a class="handbook-page-toc-link" href="#auto-continue">Auto Continue</a></li>

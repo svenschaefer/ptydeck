@@ -515,6 +515,48 @@ test("operator composer placement controller does not rewrite the focused shared
   controller.dispose();
 });
 
+test("operator composer placement controller normalizes shared footer drafts and persists them", async () => {
+  const patchCalls = [];
+  let sharedRefreshCount = 0;
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const commandInput = new FakeElement("textarea");
+  const normalizeBtn = new FakeElement("button");
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState(payload);
+      }
+    },
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput,
+    normalizeBtn,
+    scheduleSharedCommandRefresh: () => {
+      sharedRefreshCount += 1;
+    }
+  });
+
+  commandInput.value = "  echo ok  \r\nls -la  \n";
+  normalizeBtn.dispatch("click");
+
+  await waitForTurn();
+  await waitForTurn();
+
+  assert.equal(commandInput.value, "echo ok\nls -la");
+  assert.equal(controller.getState().sharedDraft, "echo ok\nls -la");
+  assert.deepEqual(patchCalls, [{ sharedDraft: "echo ok\nls -la" }]);
+  assert.equal(sharedRefreshCount, 1);
+  controller.dispose();
+});
+
 test("operator composer placement controller ignores stale pinned-draft echoes while local pinned input is newer", async () => {
   const patchCalls = [];
   const documentRef = createDocumentRef();
@@ -593,5 +635,75 @@ test("operator composer placement controller ignores stale pinned-draft echoes w
 
   assert.equal(pinnedTextarea.value, "client-new");
   assert.deepEqual(controller.getState().pinnedDrafts, { [session.id]: "client-new" });
+  controller.dispose();
+});
+
+test("operator composer placement controller normalizes pinned drafts and persists them", async () => {
+  const patchCalls = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const session = { id: "s-pin-normalize", name: "Pinned Normalize" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 40 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState({
+          mode: "active-overlay",
+          pinnedSessionIds: [session.id],
+          pinnedDrafts: payload.pinnedDrafts || {}
+        });
+      }
+    },
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput: new FakeElement("textarea"),
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session,
+    formatSessionToken: () => "P",
+    formatSessionDisplayName: (entry) => entry?.name || ""
+  });
+
+  controller.applyPlacementState(
+    createApiState({
+      mode: "active-overlay",
+      pinnedSessionIds: [session.id],
+      pinnedDrafts: { [session.id]: "  echo ok  \r\npwd  \n" }
+    })
+  );
+
+  const pinnedRoot = overlayHostEl.firstChild;
+  const pinnedTextarea = pinnedRoot?.children?.[2]?.children?.[0]?.children?.[0]?.children?.[0]?.children?.[0] || null;
+  const normalizeBtn = pinnedRoot?.children?.[2]?.children?.[0]?.children?.[0]?.children?.[1]?.children?.[0] || null;
+  assert.ok(pinnedTextarea);
+  assert.ok(normalizeBtn);
+
+  normalizeBtn.dispatch("click");
+
+  await waitForTurn();
+  await waitForTurn();
+
+  assert.equal(pinnedTextarea.value, "echo ok\npwd");
+  assert.deepEqual(controller.getState().pinnedDrafts, { [session.id]: "echo ok\npwd" });
+  assert.deepEqual(patchCalls, [{ pinnedDrafts: { [session.id]: "echo ok\npwd" } }]);
   controller.dispose();
 });

@@ -15,6 +15,18 @@ The control pane states that nothing has been sent yet, then shows `Send anyway`
 
 Use the [session settings reference](../reference/session-settings.md#input-tab) for the exact input-safety switches and thresholds.
 
+## Composer Normalize
+
+The composer now also exposes a `Normalize` action above `Send` in the shared footer and in pinned overlay composers.
+
+`Normalize` is intentionally conservative:
+
+- normalize CRLF to LF
+- strip trailing horizontal whitespace on each line
+- trim outer whitespace
+
+It does not try to repair structure or rewrite internal indentation.
+
 ## Composer Placement Modes
 
 `ptydeck` now supports two server-persisted composer placement modes for each operator client:
@@ -58,5 +70,6 @@ When paste behavior differs across sessions, compare these first:
 2. the session's send terminator
 3. whether the session has stricter send-safety rules enabled
 4. whether the operator client is using `shared-footer`, `active-overlay`, or one or more pinned overlays
+5. whether `Normalize` should be applied before sending copied multiline input
 
 The field-level truth stays in the [generated input reference](../reference/session-settings.md#input-tab).

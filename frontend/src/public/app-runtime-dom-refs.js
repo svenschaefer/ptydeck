@@ -119,6 +119,7 @@ export function collectAppRuntimeDomRefs(documentRef = globalThis.document) {
     workspaceGroupSummaryEl: getElementById("workspace-group-summary"),
     workspaceGroupPersistenceEl: getElementById("workspace-group-persistence"),
     commandInput: getElementById("command-input"),
+    normalizeBtn: getElementById("normalize-command"),
     sendBtn: getElementById("send-command"),
     template: getElementById("terminal-card-template"),
     emptyStateEl: getElementById("empty-state"),

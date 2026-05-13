@@ -72,6 +72,13 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - focused shared-footer and pinned-overlay textareas must not be programmatically rewritten from server placement state while they still hold focus
   - deliberate local semantic transitions such as pin/unpin draft transfer may still move or clear the shared draft explicitly
   - regression coverage now locks down the focused shared-footer no-overwrite contract in `frontend/test/operator-composer-placement-runtime-controller.test.js`
+- The composer-placement runtime now also exposes one explicit conservative whitespace-normalization action before `Send`:
+  - the shared footer composer now has a `Normalize` button above the primary `Send` button
+  - pinned overlay composers now expose the same `Normalize` action inside their action column
+  - the normalize action must normalize CRLF to LF, strip trailing horizontal whitespace on each line, and trim outer whitespace only
+  - it must not rewrite internal indentation or otherwise attempt structure-aware repair
+  - shared normalize persists through the same server-side `sharedDraft` authority, and pinned normalize persists through the same server-side `pinnedDrafts` authority
+  - regression coverage now locks down both the shared-footer normalize path and the pinned-overlay normalize path in `frontend/test/operator-composer-placement-runtime-controller.test.js`
 
 ## Current Quality Baseline
 

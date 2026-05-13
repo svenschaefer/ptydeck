@@ -898,6 +898,14 @@ body {
   align-items: start;
 }
 
+.command-actions-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+  min-width: 96px;
+}
+
 .command-input-wrap {
   position: relative;
   min-width: 0;
@@ -955,12 +963,22 @@ body {
   color: var(--muted);
 }
 
-.command-entry-row button {
-  justify-self: end;
-  align-self: stretch;
-  min-width: 96px;
-  height: 100%;
-  min-height: var(--command-composer-min-height);
+.command-actions-column button {
+  width: 100%;
+}
+
+.command-normalize-btn,
+.session-composer-overlay-normalize {
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.command-send-btn,
+.session-composer-overlay-send {
+  flex: 1 1 auto;
+  min-height: calc(var(--command-composer-min-height) - 46px);
 }
 
 .status-message {
@@ -1732,9 +1750,9 @@ button:hover {
 }
 
 .session-composer-overlay-unpin,
+.session-composer-overlay-normalize,
 .session-composer-overlay-guard-send,
-.session-composer-overlay-guard-cancel,
-.session-composer-overlay-send {
+.session-composer-overlay-guard-cancel {
   min-height: 32px;
 }
 

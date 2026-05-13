@@ -32,6 +32,7 @@ test("composer placement mode selector and per-session overlay anchors are prese
   assert.match(indexHtml, /id="composer-placement-mode"/);
   assert.match(indexHtml, /<option value="shared-footer">Footer<\/option>/);
   assert.match(indexHtml, /<option value="active-overlay">Overlay<\/option>/);
+  assert.match(indexHtml, /id="normalize-command"/);
   assert.match(indexHtml, /class="session-composer-pin"/);
   assert.match(indexHtml, /class="session-composer-overlay-host" hidden/);
   assert.match(indexHtml, /id="control-pane-body"/);

@@ -58,3 +58,7 @@ Notes:
 - [ ] `MSG-009` Owner `PLAT`: After a new automatic outbound baseline exists again, add an interaction-oriented Discord adapter path that preserves the same single-user ptydeck authority boundaries while validating a richer button- or workflow-driven remote interaction surface instead of only plain outbound message parity.
 - [ ] `MSG-010` Owner `PLAT`: After the third attempt is proven on at least one live outbound path plus Discord, add a Slack-style workflow-oriented adapter focused on concise summaries, handoff context, and approval/status-style workflows rather than stream mirroring.
 - [ ] `MSG-011` Owner `QA`: After a second concrete post-reset outbound adapter lands, add cross-adapter parity and contract validation ensuring provider-specific adapters still honor the same normalized event model, bounded action vocabulary, and ptydeck authority rules.
+
+### Composer Input Repair
+
+- [ ] `CMP-405` Owner `FE`: Add an opt-in structure-aware composer repair action on top of the conservative `Normalize` action. The feature must fail closed unless it can confidently recognize a specific format such as shell command blocks, JSON, or XML, and it must never silently rewrite ambiguous multiline input.

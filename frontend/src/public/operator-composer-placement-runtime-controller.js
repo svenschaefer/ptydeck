@@ -132,6 +132,12 @@ function appendText(node, text) {
   node.textContent = typeof text === "string" ? text : String(text || "");
 }
 
+function normalizeComposerDraftWhitespace(value) {
+  const normalized = String(value ?? "").replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n").map((line) => line.replace(/[ \t\u00a0]+$/g, ""));
+  return lines.join("\n").trim();
+}
+
 function createOverlayNode(documentRef, className, tagName = "div") {
   return documentRef?.createElement?.(tagName) || {
     className,
@@ -201,12 +207,20 @@ function buildPinnedOverlaySurface(documentRef) {
   commandInputWrap.appendChild(textarea);
   commandInputWrap.appendChild(inlineHintEl);
   commandInputWrap.appendChild(previewEl);
+  const actionsColumn = createOverlayNode(documentRef, "command-actions-column");
+  actionsColumn.className = "command-actions-column";
+  const normalizeBtn = createOverlayNode(documentRef, "session-composer-overlay-normalize", "button");
+  normalizeBtn.className = "session-composer-overlay-normalize";
+  normalizeBtn.type = "button";
+  normalizeBtn.textContent = "Normalize";
   const sendBtn = createOverlayNode(documentRef, "session-composer-overlay-send", "button");
   sendBtn.className = "session-composer-overlay-send";
   sendBtn.type = "button";
   sendBtn.textContent = "Send";
   commandEntryRow.appendChild(commandInputWrap);
-  commandEntryRow.appendChild(sendBtn);
+  actionsColumn.appendChild(normalizeBtn);
+  actionsColumn.appendChild(sendBtn);
+  commandEntryRow.appendChild(actionsColumn);
   commandInputColumn.appendChild(commandEntryRow);
 
   const guardEl = createOverlayNode(documentRef, "command-guard", "section");
@@ -258,6 +272,7 @@ function buildPinnedOverlaySurface(documentRef) {
     textarea,
     inlineHintEl,
     previewEl,
+    normalizeBtn,
     sendBtn,
     guardEl,
     guardSummaryEl,
@@ -400,6 +415,28 @@ function createPinnedSurfaceController(options = {}) {
     onDraftChange(String(refs.textarea.value || ""));
   }
 
+  function normalizeDraft() {
+    if (refs.textarea.disabled) {
+      return false;
+    }
+    const currentValue = String(refs.textarea.value || "");
+    const nextValue = normalizeComposerDraftWhitespace(currentValue);
+    if (currentValue === nextValue) {
+      refs.textarea.focus?.();
+      return false;
+    }
+    suppressDraftSync = true;
+    refs.textarea.value = nextValue;
+    suppressDraftSync = false;
+    persistDraft();
+    composerRuntimeController?.scheduleCommandPreview?.();
+    autocompleteController?.scheduleSuggestions?.();
+    render();
+    refs.textarea.focus?.();
+    refs.textarea.setSelectionRange?.(nextValue.length, nextValue.length);
+    return true;
+  }
+
   autocompleteController = createCommandComposerAutocompleteController({
     windowRef,
     documentRef,
@@ -520,6 +557,9 @@ function createPinnedSurfaceController(options = {}) {
       setError(getErrorMessage(error, "Failed to send command."));
     });
   });
+  refs.normalizeBtn.addEventListener?.("click", () => {
+    normalizeDraft();
+  });
   refs.guardSendOnceBtn.addEventListener?.("click", () => {
     composerRuntimeController?.confirmPendingSend?.().catch((error) => {
       setError(getErrorMessage(error, "Failed to send guarded command."));
@@ -584,6 +624,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     controlPaneResizeHandleEl = null,
     composerPlacementModeSelectEl = null,
     commandInput = null,
+    normalizeBtn = null,
     terminals = new Map(),
     getState = () => ({ sessions: [], decks: [], activeSessionId: "" }),
     getSessionById = () => null,
@@ -1141,6 +1182,27 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     queuePersistPatch({ sharedDraft: placementState.sharedDraft });
   }
 
+  function normalizeSharedDraft() {
+    if (!commandInput || commandInput.disabled) {
+      return false;
+    }
+    const currentValue = String(commandInput.value || "");
+    const nextValue = normalizeComposerDraftWhitespace(currentValue);
+    if (currentValue === nextValue) {
+      commandInput.focus?.();
+      return false;
+    }
+    placementState.sharedDraft = nextValue;
+    setPendingSharedDraft(placementState.sharedDraft);
+    commandInput.value = nextValue;
+    scheduleSharedCommandRefresh();
+    queuePersistPatch({ sharedDraft: placementState.sharedDraft });
+    commandInput.focus?.();
+    commandInput.setSelectionRange?.(nextValue.length, nextValue.length);
+    render();
+    return true;
+  }
+
   function bindUiEvents() {
     if (!sharedInputListener && commandInput) {
       sharedInputListener = () => setSharedDraftFromInput();
@@ -1157,6 +1219,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       commandInput.addEventListener?.("blur", sharedBlurListener);
       commandInput.addEventListener?.("focus", sharedFocusListener);
     }
+    normalizeBtn?.addEventListener?.("click", normalizeSharedDraft);
     if (!modeChangeListener && composerPlacementModeSelectEl && typeof composerPlacementModeSelectEl.addEventListener === "function") {
       modeChangeListener = () => {
         void setMode(composerPlacementModeSelectEl.value || SHARED_FOOTER_MODE);
@@ -1192,6 +1255,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     commandInput?.removeEventListener?.("change", sharedChangeListener);
     commandInput?.removeEventListener?.("blur", sharedBlurListener);
     commandInput?.removeEventListener?.("focus", sharedFocusListener);
+    normalizeBtn?.removeEventListener?.("click", normalizeSharedDraft);
     composerPlacementModeSelectEl?.removeEventListener?.("change", modeChangeListener);
     for (const sessionId of Array.from(pinnedSurfaces.keys())) {
       disposePinnedSurface(sessionId);

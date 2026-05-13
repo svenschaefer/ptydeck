@@ -589,6 +589,7 @@ function createDocumentFixture() {
   settingsRows.value = "20";
   const settingsApply = new FakeElement({ id: "settings-apply", tagName: "button" });
   const commandInput = new FakeElement({ id: "command-input", tagName: "textarea" });
+  const normalizeCommand = new FakeElement({ id: "normalize-command", tagName: "button" });
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
@@ -744,6 +745,7 @@ function createDocumentFixture() {
     settingsRows,
     settingsApply,
     commandInput,
+    normalizeCommand,
     sendCommand,
     emptyState,
     statusMessage,
@@ -870,6 +872,7 @@ function createDocumentFixture() {
       settingsRows,
       settingsApply,
       commandInput,
+      normalizeCommand,
       sendCommand,
       emptyState,
       statusMessage,
