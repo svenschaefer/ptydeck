@@ -7,6 +7,27 @@ import {
   requestComposerRepairCandidate
 } from "../src/public/composer-repair-runtime.js";
 
+class FakeXmlDocument {
+  constructor(hasError) {
+    this.documentElement = { nodeName: hasError ? "parsererror" : "root" };
+    this._hasError = hasError;
+  }
+
+  getElementsByTagName(name) {
+    return name === "parsererror" && this._hasError ? [{ nodeName: "parsererror" }] : [];
+  }
+}
+
+class FakeDomParser {
+  parseFromString(source, mimeType) {
+    assert.equal(mimeType, "application/xml");
+    const text = String(source ?? "");
+    const hasAttributeWrap = /<note title="Hello\s*\n\s*world">/.test(text);
+    const hasTextWrap = /<message>Hello\s*\n\s*world<\/message>/.test(text);
+    return new FakeXmlDocument(hasAttributeWrap || hasTextWrap);
+  }
+}
+
 test("composer repair runtime builds a simple line diff for changed multiline input", () => {
   const diff = buildComposerRepairDiff("echo one\nbroken", "echo one\nfixed");
   assert.equal(diff, " echo one\n-broken\n+fixed");
@@ -85,4 +106,38 @@ test("composer repair runtime repairs wrapped JSON string values and validates t
   assert.equal(candidate?.languageFamily, "json");
   assert.ok(Math.abs((candidate?.confidence || 0) - 0.84) < 0.001);
   assert.deepEqual(candidate?.operations, ["joined wrapped JSON string"]);
+});
+
+test("composer repair runtime repairs wrapped XML attribute values with parser-backed validation", () => {
+  const originalDomParser = globalThis.DOMParser;
+  globalThis.DOMParser = FakeDomParser;
+
+  try {
+    const candidate = requestComposerRepairCandidate({
+      draft: "<note title=\"Hello\nworld\"><body>ok</body></note>"
+    });
+    assert.equal(candidate?.repairedText, "<note title=\"Helloworld\"><body>ok</body></note>");
+    assert.equal(candidate?.languageFamily, "xml");
+    assert.ok(Math.abs((candidate?.confidence || 0) - 0.76) < 0.001);
+    assert.deepEqual(candidate?.operations, ["joined wrapped XML attribute value"]);
+  } finally {
+    globalThis.DOMParser = originalDomParser;
+  }
+});
+
+test("composer repair runtime repairs wrapped XML text nodes conservatively with parser-backed validation", () => {
+  const originalDomParser = globalThis.DOMParser;
+  globalThis.DOMParser = FakeDomParser;
+
+  try {
+    const candidate = requestComposerRepairCandidate({
+      draft: "<message>Hello\nworld</message>"
+    });
+    assert.equal(candidate?.repairedText, "<message>Hello world</message>");
+    assert.equal(candidate?.languageFamily, "xml");
+    assert.ok(Math.abs((candidate?.confidence || 0) - 0.76) < 0.001);
+    assert.deepEqual(candidate?.operations, ["joined wrapped XML text"]);
+  } finally {
+    globalThis.DOMParser = originalDomParser;
+  }
 });

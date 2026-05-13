@@ -667,6 +667,75 @@ test("operator composer placement controller opens a shared repair preview and o
   controller.dispose();
 });
 
+test("operator composer placement controller cancels a shared repair preview without mutating the draft", async () => {
+  const patchCalls = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const commandInput = new FakeElement("textarea");
+  const repairBtn = new FakeElement("button");
+  const repairEl = new FakeElement("section");
+  repairEl.hidden = true;
+  const repairSummaryEl = new FakeElement("p");
+  const repairDetailEl = new FakeElement("p");
+  const repairOriginalEl = new FakeElement("pre");
+  const repairOutputWrapEl = new FakeElement("section");
+  repairOutputWrapEl.hidden = true;
+  const repairOutputEl = new FakeElement("pre");
+  const repairDiffWrapEl = new FakeElement("section");
+  repairDiffWrapEl.hidden = true;
+  const repairDiffEl = new FakeElement("pre");
+  const repairApplyBtn = new FakeElement("button");
+  repairApplyBtn.hidden = true;
+  const repairCancelBtn = new FakeElement("button");
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState(payload);
+      }
+    },
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput,
+    repairBtn,
+    repairEl,
+    repairSummaryEl,
+    repairDetailEl,
+    repairOriginalEl,
+    repairOutputWrapEl,
+    repairOutputEl,
+    repairDiffWrapEl,
+    repairDiffEl,
+    repairApplyBtn,
+    repairCancelBtn,
+    requestRepairCandidate: async () => ({
+      repairedText: "<message>Hello world</message>",
+      languageFamily: "xml",
+      confidence: 0.76,
+      operations: ["joined wrapped XML text"]
+    })
+  });
+
+  commandInput.value = "<message>Hello\nworld</message>";
+  repairBtn.dispatch("click");
+  await waitForTurn();
+
+  assert.equal(repairEl.hidden, false);
+  repairCancelBtn.dispatch("click");
+
+  assert.equal(commandInput.value, "<message>Hello\nworld</message>");
+  assert.equal(repairEl.hidden, true);
+  assert.deepEqual(controller.getState().sharedDraft, "");
+  assert.deepEqual(patchCalls, []);
+  controller.dispose();
+});
+
 test("operator composer placement controller ignores stale pinned-draft echoes while local pinned input is newer", async () => {
   const patchCalls = [];
   const documentRef = createDocumentRef();

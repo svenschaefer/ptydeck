@@ -84,12 +84,13 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - the original draft must remain recoverable until the operator explicitly clicks `Apply Repair`
   - the shared footer and pinned overlay composers both persist applied repairs through the same server-authoritative `sharedDraft` / `pinnedDrafts` placement channels
   - the current shipped regression coverage locks down both the shared and pinned preview/apply flows in `frontend/test/operator-composer-placement-runtime-controller.test.js`
-- Structure-aware composer repair is now partially shipped inside the active `v0.4.0-H184` wave:
+- Structure-aware composer repair is now fully shipped as the closed `v0.4.0-H184` wave:
   - `Normalize` is the shipped conservative cleanup path and must remain deterministic and safe
   - `Repair` is explicitly not classic linting; the target problem is damaged technical syntax reconstruction rather than rule checking on already valid input
   - the shell-family repair slice is now live for Bash/POSIX shell, PowerShell, and CMD through `frontend/src/public/composer-repair-runtime.js`, using bounded hard-wrap, quote-continuation, path/URL continuation, explicit line-continuation collapse, and wrapped value joins with confidence gating and fail-closed validation
   - the JSON repair slice is now live through the same runtime, currently limited to wrapped JSON string reconstruction with strict `JSON.parse` validation
-  - XML repair and the broader acceptance closeout remain open as `CMP-409` and `CMP-410`
+  - the XML repair slice is now live through the same runtime, currently limited to conservative wrapped text and attribute-value continuation with strict browser parser validation
+  - repair regressions now cover preview/apply and cancel behavior, ambiguity fail-closed behavior, original-draft preservation, and shell/JSON/XML repair corpora
   - the retained design frame continues to live in `docs/Composer Input Repair Design.md`
 
 ## Current Quality Baseline

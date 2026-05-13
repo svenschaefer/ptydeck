@@ -14,18 +14,17 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H184` Composer Input Repair
+  - `None.`
 - Queued next waves:
   - `None.`
 
 ## Active Wave Order
 
-1. `CMP-409` Owner `FE`
-2. `CMP-410` Owner `QA`
+1. `None.`
 
 ## Wave Dependencies
 
-- `CMP-409 -> CMP-410`
+- `None.`
 
 ## Queued Wave Order
 

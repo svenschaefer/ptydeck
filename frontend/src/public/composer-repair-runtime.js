@@ -361,6 +361,10 @@ export function requestComposerRepairCandidate({ draft } = {}) {
   if (jsonCandidate) {
     return jsonCandidate;
   }
+  const xmlCandidate = requestXmlRepairCandidate(originalDraft);
+  if (xmlCandidate) {
+    return xmlCandidate;
+  }
   const shellCandidate = requestShellRepairCandidate(originalDraft);
   if (shellCandidate) {
     return shellCandidate;
@@ -502,6 +506,175 @@ function requestJsonRepairCandidate(originalDraft) {
   return {
     repairedText: output,
     languageFamily: "json",
+    confidence,
+    operations: Array.from(new Set(operations))
+  };
+}
+
+function isLikelyXmlText(draft) {
+  const trimmed = normalizeText(draft);
+  if (!trimmed || !trimmed.startsWith("<")) {
+    return false;
+  }
+  return /<([A-Za-z_][\w:.-]*)(\s|>|\/>)/.test(trimmed) && /<\/?[A-Za-z_]/.test(trimmed);
+}
+
+function createXmlParser() {
+  if (typeof globalThis.DOMParser !== "function") {
+    return null;
+  }
+  try {
+    return new globalThis.DOMParser();
+  } catch {
+    return null;
+  }
+}
+
+function hasXmlParserError(documentRef) {
+  if (!documentRef || typeof documentRef !== "object") {
+    return true;
+  }
+  const rootName = normalizeText(documentRef?.documentElement?.nodeName).toLowerCase();
+  if (rootName === "parsererror") {
+    return true;
+  }
+  if (typeof documentRef.getElementsByTagName === "function") {
+    try {
+      return Array.from(documentRef.getElementsByTagName("parsererror") || []).length > 0;
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
+function validateXmlText(text) {
+  const parser = createXmlParser();
+  if (!parser || typeof parser.parseFromString !== "function") {
+    return false;
+  }
+  try {
+    const documentRef = parser.parseFromString(String(text ?? ""), "application/xml");
+    return !hasXmlParserError(documentRef);
+  } catch {
+    return false;
+  }
+}
+
+function analyzeXmlJoinContext(text) {
+  const source = String(text ?? "");
+  let insideTag = false;
+  let attributeQuote = null;
+  let lastClosedTagIndex = -1;
+  let lastOpenedTagIndex = -1;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (attributeQuote) {
+      if (char === attributeQuote) {
+        attributeQuote = null;
+      }
+      continue;
+    }
+    if (insideTag) {
+      if (char === "\"" || char === "'") {
+        attributeQuote = char;
+        continue;
+      }
+      if (char === ">") {
+        insideTag = false;
+        lastClosedTagIndex = index;
+      }
+      continue;
+    }
+    if (char === "<") {
+      insideTag = true;
+      lastOpenedTagIndex = index;
+    }
+  }
+
+  const trailingSegment = lastClosedTagIndex >= 0 ? source.slice(lastClosedTagIndex + 1) : source;
+  return {
+    insideTag,
+    attributeQuote,
+    insideAttributeValue: Boolean(attributeQuote),
+    insideTextNode:
+      !insideTag &&
+      !attributeQuote &&
+      trailingSegment.trim() !== "" &&
+      trailingSegment.lastIndexOf("<") === -1 &&
+      lastOpenedTagIndex <= lastClosedTagIndex
+  };
+}
+
+function tryJoinXmlLine(previousText, nextLine) {
+  const previous = String(previousText ?? "");
+  const trimmedNext = String(nextLine ?? "").replace(/^\s+/, "");
+  if (!trimmedNext) {
+    return null;
+  }
+
+  const context = analyzeXmlJoinContext(previous);
+  if (context.insideAttributeValue) {
+    return {
+      text: `${previous}${trimmedNext}`,
+      operation: "joined wrapped XML attribute value"
+    };
+  }
+  if (context.insideTextNode && !trimmedNext.startsWith("<")) {
+    const separator = /[-/]$/.test(previous.trimEnd()) ? "" : " ";
+    return {
+      text: `${previous.replace(/[ \t]+$/, "")}${separator}${trimmedNext}`,
+      operation: "joined wrapped XML text"
+    };
+  }
+  return null;
+}
+
+function requestXmlRepairCandidate(originalDraft) {
+  if (!isLikelyXmlText(originalDraft)) {
+    return null;
+  }
+  const normalized = originalDraft.replace(/\r\n?/g, "\n");
+  const lines = splitLines(normalized);
+  if (lines.length < 2) {
+    return null;
+  }
+
+  const parser = createXmlParser();
+  if (!parser || typeof parser.parseFromString !== "function") {
+    return null;
+  }
+
+  const operations = [];
+  let output = lines[0].trimEnd();
+  for (let index = 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    const joinResult = tryJoinXmlLine(output, line);
+    if (!joinResult) {
+      output = `${output}\n${line}`;
+      continue;
+    }
+    output = joinResult.text;
+    operations.push(joinResult.operation);
+  }
+
+  if (output === normalized || operations.length === 0) {
+    return null;
+  }
+
+  if (!validateXmlText(output)) {
+    return null;
+  }
+
+  const confidence = clampConfidence(0.58 + operations.length * 0.18);
+  if (confidence === null || confidence < 0.76) {
+    return null;
+  }
+
+  return {
+    repairedText: output,
+    languageFamily: "xml",
     confidence,
     operations: Array.from(new Set(operations))
   };

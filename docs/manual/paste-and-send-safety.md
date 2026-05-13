@@ -44,10 +44,7 @@ Current shipped repair families:
   - PowerShell
   - CMD
 - JSON string-wrap repair with strict `JSON.parse` validation
-
-Current non-goal:
-
-- XML repair is not shipped yet
+- XML wrapped text and attribute-value continuation with strict browser parser validation
 
 Use `Repair` when copied technical text looks structurally broken instead of only whitespace-damaged.
 
