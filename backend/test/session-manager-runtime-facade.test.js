@@ -272,4 +272,28 @@ test("session manager runtime facade delegates launch, startup, replay, mutation
   assert.ok(calls.some((entry) => entry[0] === "scheduleSessionForegroundProcessIdentityRefresh" && entry[2].delayMs === 33));
   assert.ok(calls.some((entry) => entry[0] === "signal" && entry[2] === "SIGINT"));
   assert.ok(calls.some((entry) => entry[0] === "closeSessionWithReason" && entry[2] === "deleted"));
+  assert.ok(calls.some((entry) => entry[0] === "createSession" && entry[1].initialState === undefined));
+});
+
+test("session manager runtime facade forwards initial stopped state through create", () => {
+  const calls = [];
+  const facade = createSessionManagerRuntimeFacade({
+    sessionRuntime: {
+      createSession(options) {
+        calls.push(options);
+        return { ...options };
+      }
+    }
+  });
+
+  const created = facade.create({
+    id: "session-stopped",
+    cwd: "/tmp",
+    shell: "bash",
+    initialState: "stopped"
+  });
+
+  assert.equal(created.initialState, "stopped");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].initialState, "stopped");
 });

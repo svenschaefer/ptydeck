@@ -171,6 +171,27 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   assert.equal(manager.list().length, 0);
 });
 
+test("SessionManager create honors the explicit stopped initial state without launching a PTY", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    defaultShell: "bash",
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({
+    id: "session-stopped",
+    cwd: "/tmp",
+    shell: "bash",
+    initialState: "stopped"
+  });
+
+  assert.equal(created.id, "session-stopped");
+  assert.equal(created.state, "stopped");
+  assert.equal(created.startedAt, null);
+  assert.equal(manager.get("session-stopped").ptyProcess, null);
+  assert.equal(fakePty.killed, false);
+});
+
 test("SessionManager emits explicit created and started lifecycle events", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({

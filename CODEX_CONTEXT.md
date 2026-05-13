@@ -43,6 +43,7 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - persisted stopped sessions restore as stopped without launching a PTY
   - persisted running sessions are started again through the existing restore path
   - stopped sessions remain out of active-session metrics even though the session record still exists
+  - this only works if `backend/src/session-manager-runtime-facade.js` forwards `initialState` unchanged through `manager.create(...)`; dropping that field turns a persisted stopped restore back into a normal PTY launch
 - The backend `SessionManager` now supports explicit stop/start lifecycle transitions instead of only restart/delete:
   - `stop` tears down the live PTY, clears pending live runtime state, preserves the persisted session identity/settings, and emits `session.updated`
   - `start` rebuilds a fresh live session from the persisted session contract and emits `session.updated`

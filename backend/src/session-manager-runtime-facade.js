@@ -240,7 +240,8 @@ export function createSessionManagerRuntimeFacade(dependencies = {}) {
       inactiveThemeProfile,
       createdAt,
       updatedAt,
-      trace
+      trace,
+      initialState
     } = {}) {
       return sessionRuntime.createSession({
         id,
@@ -268,7 +269,8 @@ export function createSessionManagerRuntimeFacade(dependencies = {}) {
         inactiveThemeProfile,
         createdAt,
         updatedAt,
-        trace
+        trace,
+        initialState
       });
     },
 
