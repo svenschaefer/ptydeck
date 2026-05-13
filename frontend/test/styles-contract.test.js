@@ -148,4 +148,20 @@ test("session header lifecycle toggle shares the same button sizing and icon col
     stylesCss,
     /\.session-start-stop-icon,\s*\.session-refresh-icon,\s*\.session-settings-icon \{[\s\S]*width: 18px;[\s\S]*height: 18px;[\s\S]*\}/m
   );
+  assert.match(
+    stylesCss,
+    /--icon-tabler-player-play-filled-mask:\s*url\(/m
+  );
+  assert.match(
+    stylesCss,
+    /--icon-tabler-player-stop-filled-mask:\s*url\(/m
+  );
+  assert.match(
+    stylesCss,
+    /\.icon-tabler-player-play-filled \{[\s\S]*--icon-tabler-mask: var\(--icon-tabler-player-play-filled-mask\);[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.icon-tabler-player-stop-filled \{[\s\S]*--icon-tabler-mask: var\(--icon-tabler-player-stop-filled-mask\);[\s\S]*\}/m
+  );
 });
