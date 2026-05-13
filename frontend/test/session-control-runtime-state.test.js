@@ -166,6 +166,36 @@ test("session control helpers classify implicit-owner fallback and read-only spe
   );
 });
 
+test("session control helpers fail closed while the runtime connection is reconnecting", () => {
+  const fallbackSession = {
+    id: "s-3",
+    controlState: {
+      currentController: null,
+      attachedClients: []
+    }
+  };
+  const reconnectingContext = createContext({
+    getConnectionState: () => "reconnecting"
+  });
+
+  assert.equal(canUseImplicitOwnerFallback(fallbackSession, reconnectingContext), false);
+  assert.equal(canWriteToSession(fallbackSession, reconnectingContext), false);
+  assert.equal(canTakeSessionControl(createReconnectReservedSession(), reconnectingContext), false);
+  assert.equal(
+    getSessionWriteBlockMessage(fallbackSession, reconnectingContext),
+    "Connection state: reconnecting. Wait for the session UI to establish session control before sending input or resizing."
+  );
+  assert.equal(
+    getSessionControlSummary(fallbackSession, reconnectingContext),
+    "Connection state: reconnecting. Waiting for Laptop to attach."
+  );
+  assert.deepEqual(getSessionControlBadgeState(fallbackSession, reconnectingContext), {
+    label: "ATTACHING",
+    tone: "pending",
+    title: "Connection state: reconnecting. Waiting for Laptop to attach to session control metadata."
+  });
+});
+
 test("session control helpers identify repairable origin-handoff sessions and stale-device actions only when ownership is safe", () => {
   const session = createReconnectReservedSession();
   const sessions = [

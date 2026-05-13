@@ -67,6 +67,7 @@ export function createSessionControlRuntimeController(options = {}) {
     retryBlockedAction = async () => {},
     applyResizeForSession = () => {},
     showControlPane = () => {},
+    getConnectionState = () => "",
     debugLog = () => {}
   } = options;
 
@@ -103,6 +104,7 @@ export function createSessionControlRuntimeController(options = {}) {
     return {
       runtimeClientId,
       trustedLocalClientLabel,
+      getConnectionState,
       isReadOnlyMode,
       getReadOnlyModeMessage,
       runtimeClientIdentityCreatedOnThisOrigin,

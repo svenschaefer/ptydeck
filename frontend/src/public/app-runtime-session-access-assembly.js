@@ -131,6 +131,10 @@ export function createAppRuntimeSessionAccessAssembly(options = {}) {
     config,
     uiState,
     api,
+    getConnectionState: () => {
+      const state = store?.getState?.() || {};
+      return typeof state.connectionState === "string" ? state.connectionState : "";
+    },
     requestRender,
     setCommandFeedback,
     clearCommandFeedbackAction,

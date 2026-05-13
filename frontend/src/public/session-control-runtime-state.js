@@ -106,6 +106,17 @@ function readOriginHandoffSource(context = {}) {
   return normalizeOriginValue(context.originHandoffSourceOrigin);
 }
 
+function readConnectionState(context = {}) {
+  const value =
+    typeof context.getConnectionState === "function" ? context.getConnectionState() : context.connectionState;
+  return normalizeControlText(value).toLowerCase();
+}
+
+function hasConnectedSessionTransport(context = {}) {
+  const connectionState = readConnectionState(context);
+  return !connectionState || connectionState === "connected";
+}
+
 export function getSessionControlState(session) {
   return session?.controlState && typeof session.controlState === "object" ? session.controlState : null;
 }
@@ -162,6 +173,9 @@ export function canUseImplicitOwnerFallback(session, context = {}) {
   if (isReadOnlyMode(context) || !session) {
     return false;
   }
+  if (!hasConnectedSessionTransport(context)) {
+    return false;
+  }
   if (!getSessionControlState(session)) {
     return true;
   }
@@ -174,6 +188,9 @@ export function canUseImplicitOwnerFallback(session, context = {}) {
 
 export function canWriteToSession(session, context = {}) {
   if (isReadOnlyMode(context) || !session) {
+    return false;
+  }
+  if (!hasConnectedSessionTransport(context)) {
     return false;
   }
   return isLocalSessionController(session, context) || canUseImplicitOwnerFallback(session, context);
@@ -195,6 +212,10 @@ export function getSessionWriteBlockMessage(session, context = {}) {
   }
   if (!session) {
     return "No active session selected.";
+  }
+  const connectionState = readConnectionState(context);
+  if (connectionState && connectionState !== "connected") {
+    return `Connection state: ${connectionState}. Wait for the session UI to establish session control before sending input or resizing.`;
   }
   if (canUseImplicitOwnerFallback(session, context)) {
     return "";
@@ -228,8 +249,12 @@ export function getSessionControlSummary(session, context = {}) {
   const controller = getCurrentSessionController(session);
   const localClient = getLocalSessionClient(session, context);
   const localDeviceLabel = getLocalDeviceLabel(session, context);
+  const connectionState = readConnectionState(context);
   if (!session) {
     return "Control unavailable.";
+  }
+  if (connectionState && connectionState !== "connected") {
+    return `Connection state: ${connectionState}. Waiting for ${localDeviceLabel} to attach.`;
   }
   if (!runtimeClientId || !localClient) {
     if (canUseImplicitOwnerFallback(session, context)) {
@@ -260,6 +285,9 @@ export function getSessionControlSummary(session, context = {}) {
 
 export function canTakeSessionControl(session, context = {}) {
   if (isReadOnlyMode(context) || !session || !readRuntimeClientId(context)) {
+    return false;
+  }
+  if (!hasConnectedSessionTransport(context)) {
     return false;
   }
   const localClient = getLocalSessionClient(session, context);
@@ -303,6 +331,9 @@ export function canReleaseSessionControl(session, context = {}) {
   if (isReadOnlyMode(context) || !session || !readRuntimeClientId(context)) {
     return false;
   }
+  if (!hasConnectedSessionTransport(context)) {
+    return false;
+  }
   const localClient = getLocalSessionClient(session, context);
   if (!localClient || localClient.active !== true) {
     return false;
@@ -312,6 +343,9 @@ export function canReleaseSessionControl(session, context = {}) {
 
 export function canTransferSessionControl(session, targetClientId, context = {}) {
   if (isReadOnlyMode(context) || !session || !readRuntimeClientId(context)) {
+    return false;
+  }
+  if (!hasConnectedSessionTransport(context)) {
     return false;
   }
   const normalizedTargetClientId = normalizeControlText(targetClientId);
@@ -333,6 +367,9 @@ export function canTransferSessionControl(session, targetClientId, context = {})
 
 export function canManageTrustedLocalDevice(session, context = {}) {
   if (isReadOnlyMode(context) || !session || !readRuntimeClientId(context)) {
+    return false;
+  }
+  if (!hasConnectedSessionTransport(context)) {
     return false;
   }
   const localClient = getLocalSessionClient(session, context);
@@ -369,6 +406,14 @@ export function getTakeOrReclaimControlLabel(session, context = {}) {
 export function getSessionControlBadgeState(session, context = {}) {
   if (!session) {
     return { label: "", tone: "", title: "" };
+  }
+  const connectionState = readConnectionState(context);
+  if (connectionState && connectionState !== "connected") {
+    return {
+      label: "ATTACHING",
+      tone: "pending",
+      title: `Connection state: ${connectionState}. Waiting for ${getLocalDeviceLabel(session, context)} to attach to session control metadata.`
+    };
   }
   const runtimeClientId = readRuntimeClientId(context);
   if (canUseImplicitOwnerFallback(session, context)) {

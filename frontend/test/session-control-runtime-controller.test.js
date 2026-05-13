@@ -193,6 +193,28 @@ test("session-control runtime controller auto-repairs origin handoff once and cl
   assert.equal(debugEvents[1][0], "trusted_local.origin_handoff_auto_repair.ok");
 });
 
+test("session-control runtime controller fails closed for write actions while the websocket connection is reconnecting", () => {
+  const fallbackSession = {
+    id: "s-2",
+    controlState: {
+      currentController: null,
+      attachedClients: []
+    }
+  };
+  const controller = createSessionControlRuntimeController({
+    getConnectionState: () => "reconnecting"
+  });
+
+  controller.setRuntimeClientId("client-local");
+  controller.setTrustedLocalClientLabel("Laptop");
+
+  assert.equal(controller.canWriteToSession(fallbackSession), false);
+  assert.equal(
+    controller.getSessionWriteBlockMessage(fallbackSession),
+    "Connection state: reconnecting. Wait for the session UI to establish session control before sending input or resizing."
+  );
+});
+
 test("session-control runtime controller drives reclaim-and-retry actions through takeover and blocked-action retry", async () => {
   const feedbackActionStates = [];
   const feedbackMessages = [];
