@@ -184,9 +184,32 @@
                     </div>
                     <div class="command-actions-column">
                       <button id="normalize-command" class="command-normalize-btn" type="button">Normalize</button>
+                      <button id="repair-command" class="command-repair-btn" type="button">Repair</button>
                       <button id="send-command" class="command-send-btn" type="button">Send</button>
                     </div>
                   </div>
+                  <section id="command-repair" class="command-repair" hidden>
+                    <p id="command-repair-summary" class="command-repair-summary"></p>
+                    <p id="command-repair-detail" class="command-repair-detail"></p>
+                    <div class="command-repair-columns">
+                      <section class="command-repair-column">
+                        <p class="command-repair-label">Original</p>
+                        <pre id="command-repair-original" class="command-repair-preview"></pre>
+                      </section>
+                      <section id="command-repair-output-wrap" class="command-repair-column" hidden>
+                        <p class="command-repair-label">Repaired</p>
+                        <pre id="command-repair-output" class="command-repair-preview"></pre>
+                      </section>
+                    </div>
+                    <section id="command-repair-diff-wrap" class="command-repair-diff-wrap" hidden>
+                      <p class="command-repair-label">Diff</p>
+                      <pre id="command-repair-diff" class="command-repair-diff"></pre>
+                    </section>
+                    <div class="command-repair-actions">
+                      <button id="command-repair-apply" type="button" hidden>Apply Repair</button>
+                      <button id="command-repair-cancel" type="button">Cancel</button>
+                    </div>
+                  </section>
                   <section id="command-guard" class="command-guard" hidden>
                     <p id="command-guard-summary" class="command-guard-summary"></p>
                     <p class="command-guard-hint">

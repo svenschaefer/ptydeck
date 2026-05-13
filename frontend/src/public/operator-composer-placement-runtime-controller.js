@@ -1,5 +1,6 @@
 import { createCommandComposerAutocompleteController } from "./command-composer-autocomplete-controller.js";
 import { createCommandComposerRuntimeController } from "./command-composer-runtime-controller.js";
+import { createComposerRepairPreviewState } from "./composer-repair-runtime.js";
 import { interpretComposerInput as defaultInterpretComposerInput } from "./command-interpreter.js";
 
 const DEFAULT_MODE = "shared-footer";
@@ -138,6 +139,47 @@ function normalizeComposerDraftWhitespace(value) {
   return lines.join("\n").trim();
 }
 
+function createEmptyRepairPreviewState() {
+  return {
+    active: false,
+    canApply: false,
+    summary: "",
+    detail: "",
+    originalText: "",
+    repairedText: "",
+    diffText: ""
+  };
+}
+
+function applyRepairPreviewState(target, nextState = {}) {
+  target.active = nextState.active === true;
+  target.canApply = nextState.canApply === true;
+  target.summary = typeof nextState.summary === "string" ? nextState.summary : "";
+  target.detail = typeof nextState.detail === "string" ? nextState.detail : "";
+  target.originalText = typeof nextState.originalText === "string" ? nextState.originalText : "";
+  target.repairedText = typeof nextState.repairedText === "string" ? nextState.repairedText : "";
+  target.diffText = typeof nextState.diffText === "string" ? nextState.diffText : "";
+}
+
+function renderRepairPreview(refs, repairState) {
+  refs?.repairEl && (refs.repairEl.hidden = repairState?.active !== true);
+  appendText(refs?.repairSummaryEl, repairState?.summary);
+  appendText(refs?.repairDetailEl, repairState?.detail);
+  appendText(refs?.repairOriginalEl, repairState?.originalText);
+  appendText(refs?.repairOutputEl, repairState?.repairedText);
+  appendText(refs?.repairDiffEl, repairState?.diffText);
+  if (refs?.repairOutputWrapEl) {
+    refs.repairOutputWrapEl.hidden = !(repairState?.repairedText);
+  }
+  if (refs?.repairDiffWrapEl) {
+    refs.repairDiffWrapEl.hidden = !(repairState?.diffText);
+  }
+  if (refs?.repairApplyBtn) {
+    refs.repairApplyBtn.hidden = repairState?.canApply !== true;
+    refs.repairApplyBtn.disabled = repairState?.canApply !== true;
+  }
+}
+
 function createOverlayNode(documentRef, className, tagName = "div") {
   return documentRef?.createElement?.(tagName) || {
     className,
@@ -213,15 +255,77 @@ function buildPinnedOverlaySurface(documentRef) {
   normalizeBtn.className = "session-composer-overlay-normalize";
   normalizeBtn.type = "button";
   normalizeBtn.textContent = "Normalize";
+  const repairBtn = createOverlayNode(documentRef, "session-composer-overlay-repair", "button");
+  repairBtn.className = "session-composer-overlay-repair";
+  repairBtn.type = "button";
+  repairBtn.textContent = "Repair";
   const sendBtn = createOverlayNode(documentRef, "session-composer-overlay-send", "button");
   sendBtn.className = "session-composer-overlay-send";
   sendBtn.type = "button";
   sendBtn.textContent = "Send";
   commandEntryRow.appendChild(commandInputWrap);
   actionsColumn.appendChild(normalizeBtn);
+  actionsColumn.appendChild(repairBtn);
   actionsColumn.appendChild(sendBtn);
   commandEntryRow.appendChild(actionsColumn);
   commandInputColumn.appendChild(commandEntryRow);
+
+  const repairEl = createOverlayNode(documentRef, "command-repair", "section");
+  repairEl.className = "command-repair";
+  repairEl.hidden = true;
+  const repairSummaryEl = createOverlayNode(documentRef, "command-repair-summary", "p");
+  repairSummaryEl.className = "command-repair-summary";
+  const repairDetailEl = createOverlayNode(documentRef, "command-repair-detail", "p");
+  repairDetailEl.className = "command-repair-detail";
+  const repairColumnsEl = createOverlayNode(documentRef, "command-repair-columns");
+  repairColumnsEl.className = "command-repair-columns";
+  const repairOriginalWrapEl = createOverlayNode(documentRef, "command-repair-column", "section");
+  repairOriginalWrapEl.className = "command-repair-column";
+  const repairOriginalLabelEl = createOverlayNode(documentRef, "command-repair-label", "p");
+  repairOriginalLabelEl.className = "command-repair-label";
+  repairOriginalLabelEl.textContent = "Original";
+  const repairOriginalEl = createOverlayNode(documentRef, "command-repair-preview", "pre");
+  repairOriginalEl.className = "command-repair-preview";
+  repairOriginalWrapEl.appendChild(repairOriginalLabelEl);
+  repairOriginalWrapEl.appendChild(repairOriginalEl);
+  const repairOutputWrapEl = createOverlayNode(documentRef, "command-repair-column", "section");
+  repairOutputWrapEl.className = "command-repair-column";
+  const repairOutputLabelEl = createOverlayNode(documentRef, "command-repair-label", "p");
+  repairOutputLabelEl.className = "command-repair-label";
+  repairOutputLabelEl.textContent = "Repaired";
+  const repairOutputEl = createOverlayNode(documentRef, "command-repair-preview", "pre");
+  repairOutputEl.className = "command-repair-preview";
+  repairOutputWrapEl.appendChild(repairOutputLabelEl);
+  repairOutputWrapEl.appendChild(repairOutputEl);
+  repairColumnsEl.appendChild(repairOriginalWrapEl);
+  repairColumnsEl.appendChild(repairOutputWrapEl);
+  const repairDiffWrapEl = createOverlayNode(documentRef, "command-repair-diff-wrap", "section");
+  repairDiffWrapEl.className = "command-repair-diff-wrap";
+  const repairDiffLabelEl = createOverlayNode(documentRef, "command-repair-label", "p");
+  repairDiffLabelEl.className = "command-repair-label";
+  repairDiffLabelEl.textContent = "Diff";
+  const repairDiffEl = createOverlayNode(documentRef, "command-repair-diff", "pre");
+  repairDiffEl.className = "command-repair-diff";
+  repairDiffWrapEl.appendChild(repairDiffLabelEl);
+  repairDiffWrapEl.appendChild(repairDiffEl);
+  const repairActionsEl = createOverlayNode(documentRef, "command-repair-actions");
+  repairActionsEl.className = "command-repair-actions";
+  const repairApplyBtn = createOverlayNode(documentRef, "session-composer-overlay-repair-apply", "button");
+  repairApplyBtn.className = "session-composer-overlay-repair-apply";
+  repairApplyBtn.type = "button";
+  repairApplyBtn.textContent = "Apply Repair";
+  const repairCancelBtn = createOverlayNode(documentRef, "session-composer-overlay-repair-cancel", "button");
+  repairCancelBtn.className = "session-composer-overlay-repair-cancel";
+  repairCancelBtn.type = "button";
+  repairCancelBtn.textContent = "Cancel";
+  repairActionsEl.appendChild(repairApplyBtn);
+  repairActionsEl.appendChild(repairCancelBtn);
+  repairEl.appendChild(repairSummaryEl);
+  repairEl.appendChild(repairDetailEl);
+  repairEl.appendChild(repairColumnsEl);
+  repairEl.appendChild(repairDiffWrapEl);
+  repairEl.appendChild(repairActionsEl);
+  commandInputColumn.appendChild(repairEl);
 
   const guardEl = createOverlayNode(documentRef, "command-guard", "section");
   guardEl.className = "command-guard";
@@ -273,7 +377,18 @@ function buildPinnedOverlaySurface(documentRef) {
     inlineHintEl,
     previewEl,
     normalizeBtn,
+    repairBtn,
     sendBtn,
+    repairEl,
+    repairSummaryEl,
+    repairDetailEl,
+    repairOriginalEl,
+    repairOutputWrapEl,
+    repairOutputEl,
+    repairDiffWrapEl,
+    repairDiffEl,
+    repairApplyBtn,
+    repairCancelBtn,
     guardEl,
     guardSummaryEl,
     guardReasonsEl,
@@ -347,6 +462,7 @@ function createPinnedSurfaceController(options = {}) {
     getCustomCommandState = () => null,
     formatQuickSwitchPreview = () => "",
     runWorkflowDetailed = null,
+    requestRepairCandidate = null,
     onDraftChange = () => {},
     onUnpin = () => {},
     readClipboardText = async () => "",
@@ -362,7 +478,8 @@ function createPinnedSurfaceController(options = {}) {
     commandGuardActive: false,
     commandGuardSummary: "",
     commandGuardReasons: "",
-    commandGuardPreview: ""
+    commandGuardPreview: "",
+    repairPreview: createEmptyRepairPreviewState()
   };
   let suppressDraftSync = false;
   let inputListener = null;
@@ -402,6 +519,7 @@ function createPinnedSurfaceController(options = {}) {
     appendText(refs.previewEl, uiState.commandPreview);
     appendText(refs.suggestionsEl, uiState.commandSuggestions);
     refs.suggestionsEl.hidden = !uiState.commandSuggestions;
+    renderRepairPreview(refs, uiState.repairPreview);
     refs.guardEl.hidden = uiState.commandGuardActive !== true;
     appendText(refs.guardSummaryEl, uiState.commandGuardSummary);
     appendText(refs.guardReasonsEl, uiState.commandGuardReasons);
@@ -425,6 +543,7 @@ function createPinnedSurfaceController(options = {}) {
       refs.textarea.focus?.();
       return false;
     }
+    clearRepairPreview({ renderAfterClear: false });
     suppressDraftSync = true;
     refs.textarea.value = nextValue;
     suppressDraftSync = false;
@@ -435,6 +554,62 @@ function createPinnedSurfaceController(options = {}) {
     refs.textarea.focus?.();
     refs.textarea.setSelectionRange?.(nextValue.length, nextValue.length);
     return true;
+  }
+
+  function clearRepairPreview({ renderAfterClear = true } = {}) {
+    const hadPreview = uiState.repairPreview.active === true;
+    applyRepairPreviewState(uiState.repairPreview, createEmptyRepairPreviewState());
+    if (renderAfterClear && hadPreview) {
+      render();
+    }
+  }
+
+  function applyRepairPreview() {
+    if (uiState.repairPreview.canApply !== true) {
+      refs.textarea.focus?.();
+      return false;
+    }
+    const nextValue = String(uiState.repairPreview.repairedText || "");
+    suppressDraftSync = true;
+    refs.textarea.value = nextValue;
+    suppressDraftSync = false;
+    persistDraft();
+    clearRepairPreview({ renderAfterClear: false });
+    composerRuntimeController?.scheduleCommandPreview?.();
+    autocompleteController?.scheduleSuggestions?.();
+    render();
+    refs.textarea.focus?.();
+    refs.textarea.setSelectionRange?.(nextValue.length, nextValue.length);
+    return true;
+  }
+
+  async function openRepairPreview() {
+    if (refs.textarea.disabled) {
+      return false;
+    }
+    const originalDraft = String(refs.textarea.value || "");
+    if (!normalizeText(originalDraft)) {
+      clearRepairPreview({ renderAfterClear: true });
+      setCommandFeedback("Repair needs some input first.");
+      refs.textarea.focus?.();
+      return false;
+    }
+    let candidate = null;
+    try {
+      candidate = await requestRepairCandidate?.({
+        draft: originalDraft,
+        session: getSession(),
+        state: getPinnedState(),
+        mode: "pinned-overlay"
+      });
+    } catch (error) {
+      setError(getErrorMessage(error, "Failed to prepare repair preview."));
+      return false;
+    }
+    clearError();
+    applyRepairPreviewState(uiState.repairPreview, createComposerRepairPreviewState(originalDraft, candidate));
+    render();
+    return uiState.repairPreview.active === true;
   }
 
   autocompleteController = createCommandComposerAutocompleteController({
@@ -453,6 +628,7 @@ function createPinnedSurfaceController(options = {}) {
     recordDiscoveryUsage,
     onInputChange: () => {
       composerRuntimeController?.clearPendingSend?.({ renderAfterClear: true });
+      clearRepairPreview({ renderAfterClear: false });
       persistDraft();
     }
   });
@@ -465,6 +641,7 @@ function createPinnedSurfaceController(options = {}) {
       if (refs.textarea.value === nextValue) {
         return;
       }
+      clearRepairPreview({ renderAfterClear: false });
       suppressDraftSync = true;
       refs.textarea.value = nextValue;
       suppressDraftSync = false;
@@ -539,14 +716,20 @@ function createPinnedSurfaceController(options = {}) {
     resolveBroadcastTargets: () => ({ active: false, sessions: [], error: "", routeFeedback: "" })
   });
 
-  inputListener = () => persistDraft();
-  changeListener = () => persistDraft();
   blurListener = () => {
     textareaFocused = false;
     persistDraft();
   };
   focusListener = () => {
     textareaFocused = true;
+  };
+  inputListener = () => {
+    clearRepairPreview({ renderAfterClear: false });
+    persistDraft();
+  };
+  changeListener = () => {
+    clearRepairPreview({ renderAfterClear: false });
+    persistDraft();
   };
   refs.textarea.addEventListener?.("input", inputListener);
   refs.textarea.addEventListener?.("change", changeListener);
@@ -559,6 +742,16 @@ function createPinnedSurfaceController(options = {}) {
   });
   refs.normalizeBtn.addEventListener?.("click", () => {
     normalizeDraft();
+  });
+  refs.repairBtn.addEventListener?.("click", () => {
+    void openRepairPreview();
+  });
+  refs.repairApplyBtn.addEventListener?.("click", () => {
+    applyRepairPreview();
+  });
+  refs.repairCancelBtn.addEventListener?.("click", () => {
+    clearRepairPreview({ renderAfterClear: true });
+    refs.textarea.focus?.();
   });
   refs.guardSendOnceBtn.addEventListener?.("click", () => {
     composerRuntimeController?.confirmPendingSend?.().catch((error) => {
@@ -579,6 +772,9 @@ function createPinnedSurfaceController(options = {}) {
     render,
     setDraft(value, { scheduleRefresh = true } = {}) {
       const nextValue = String(value || "");
+      if (uiState.repairPreview.active === true && uiState.repairPreview.originalText !== nextValue) {
+        clearRepairPreview({ renderAfterClear: false });
+      }
       if (refs.textarea.value !== nextValue) {
         if (textareaFocused) {
           if (scheduleRefresh) {
@@ -625,6 +821,17 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     composerPlacementModeSelectEl = null,
     commandInput = null,
     normalizeBtn = null,
+    repairBtn = null,
+    repairEl = null,
+    repairSummaryEl = null,
+    repairDetailEl = null,
+    repairOriginalEl = null,
+    repairOutputWrapEl = null,
+    repairOutputEl = null,
+    repairDiffWrapEl = null,
+    repairDiffEl = null,
+    repairApplyBtn = null,
+    repairCancelBtn = null,
     terminals = new Map(),
     getState = () => ({ sessions: [], decks: [], activeSessionId: "" }),
     getSessionById = () => null,
@@ -664,6 +871,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     scheduleSharedCommandRefresh = () => {},
     formatQuickSwitchPreview = () => "",
     runWorkflowDetailed = null,
+    requestRepairCandidate = null,
     readClipboardText = async () => "",
     writeClipboardText = async () => false
   } = options;
@@ -680,11 +888,15 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
   let sharedBlurListener = null;
   let sharedFocusListener = null;
   let modeChangeListener = null;
+  let sharedRepairClickListener = null;
+  let sharedRepairApplyListener = null;
+  let sharedRepairCancelListener = null;
   let persistTimer = null;
   let pendingPersistPatch = {};
   let initializePromise = null;
   const pinnedSurfaces = new Map();
   let sharedInputFocused = false;
+  const sharedRepairPreview = createEmptyRepairPreviewState();
   const pendingPlacementState = {
     mode: null,
     pinnedSessionIds: null,
@@ -719,6 +931,9 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
 
   function setSharedComposerDraftLocally(value, { scheduleRefresh = false } = {}) {
     const nextValue = typeof value === "string" ? value : "";
+    if (sharedRepairPreview.active === true && sharedRepairPreview.originalText !== nextValue) {
+      applyRepairPreviewState(sharedRepairPreview, createEmptyRepairPreviewState());
+    }
     placementState.sharedDraft = nextValue;
     if (commandInput && commandInput.value !== nextValue) {
       if (sharedInputFocused) {
@@ -840,6 +1055,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       getCustomCommandState,
       formatQuickSwitchPreview,
       runWorkflowDetailed,
+      requestRepairCandidate,
       onDraftChange: (draft) => {
         setPinnedDraftLocally(normalizedSessionId, draft);
         setPendingPinnedDrafts(placementState.pinnedDrafts);
@@ -958,6 +1174,20 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     workspaceShellEl?.classList?.toggle?.("composer-placement-active-overlay", overlayMode);
     controlPaneEl?.classList?.toggle?.("control-pane-overlay-mode", overlayMode);
     controlPaneResizeHandleEl?.classList?.toggle?.("control-pane-resize-handle-hidden", overlayMode);
+    renderRepairPreview(
+      {
+        repairEl,
+        repairSummaryEl,
+        repairDetailEl,
+        repairOriginalEl,
+        repairOutputWrapEl,
+        repairOutputEl,
+        repairDiffWrapEl,
+        repairDiffEl,
+        repairApplyBtn
+      },
+      sharedRepairPreview
+    );
 
     if (!overlayMode) {
       moveSharedComposerBody(controlPaneEl);
@@ -1182,6 +1412,14 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     queuePersistPatch({ sharedDraft: placementState.sharedDraft });
   }
 
+  function clearSharedRepairPreview({ renderAfterClear = true } = {}) {
+    const hadPreview = sharedRepairPreview.active === true;
+    applyRepairPreviewState(sharedRepairPreview, createEmptyRepairPreviewState());
+    if (renderAfterClear && hadPreview) {
+      render();
+    }
+  }
+
   function normalizeSharedDraft() {
     if (!commandInput || commandInput.disabled) {
       return false;
@@ -1192,6 +1430,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       commandInput.focus?.();
       return false;
     }
+    clearSharedRepairPreview({ renderAfterClear: false });
     placementState.sharedDraft = nextValue;
     setPendingSharedDraft(placementState.sharedDraft);
     commandInput.value = nextValue;
@@ -1203,10 +1442,63 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     return true;
   }
 
+  function applySharedRepairPreview() {
+    if (!commandInput || sharedRepairPreview.canApply !== true) {
+      commandInput?.focus?.();
+      return false;
+    }
+    const nextValue = String(sharedRepairPreview.repairedText || "");
+    placementState.sharedDraft = nextValue;
+    setPendingSharedDraft(placementState.sharedDraft);
+    commandInput.value = nextValue;
+    scheduleSharedCommandRefresh();
+    queuePersistPatch({ sharedDraft: placementState.sharedDraft });
+    clearSharedRepairPreview({ renderAfterClear: false });
+    commandInput.focus?.();
+    commandInput.setSelectionRange?.(nextValue.length, nextValue.length);
+    render();
+    return true;
+  }
+
+  async function openSharedRepairPreview() {
+    if (!commandInput || commandInput.disabled) {
+      return false;
+    }
+    const originalDraft = String(commandInput.value || "");
+    if (!normalizeText(originalDraft)) {
+      clearSharedRepairPreview({ renderAfterClear: true });
+      setCommandFeedback("Repair needs some input first.");
+      commandInput.focus?.();
+      return false;
+    }
+    let candidate = null;
+    try {
+      candidate = await requestRepairCandidate?.({
+        draft: originalDraft,
+        session: getSessionById(normalizeText((getState() || {}).activeSessionId)),
+        state: getState() || {},
+        mode: placementState.mode === ACTIVE_OVERLAY_MODE ? "shared-overlay" : "shared-footer"
+      });
+    } catch (error) {
+      setError(getErrorMessage(error, "Failed to prepare repair preview."));
+      return false;
+    }
+    clearError();
+    applyRepairPreviewState(sharedRepairPreview, createComposerRepairPreviewState(originalDraft, candidate));
+    render();
+    return sharedRepairPreview.active === true;
+  }
+
   function bindUiEvents() {
     if (!sharedInputListener && commandInput) {
-      sharedInputListener = () => setSharedDraftFromInput();
-      sharedChangeListener = () => setSharedDraftFromInput();
+      sharedInputListener = () => {
+        clearSharedRepairPreview({ renderAfterClear: false });
+        setSharedDraftFromInput();
+      };
+      sharedChangeListener = () => {
+        clearSharedRepairPreview({ renderAfterClear: false });
+        setSharedDraftFromInput();
+      };
       sharedBlurListener = () => {
         sharedInputFocused = false;
         setSharedDraftFromInput();
@@ -1220,6 +1512,25 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       commandInput.addEventListener?.("focus", sharedFocusListener);
     }
     normalizeBtn?.addEventListener?.("click", normalizeSharedDraft);
+    if (!sharedRepairClickListener && repairBtn) {
+      sharedRepairClickListener = () => {
+        void openSharedRepairPreview();
+      };
+      repairBtn.addEventListener?.("click", sharedRepairClickListener);
+    }
+    if (!sharedRepairApplyListener && repairApplyBtn) {
+      sharedRepairApplyListener = () => {
+        applySharedRepairPreview();
+      };
+      repairApplyBtn.addEventListener?.("click", sharedRepairApplyListener);
+    }
+    if (!sharedRepairCancelListener && repairCancelBtn) {
+      sharedRepairCancelListener = () => {
+        clearSharedRepairPreview({ renderAfterClear: true });
+        commandInput?.focus?.();
+      };
+      repairCancelBtn.addEventListener?.("click", sharedRepairCancelListener);
+    }
     if (!modeChangeListener && composerPlacementModeSelectEl && typeof composerPlacementModeSelectEl.addEventListener === "function") {
       modeChangeListener = () => {
         void setMode(composerPlacementModeSelectEl.value || SHARED_FOOTER_MODE);
@@ -1256,6 +1567,9 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     commandInput?.removeEventListener?.("blur", sharedBlurListener);
     commandInput?.removeEventListener?.("focus", sharedFocusListener);
     normalizeBtn?.removeEventListener?.("click", normalizeSharedDraft);
+    repairBtn?.removeEventListener?.("click", sharedRepairClickListener);
+    repairApplyBtn?.removeEventListener?.("click", sharedRepairApplyListener);
+    repairCancelBtn?.removeEventListener?.("click", sharedRepairCancelListener);
     composerPlacementModeSelectEl?.removeEventListener?.("change", modeChangeListener);
     for (const sessionId of Array.from(pinnedSurfaces.keys())) {
       disposePinnedSurface(sessionId);

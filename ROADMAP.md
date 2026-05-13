@@ -20,20 +20,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Active Wave Order
 
-1. `CMP-406` Owner `FE`
-2. `CMP-407` Owner `FE`
-3. `CMP-408` Owner `FE`
-4. `CMP-409` Owner `FE`
-5. `CMP-410` Owner `QA`
+1. `CMP-409` Owner `FE`
+2. `CMP-410` Owner `QA`
 
 ## Wave Dependencies
 
-- `CMP-406 -> CMP-407`
-- `CMP-406 -> CMP-408`
-- `CMP-406 -> CMP-409`
-- `CMP-406 -> CMP-410`
-- `CMP-407 -> CMP-410`
-- `CMP-408 -> CMP-410`
 - `CMP-409 -> CMP-410`
 
 ## Queued Wave Order

@@ -64,6 +64,38 @@
 
 <p>It does not try to repair structure or rewrite internal indentation.</p>
 
+<h2 id="composer-repair">Composer Repair</h2>
+
+<p>The composer now also exposes a separate opt-in <code>Repair</code> action beside <code>Normalize</code>.</p>
+
+<p><code>Repair</code> is intentionally different from <code>Normalize</code>:</p>
+
+<ul>
+<li>it opens an explicit preview/apply shell instead of mutating the draft immediately</li>
+<li>it keeps the original draft recoverable until you click <code>Apply Repair</code></li>
+<li>it fails closed when the current repair stage cannot validate a confident candidate</li>
+</ul>
+
+<p>Current shipped repair families:</p>
+
+<ul>
+<li>shell-family commands</li>
+</ul>
+
+<p>- Bash / POSIX shell - PowerShell - CMD</p>
+
+<ul>
+<li>JSON string-wrap repair with strict <code>JSON.parse</code> validation</li>
+</ul>
+
+<p>Current non-goal:</p>
+
+<ul>
+<li>XML repair is not shipped yet</li>
+</ul>
+
+<p>Use <code>Repair</code> when copied technical text looks structurally broken instead of only whitespace-damaged.</p>
+
 <h2 id="composer-placement-modes">Composer Placement Modes</h2>
 
 <p><code>ptydeck</code> now supports two server-persisted composer placement modes for each operator client:</p>
@@ -115,6 +147,7 @@
 <li>whether the session has stricter send-safety rules enabled</li>
 <li>whether the operator client is using <code>shared-footer</code>, <code>active-overlay</code>, or one or more pinned overlays</li>
 <li>whether <code>Normalize</code> should be applied before sending copied multiline input</li>
+<li>whether <code>Repair</code> should be used instead because the pasted text looks hard-wrapped or structurally damaged</li>
 </ol>
 
 <p>The field-level truth stays in the <a href="/handbook/reference/session-settings.html#input-tab">generated input reference</a>.</p>
@@ -124,6 +157,7 @@
         <ul class="handbook-page-toc-list">
 <li><a class="handbook-page-toc-link" href="#guarded-sends">Guarded Sends</a></li>
 <li><a class="handbook-page-toc-link" href="#composer-normalize">Composer Normalize</a></li>
+<li><a class="handbook-page-toc-link" href="#composer-repair">Composer Repair</a></li>
 <li><a class="handbook-page-toc-link" href="#composer-placement-modes">Composer Placement Modes</a></li>
 <li><a class="handbook-page-toc-link" href="#terminal-local-paste">Terminal-Local Paste</a></li>
 <li><a class="handbook-page-toc-link" href="#auto-continue">Auto Continue</a></li>

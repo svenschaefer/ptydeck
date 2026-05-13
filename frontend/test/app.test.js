@@ -590,6 +590,7 @@ function createDocumentFixture() {
   const settingsApply = new FakeElement({ id: "settings-apply", tagName: "button" });
   const commandInput = new FakeElement({ id: "command-input", tagName: "textarea" });
   const normalizeCommand = new FakeElement({ id: "normalize-command", tagName: "button" });
+  const repairCommand = new FakeElement({ id: "repair-command", tagName: "button" });
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
@@ -603,6 +604,20 @@ function createDocumentFixture() {
   const commandInlineHint = new FakeElement({ id: "command-inline-hint" });
   const commandPreview = new FakeElement({ id: "command-preview", tagName: "p" });
   const commandSuggestions = new FakeElement({ id: "command-suggestions", tagName: "pre" });
+  const commandRepair = new FakeElement({ id: "command-repair", tagName: "div" });
+  commandRepair.hidden = true;
+  const commandRepairSummary = new FakeElement({ id: "command-repair-summary", tagName: "p" });
+  const commandRepairDetail = new FakeElement({ id: "command-repair-detail", tagName: "p" });
+  const commandRepairOriginal = new FakeElement({ id: "command-repair-original", tagName: "pre" });
+  const commandRepairOutputWrap = new FakeElement({ id: "command-repair-output-wrap", tagName: "section" });
+  commandRepairOutputWrap.hidden = true;
+  const commandRepairOutput = new FakeElement({ id: "command-repair-output", tagName: "pre" });
+  const commandRepairDiffWrap = new FakeElement({ id: "command-repair-diff-wrap", tagName: "section" });
+  commandRepairDiffWrap.hidden = true;
+  const commandRepairDiff = new FakeElement({ id: "command-repair-diff", tagName: "pre" });
+  const commandRepairApply = new FakeElement({ id: "command-repair-apply", tagName: "button" });
+  commandRepairApply.hidden = true;
+  const commandRepairCancel = new FakeElement({ id: "command-repair-cancel", tagName: "button" });
   const commandGuard = new FakeElement({ id: "command-guard", tagName: "div" });
   commandGuard.hidden = true;
   const commandGuardSummary = new FakeElement({ id: "command-guard-summary", tagName: "p" });
@@ -746,6 +761,7 @@ function createDocumentFixture() {
     settingsApply,
     commandInput,
     normalizeCommand,
+    repairCommand,
     sendCommand,
     emptyState,
     statusMessage,
@@ -759,6 +775,16 @@ function createDocumentFixture() {
     commandInlineHint,
     commandPreview,
     commandSuggestions,
+    commandRepair,
+    commandRepairSummary,
+    commandRepairDetail,
+    commandRepairOriginal,
+    commandRepairOutputWrap,
+    commandRepairOutput,
+    commandRepairDiffWrap,
+    commandRepairDiff,
+    commandRepairApply,
+    commandRepairCancel,
     commandGuard,
     commandGuardSummary,
     commandGuardReasons,
@@ -873,6 +899,7 @@ function createDocumentFixture() {
       settingsApply,
       commandInput,
       normalizeCommand,
+      repairCommand,
       sendCommand,
       emptyState,
       statusMessage,
@@ -886,6 +913,16 @@ function createDocumentFixture() {
       commandInlineHint,
       commandPreview,
       commandSuggestions,
+      commandRepair,
+      commandRepairSummary,
+      commandRepairDetail,
+      commandRepairOriginal,
+      commandRepairOutputWrap,
+      commandRepairOutput,
+      commandRepairDiffWrap,
+      commandRepairDiff,
+      commandRepairApply,
+      commandRepairCancel,
       commandGuard,
       commandGuardSummary,
       commandGuardReasons,

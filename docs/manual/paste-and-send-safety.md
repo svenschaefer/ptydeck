@@ -27,6 +27,30 @@ The composer now also exposes a `Normalize` action above `Send` in the shared fo
 
 It does not try to repair structure or rewrite internal indentation.
 
+## Composer Repair
+
+The composer now also exposes a separate opt-in `Repair` action beside `Normalize`.
+
+`Repair` is intentionally different from `Normalize`:
+
+- it opens an explicit preview/apply shell instead of mutating the draft immediately
+- it keeps the original draft recoverable until you click `Apply Repair`
+- it fails closed when the current repair stage cannot validate a confident candidate
+
+Current shipped repair families:
+
+- shell-family commands
+  - Bash / POSIX shell
+  - PowerShell
+  - CMD
+- JSON string-wrap repair with strict `JSON.parse` validation
+
+Current non-goal:
+
+- XML repair is not shipped yet
+
+Use `Repair` when copied technical text looks structurally broken instead of only whitespace-damaged.
+
 ## Composer Placement Modes
 
 `ptydeck` now supports two server-persisted composer placement modes for each operator client:
@@ -71,5 +95,6 @@ When paste behavior differs across sessions, compare these first:
 3. whether the session has stricter send-safety rules enabled
 4. whether the operator client is using `shared-footer`, `active-overlay`, or one or more pinned overlays
 5. whether `Normalize` should be applied before sending copied multiline input
+6. whether `Repair` should be used instead because the pasted text looks hard-wrapped or structurally damaged
 
 The field-level truth stays in the [generated input reference](../reference/session-settings.md#input-tab).

@@ -10,6 +10,7 @@ import { createAppRuntimeSessionGridActions } from "./app-runtime-session-grid-a
 import { createAppRuntimeStartupHelperComposition } from "./app-runtime-startup-helper-composition.js";
 import { createOperatorComposerPlacementRuntimeController } from "./operator-composer-placement-runtime-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
+import { requestComposerRepairCandidate } from "./composer-repair-runtime.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
@@ -163,7 +164,18 @@ const {
   workspaceGroupPersistenceEl,
   commandInput,
   normalizeBtn,
+  repairBtn,
   sendBtn,
+  repairEl,
+  repairSummaryEl,
+  repairDetailEl,
+  repairOriginalEl,
+  repairOutputWrapEl,
+  repairOutputEl,
+  repairDiffWrapEl,
+  repairDiffEl,
+  repairApplyBtn,
+  repairCancelBtn,
   template,
   emptyStateEl,
   statusMessageEl,
@@ -1277,6 +1289,17 @@ operatorComposerPlacementRuntimeController = createOperatorComposerPlacementRunt
   composerPlacementModeSelectEl,
   commandInput,
   normalizeBtn,
+  repairBtn,
+  repairEl,
+  repairSummaryEl,
+  repairDetailEl,
+  repairOriginalEl,
+  repairOutputWrapEl,
+  repairOutputEl,
+  repairDiffWrapEl,
+  repairDiffEl,
+  repairApplyBtn,
+  repairCancelBtn,
   terminals,
   getState: () => store?.getState?.() || {},
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
@@ -1330,6 +1353,7 @@ operatorComposerPlacementRuntimeController = createOperatorComposerPlacementRunt
   formatQuickSwitchPreview: (selectorText, sessions) =>
     commandTargetRuntimeController?.formatQuickSwitchPreview?.(selectorText, sessions) || "",
   runWorkflowDetailed: (interpreted) => slashWorkflowRuntimeController?.runWorkflowDetailed?.(interpreted),
+  requestRepairCandidate: (runtimeOptions) => requestComposerRepairCandidate(runtimeOptions),
   readClipboardText: () => clipboardRuntimeController?.readText?.(),
   writeClipboardText: (text) => clipboardRuntimeController?.writeText?.(text)
 });

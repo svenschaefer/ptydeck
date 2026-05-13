@@ -135,6 +135,27 @@ class FakeElement {
   focus() {}
 }
 
+function hasClassName(node, className) {
+  const value = typeof node?.className === "string" ? node.className : "";
+  return value.split(/\s+/).includes(className);
+}
+
+function findNodeByClass(root, className) {
+  if (!root) {
+    return null;
+  }
+  if (hasClassName(root, className)) {
+    return root;
+  }
+  for (const child of root.children || []) {
+    const match = findNodeByClass(child, className);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
+}
+
 function createWindowRef() {
   return {
     setTimeout(callback) {
@@ -557,6 +578,95 @@ test("operator composer placement controller normalizes shared footer drafts and
   controller.dispose();
 });
 
+test("operator composer placement controller opens a shared repair preview and only applies it on explicit approval", async () => {
+  const patchCalls = [];
+  let sharedRefreshCount = 0;
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const commandInput = new FakeElement("textarea");
+  const normalizeBtn = new FakeElement("button");
+  const repairBtn = new FakeElement("button");
+  const repairEl = new FakeElement("section");
+  repairEl.hidden = true;
+  const repairSummaryEl = new FakeElement("p");
+  const repairDetailEl = new FakeElement("p");
+  const repairOriginalEl = new FakeElement("pre");
+  const repairOutputWrapEl = new FakeElement("section");
+  repairOutputWrapEl.hidden = true;
+  const repairOutputEl = new FakeElement("pre");
+  const repairDiffWrapEl = new FakeElement("section");
+  repairDiffWrapEl.hidden = true;
+  const repairDiffEl = new FakeElement("pre");
+  const repairApplyBtn = new FakeElement("button");
+  repairApplyBtn.hidden = true;
+  const repairCancelBtn = new FakeElement("button");
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState(payload);
+      }
+    },
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput,
+    normalizeBtn,
+    repairBtn,
+    repairEl,
+    repairSummaryEl,
+    repairDetailEl,
+    repairOriginalEl,
+    repairOutputWrapEl,
+    repairOutputEl,
+    repairDiffWrapEl,
+    repairDiffEl,
+    repairApplyBtn,
+    repairCancelBtn,
+    requestRepairCandidate: async () => ({
+      repairedText: "Ubuntu-24.04",
+      languageFamily: "powershell",
+      confidence: 0.92,
+      operations: ["joined wrapped token"]
+    }),
+    scheduleSharedCommandRefresh: () => {
+      sharedRefreshCount += 1;
+    }
+  });
+
+  commandInput.value = "Ubuntu-\n24.04";
+  repairBtn.dispatch("click");
+
+  await waitForTurn();
+
+  assert.equal(commandInput.value, "Ubuntu-\n24.04");
+  assert.equal(repairEl.hidden, false);
+  assert.equal(repairSummaryEl.textContent, "Review repair suggestion.");
+  assert.equal(repairOriginalEl.textContent, "Ubuntu-\n24.04");
+  assert.equal(repairOutputEl.textContent, "Ubuntu-24.04");
+  assert.equal(repairDiffEl.textContent, "-Ubuntu-\n-24.04\n+Ubuntu-24.04");
+  assert.equal(repairOutputWrapEl.hidden, false);
+  assert.equal(repairDiffWrapEl.hidden, false);
+  assert.equal(repairApplyBtn.hidden, false);
+  assert.deepEqual(patchCalls, []);
+
+  repairApplyBtn.dispatch("click");
+  await waitForTurn();
+  await waitForTurn();
+
+  assert.equal(commandInput.value, "Ubuntu-24.04");
+  assert.equal(repairEl.hidden, true);
+  assert.deepEqual(controller.getState().sharedDraft, "Ubuntu-24.04");
+  assert.deepEqual(patchCalls, [{ sharedDraft: "Ubuntu-24.04" }]);
+  assert.equal(sharedRefreshCount, 1);
+  controller.dispose();
+});
+
 test("operator composer placement controller ignores stale pinned-draft echoes while local pinned input is newer", async () => {
   const patchCalls = [];
   const documentRef = createDocumentRef();
@@ -705,5 +815,121 @@ test("operator composer placement controller normalizes pinned drafts and persis
   assert.equal(pinnedTextarea.value, "echo ok\npwd");
   assert.deepEqual(controller.getState().pinnedDrafts, { [session.id]: "echo ok\npwd" });
   assert.deepEqual(patchCalls, [{ pinnedDrafts: { [session.id]: "echo ok\npwd" } }]);
+  controller.dispose();
+});
+
+test("operator composer placement controller opens pinned repair previews without mutating the draft until apply", async () => {
+  const patchCalls = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const session = { id: "s-pin-repair", name: "Pinned Repair" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 40 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState({
+          mode: "active-overlay",
+          pinnedSessionIds: [session.id],
+          pinnedDrafts: payload.pinnedDrafts || {}
+        });
+      }
+    },
+    workspaceShellEl: new FakeElement("section"),
+    controlPaneEl: new FakeElement("section"),
+    controlPaneBodyEl: new FakeElement("div"),
+    controlPaneResizeHandleEl: new FakeElement("div"),
+    composerPlacementModeSelectEl: new FakeElement("select"),
+    commandInput: new FakeElement("textarea"),
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session,
+    requestRepairCandidate: async () => ({
+      repairedText: "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-24.04\\demo.ps1\"",
+      languageFamily: "powershell",
+      confidence: 0.91,
+      operations: ["joined wrapped path token", "removed hard-wrap line break inside quoted argument"]
+    }),
+    formatSessionToken: () => "P",
+    formatSessionDisplayName: (entry) => entry?.name || ""
+  });
+
+  controller.applyPlacementState(
+    createApiState({
+      mode: "active-overlay",
+      pinnedSessionIds: [session.id],
+      pinnedDrafts: { [session.id]: "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-\n24.04\\demo.ps1\"" }
+    })
+  );
+
+  const pinnedRoot = overlayHostEl.firstChild;
+  const pinnedTextarea = findNodeByClass(pinnedRoot, "session-composer-overlay-input");
+  const repairBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-repair");
+  const repairEl = findNodeByClass(pinnedRoot, "command-repair");
+  const repairSummaryEl = findNodeByClass(pinnedRoot, "command-repair-summary");
+  const repairOriginalEl = findNodeByClass(pinnedRoot, "command-repair-preview");
+  const repairOutputEl = (function findSecondPreview(root) {
+    const matches = [];
+    (function visit(node) {
+      if (!node) {
+        return;
+      }
+      if (hasClassName(node, "command-repair-preview")) {
+        matches.push(node);
+      }
+      for (const child of node.children || []) {
+        visit(child);
+      }
+    })(root);
+    return matches[1] || null;
+  })(pinnedRoot);
+  const repairApplyBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-repair-apply");
+
+  assert.ok(pinnedTextarea);
+  assert.ok(repairBtn);
+  assert.ok(repairEl);
+  assert.ok(repairApplyBtn);
+
+  repairBtn.dispatch("click");
+  await waitForTurn();
+
+  assert.equal(pinnedTextarea.value, "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-\n24.04\\demo.ps1\"");
+  assert.equal(repairEl.hidden, false);
+  assert.equal(repairSummaryEl?.textContent, "Review repair suggestion.");
+  assert.equal(repairOriginalEl?.textContent, "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-\n24.04\\demo.ps1\"");
+  assert.equal(repairOutputEl?.textContent, "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-24.04\\demo.ps1\"");
+  assert.deepEqual(patchCalls, []);
+
+  repairApplyBtn.dispatch("click");
+  await waitForTurn();
+  await waitForTurn();
+
+  assert.equal(pinnedTextarea.value, "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-24.04\\demo.ps1\"");
+  assert.equal(repairEl.hidden, true);
+  assert.deepEqual(controller.getState().pinnedDrafts, {
+    [session.id]: "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-24.04\\demo.ps1\""
+  });
+  assert.deepEqual(patchCalls, [
+    {
+      pinnedDrafts: {
+        [session.id]: "powershell -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu-24.04\\demo.ps1\""
+      }
+    }
+  ]);
   controller.dispose();
 });

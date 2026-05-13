@@ -79,11 +79,18 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - it must not rewrite internal indentation or otherwise attempt structure-aware repair
   - shared normalize persists through the same server-side `sharedDraft` authority, and pinned normalize persists through the same server-side `pinnedDrafts` authority
   - regression coverage now locks down both the shared-footer normalize path and the pinned-overlay normalize path in `frontend/test/operator-composer-placement-runtime-controller.test.js`
-- Future structure-aware composer repair is now promoted into the active `v0.4.0-H184` wave through `CMP-406` through `CMP-410`:
+- The composer-placement runtime now also exposes an explicit opt-in `Repair` action beside `Normalize` for the shared footer composer and pinned overlay composers:
+  - `Repair` must open a preview/apply shell instead of mutating the current draft immediately
+  - the original draft must remain recoverable until the operator explicitly clicks `Apply Repair`
+  - the shared footer and pinned overlay composers both persist applied repairs through the same server-authoritative `sharedDraft` / `pinnedDrafts` placement channels
+  - the current shipped regression coverage locks down both the shared and pinned preview/apply flows in `frontend/test/operator-composer-placement-runtime-controller.test.js`
+- Structure-aware composer repair is now partially shipped inside the active `v0.4.0-H184` wave:
   - `Normalize` is the shipped conservative cleanup path and must remain deterministic and safe
-  - the future feature is explicitly `Repair`, not classic linting, because the target problem is damaged technical syntax reconstruction rather than rule checking on already valid input
-  - any future `Repair` action must stay opt-in, fail closed on ambiguity, preserve the original draft until operator acceptance, and validate family-specific repair candidates before applying them
-  - the retained design frame now lives in `docs/Composer Input Repair Design.md`, and the first promoted delivery order is: repair action plus preview shell first, then shell-family repair, then JSON repair, then XML repair, then acceptance coverage
+  - `Repair` is explicitly not classic linting; the target problem is damaged technical syntax reconstruction rather than rule checking on already valid input
+  - the shell-family repair slice is now live for Bash/POSIX shell, PowerShell, and CMD through `frontend/src/public/composer-repair-runtime.js`, using bounded hard-wrap, quote-continuation, path/URL continuation, explicit line-continuation collapse, and wrapped value joins with confidence gating and fail-closed validation
+  - the JSON repair slice is now live through the same runtime, currently limited to wrapped JSON string reconstruction with strict `JSON.parse` validation
+  - XML repair and the broader acceptance closeout remain open as `CMP-409` and `CMP-410`
+  - the retained design frame continues to live in `docs/Composer Input Repair Design.md`
 
 ## Current Quality Baseline
 

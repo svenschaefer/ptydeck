@@ -968,7 +968,9 @@ body {
 }
 
 .command-normalize-btn,
-.session-composer-overlay-normalize {
+.command-repair-btn,
+.session-composer-overlay-normalize,
+.session-composer-overlay-repair {
   min-height: 38px;
   padding: 6px 10px;
   font-size: 12px;
@@ -978,7 +980,7 @@ body {
 .command-send-btn,
 .session-composer-overlay-send {
   flex: 1 1 auto;
-  min-height: calc(var(--command-composer-min-height) - 46px);
+  min-height: 56px;
 }
 
 .status-message {
@@ -1183,6 +1185,94 @@ body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.command-repair {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(139, 182, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 20, 30, 0.78);
+}
+
+.command-repair[hidden] {
+  display: none !important;
+}
+
+.command-repair-summary,
+.command-repair-detail,
+.command-repair-label {
+  margin: 0;
+  min-width: 0;
+}
+
+.command-repair-summary {
+  color: #8bb6ff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.command-repair-detail {
+  color: #9db8d2;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.command-repair-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.command-repair-column {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.command-repair-label {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.command-repair-preview,
+.command-repair-diff {
+  margin: 0;
+  min-width: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(70, 91, 116, 0.8);
+  border-radius: 6px;
+  background: rgba(10, 13, 18, 0.82);
+  color: #d8dee9;
+  font-family: var(--command-composer-font-family);
+  font-size: var(--command-composer-font-size);
+  line-height: var(--command-composer-line-height);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.command-repair-diff-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.command-repair-diff {
+  color: #c8d6e5;
+}
+
+.command-repair-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .workflow-runtime-panel {
@@ -1751,6 +1841,9 @@ button:hover {
 
 .session-composer-overlay-unpin,
 .session-composer-overlay-normalize,
+.session-composer-overlay-repair,
+.session-composer-overlay-repair-apply,
+.session-composer-overlay-repair-cancel,
 .session-composer-overlay-guard-send,
 .session-composer-overlay-guard-cancel {
   min-height: 32px;
