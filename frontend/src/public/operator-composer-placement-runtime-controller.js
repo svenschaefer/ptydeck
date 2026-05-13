@@ -69,6 +69,21 @@ function removeNode(node) {
   node.parentNode.removeChild(node);
 }
 
+function ensureNodeChild(parent, child) {
+  if (!parent) {
+    return;
+  }
+  if (!child) {
+    clearNodeChildren(parent);
+    return;
+  }
+  if (parent.firstChild === child && parent.children?.length === 1) {
+    return;
+  }
+  clearNodeChildren(parent);
+  parent.appendChild?.(child);
+}
+
 function appendText(node, text) {
   if (!node) {
     return;
@@ -764,9 +779,9 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     if (!host) {
       return;
     }
-    clearNodeChildren(host);
     const overlayMode = placementState.mode === ACTIVE_OVERLAY_MODE;
     if (!overlayMode) {
+      clearNodeChildren(host);
       host.hidden = true;
       return;
     }
@@ -778,11 +793,12 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     if (pinned) {
       const surface = createPinnedSurface(sessionId);
       if (surface) {
-        host.appendChild(surface.root);
+        ensureNodeChild(host, surface.root);
         surface.setDraft(placementState.pinnedDrafts[sessionId] || "", { scheduleRefresh: false });
         surface.render?.();
         host.hidden = false;
       } else {
+        clearNodeChildren(host);
         host.hidden = true;
       }
       return;
@@ -791,12 +807,13 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     disposePinnedSurface(sessionId);
 
     if (!active) {
+      clearNodeChildren(host);
       host.hidden = true;
       return;
     }
 
     sharedOverlay.targetEl.textContent = session ? `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}` : "";
-    host.appendChild(sharedOverlay.shell);
+    ensureNodeChild(host, sharedOverlay.shell);
     moveSharedComposerBody(sharedOverlay.slotEl);
     host.hidden = false;
   }

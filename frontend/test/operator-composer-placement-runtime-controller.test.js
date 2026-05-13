@@ -63,6 +63,8 @@ class FakeElement {
     this.listeners = new Map();
     this.offsetHeight = offsetHeight;
     this.clientHeight = offsetHeight;
+    this.appendChildCalls = 0;
+    this.removeChildCalls = 0;
   }
 
   get firstChild() {
@@ -73,6 +75,7 @@ class FakeElement {
     if (!child) {
       return child;
     }
+    this.appendChildCalls += 1;
     if (child.parentNode) {
       child.parentNode.removeChild(child);
     }
@@ -84,6 +87,7 @@ class FakeElement {
   removeChild(child) {
     const index = this.children.indexOf(child);
     if (index >= 0) {
+      this.removeChildCalls += 1;
       this.children.splice(index, 1);
       child.parentNode = null;
     }
@@ -285,6 +289,68 @@ test("operator composer placement controller initializes from the server-side pl
   assert.equal(overlayHostEl.hidden, false);
   assert.equal(overlayHostEl.children.length, 1);
   assert.notEqual(controlPaneBodyEl.parentNode, controlPaneEl);
+  controller.dispose();
+});
+
+test("operator composer placement controller keeps the shared overlay mounted across stable rerenders", async () => {
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const workspaceShellEl = new FakeElement("section");
+  const controlPaneEl = new FakeElement("section");
+  const controlPaneBodyEl = new FakeElement("div");
+  const controlPaneResizeHandleEl = new FakeElement("div");
+  const composerPlacementModeSelectEl = new FakeElement("select");
+  const commandInput = new FakeElement("textarea");
+  const session = { id: "s-stable", name: "Stable" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 40 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+  controlPaneEl.appendChild(controlPaneBodyEl);
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    workspaceShellEl,
+    controlPaneEl,
+    controlPaneBodyEl,
+    controlPaneResizeHandleEl,
+    composerPlacementModeSelectEl,
+    commandInput,
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session,
+    formatSessionToken: () => "S",
+    formatSessionDisplayName: (entry) => entry?.name || ""
+  });
+
+  controller.applyPlacementState({
+    clientId: "client-1",
+    mode: "active-overlay",
+    pinnedSessionIds: [],
+    sharedDraft: "echo stable",
+    pinnedDrafts: {}
+  });
+
+  const appendCallsAfterFirstMount = overlayHostEl.appendChildCalls;
+  const removeCallsAfterFirstMount = overlayHostEl.removeChildCalls;
+  const mountedChild = overlayHostEl.firstChild;
+
+  controller.render();
+
+  assert.equal(overlayHostEl.firstChild, mountedChild);
+  assert.equal(overlayHostEl.appendChildCalls, appendCallsAfterFirstMount);
+  assert.equal(overlayHostEl.removeChildCalls, removeCallsAfterFirstMount);
+  assert.equal(controlPaneBodyEl.parentNode?.parentNode, mountedChild);
   controller.dispose();
 });
 

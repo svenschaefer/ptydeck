@@ -60,6 +60,10 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - the frontend now reuses the shared composer body for the active overlay path instead of cloning the shared footer composer into a second source of truth
   - pinned overlays use isolated drafts and keep using the normal guarded send/completion/runtime command seams
   - focused regression coverage now locks down REST wiring, runtime snapshot/update application, overlay migration, pin lifecycle, draft isolation, and the shipped template/CSS contract
+- The active-overlay runtime contract now also requires stable DOM mounting across no-op rerenders:
+  - `frontend/src/public/operator-composer-placement-runtime-controller.js` must not clear and re-append the active shared overlay host or an unchanged pinned overlay host when the effective placement target has not changed
+  - this preserves textarea focus while the composer preview/suggestion/runtime render loop updates on input
+  - regression coverage for that focus-preserving mount contract now lives in `frontend/test/operator-composer-placement-runtime-controller.test.js`
 
 ## Current Quality Baseline
 
