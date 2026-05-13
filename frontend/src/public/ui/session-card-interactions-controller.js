@@ -176,7 +176,7 @@ export function createSessionCardInteractionsController(options = {}) {
     });
     refs.startStopBtn?.addEventListener("click", async () => {
       const currentSession = getSession() || session;
-      if (!api?.startSession || !api?.stopSession) {
+      if (!api?.startSession || !api?.stopSession || !api?.restartSession) {
         setError("Session start/stop is unavailable.");
         return;
       }
@@ -191,7 +191,7 @@ export function createSessionCardInteractionsController(options = {}) {
           source: "session-start-stop",
           message,
           retryAction: {
-            kind: isSessionStopped(currentSession) ? "session-start" : "session-stop",
+            kind: isSessionStopped(currentSession) ? "session-start" : isSessionExited(currentSession) ? "session-restart" : "session-stop",
             sessionId: session.id
           }
         });
@@ -202,6 +202,14 @@ export function createSessionCardInteractionsController(options = {}) {
           () => api.startSession(session.id),
           `Started [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
           "Failed to start the session."
+        );
+        return;
+      }
+      if (isSessionExited(currentSession)) {
+        await applySessionControlUpdate(
+          () => api.restartSession(session.id),
+          `Restarted [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
+          "Failed to restart the session."
         );
         return;
       }

@@ -139,6 +139,7 @@ export function createSessionCardFactoryController(options = {}) {
     const stateHintText = getSessionStateHintText(session);
     const runtimeState = getSessionRuntimeState(session);
     const sessionStopped = isSessionStopped(session);
+    const sessionExited = isSessionExited(session);
     const startBlocked = isSessionStartBlocked(session);
     const readOnlyMode = isReadOnlyMode();
     const readOnlyMessage = readOnlyMode ? getReadOnlyModeMessage() : "";
@@ -149,8 +150,9 @@ export function createSessionCardFactoryController(options = {}) {
       runtimeState === "running" ||
       runtimeState === "busy" ||
       runtimeState === "idle" ||
-      sessionStopped;
-    const startMode = sessionStopped;
+      sessionStopped ||
+      sessionExited;
+    const startMode = sessionStopped || sessionExited;
 
     if (focusBtn) {
       focusBtn.textContent = getSessionHeaderLabel(session);

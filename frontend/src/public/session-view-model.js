@@ -151,7 +151,7 @@ export function createSessionViewModel(options = {}) {
       return "Session is stopped. Start it to launch the terminal again. The reserved terminal space stays visible while stopped.";
     }
     if (isSessionExited(session)) {
-      return `Session process exited${getExitedSessionStatusSuffix(session)}. Rename, restart, input, resize, and settings changes are disabled. Delete this session to remove the card.`;
+      return `Session process exited${getExitedSessionStatusSuffix(session)}. Rename, input, resize, and settings changes are disabled. Start it from the header to relaunch it, or delete this session to remove the card.`;
     }
     return "";
   }
@@ -163,7 +163,7 @@ export function createSessionViewModel(options = {}) {
 
   function getExitedSessionMessage(session) {
     const label = `[${formatSessionToken(session.id)}] ${displayName(session)}`;
-    return `Session ${label} has exited${getExitedSessionStatusSuffix(session)}. Rename, restart, input, resize, and settings changes are disabled. Delete this session to remove the card.`;
+    return `Session ${label} has exited${getExitedSessionStatusSuffix(session)}. Rename, input, resize, and settings changes are disabled. Start it from the header to relaunch it, or delete this session to remove the card.`;
   }
 
   function getStoppedSessionMessage(session) {

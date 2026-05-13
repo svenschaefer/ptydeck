@@ -29,6 +29,8 @@ test("session runtime helpers produce exited messaging", () => {
   const session = { id: "abcd1234", name: "build", state: "exited", exitCode: 2, exitSignal: "" };
   assert.equal(model.getSessionStateBadgeText(session), "EXITED");
   assert.match(model.getExitedSessionMessage(session), /exit code 2/);
+  assert.match(model.getExitedSessionMessage(session), /Start it from the header to relaunch it/i);
+  assert.match(model.getSessionStateHintText(session), /Start it from the header to relaunch it/i);
 });
 
 test("session runtime helpers expose stopped lifecycle messaging", () => {

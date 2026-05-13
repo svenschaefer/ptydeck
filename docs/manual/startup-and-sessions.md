@@ -61,6 +61,7 @@ Each session header now also exposes a start/stop toggle beside `Refresh` and `S
 
 - Running sessions show `Stop`.
 - Stopped sessions show `Start`.
+- Exited sessions also show `Start`, which relaunches the session through the existing restart contract while preserving the session identity and card slot.
 - Stopping a session keeps the session card and layout slot on screen, but clears the terminal viewport so the reserved area stays visually empty until you start it again.
 - The stopped/running state is server-persisted across backend restart and restore:
   - stopped sessions stay stopped

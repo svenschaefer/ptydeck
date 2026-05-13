@@ -99,6 +99,7 @@ export function createSessionCardRenderController(options = {}) {
     if (entry.startStopBtn) {
       const runtimeState = getSessionRuntimeState(session);
       const sessionStopped = isSessionStopped(session);
+      const sessionExited = isSessionExited(session);
       const startBlocked = isSessionStartBlocked(session);
       const startBlockedMessage = startBlocked ? getSessionStartBlockedMessage(session) : "";
       const interactiveToggleState =
@@ -107,8 +108,9 @@ export function createSessionCardRenderController(options = {}) {
         runtimeState === "running" ||
         runtimeState === "busy" ||
         runtimeState === "idle" ||
-        sessionStopped;
-      const startMode = sessionStopped;
+        sessionStopped ||
+        sessionExited;
+      const startMode = sessionStopped || sessionExited;
       entry.startStopBtn.disabled = readOnlyMode || !interactiveToggleState || startBlocked;
       entry.startStopBtn.setAttribute(
         "aria-label",

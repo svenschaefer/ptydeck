@@ -25,6 +25,7 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
 - Session cards now expose one additional lifecycle toggle in the terminal header beside `Refresh` and `Settings`:
   - running sessions show a `Stop` action
   - stopped sessions show a `Start` action
+  - exited sessions also show a `Start` action, but that action relaunches through the existing restart contract instead of the explicit stopped-session start contract
 - The session lifecycle state now includes one explicit persisted `stopped` state in addition to the existing running/startup/unrestored/exited states.
 - The backend contract now exposes:
   - `POST /api/v1/sessions/{sessionId}/start`
@@ -45,6 +46,10 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
 - The backend `SessionManager` now supports explicit stop/start lifecycle transitions instead of only restart/delete:
   - `stop` tears down the live PTY, clears pending live runtime state, preserves the persisted session identity/settings, and emits `session.updated`
   - `start` rebuilds a fresh live session from the persisted session contract and emits `session.updated`
+- Exited-session toolbar behavior now has one explicit frontend contract:
+  - `frontend/src/public/ui/session-card-factory-controller.js` and `frontend/src/public/ui/session-card-render-controller.js` must treat `state: exited` as a playable lifecycle state for icon, tooltip, and `aria-label` purposes
+  - `frontend/src/public/ui/session-card-interactions-controller.js` must route that `Play` click to `restartSession(...)` instead of `startSession(...)`
+  - `frontend/src/public/session-view-model.js` must tell operators that exited sessions can be relaunched from the header instead of claiming restart is disabled
 - Secret-backed SSH boundaries remain intentionally fail-closed:
   - ptydeck still does not persist runtime SSH secrets
   - password or keyboard-interactive SSH sessions can be restored into persisted `stopped` state without the original secret

@@ -1123,6 +1123,10 @@ test("session-card-interactions controller routes start-stop actions through the
         sessions.set(sessionId, next);
         return next;
       },
+      restartSession: async () => {
+        calls.push(["unexpected-restart"]);
+        return null;
+      },
       stopSession: async (sessionId) => {
         calls.push(["stop", sessionId]);
         const next = { id: sessionId, name: "Alpha", state: "stopped" };
@@ -1179,6 +1183,10 @@ test("session-card-interactions controller blocks start-stop when this client ca
         calls.push(["unexpected-start"]);
         return null;
       },
+      restartSession: async () => {
+        calls.push(["unexpected-restart"]);
+        return null;
+      },
       stopSession: async () => {
         calls.push(["unexpected-stop"]);
         return null;
@@ -1195,6 +1203,59 @@ test("session-card-interactions controller blocks start-stop when this client ca
   assert.deepEqual(calls, [
     ["error", "This session is currently controlled by another client. Input and resize are disabled."],
     ["reclaim", "s2", "session-start-stop", "session-stop"]
+  ]);
+});
+
+test("session-card-interactions controller restarts exited sessions through the session API", async () => {
+  const calls = [];
+  const sessions = new Map([["s1", { id: "s1", name: "Alpha", state: "exited", exitCode: 0 }]]);
+  const controller = createSessionCardInteractionsController({
+    isSessionExited: (session) => session?.state === "exited",
+    getSessionRuntimeState: (session) => session?.state || "running"
+  });
+  const refs = {
+    focusBtn: createEventTarget(),
+    startStopBtn: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("off")
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "Alpha" },
+    refs,
+    api: {
+      startSession: async () => {
+        calls.push(["unexpected-start"]);
+        return null;
+      },
+      restartSession: async (sessionId) => {
+        calls.push(["restart", sessionId]);
+        const next = { id: sessionId, name: "Alpha", state: "running" };
+        sessions.set(sessionId, next);
+        return next;
+      },
+      stopSession: async () => {
+        calls.push(["unexpected-stop"]);
+        return null;
+      }
+    },
+    getSession: () => sessions.get("s1"),
+    getEntry: () => ({ id: "entry-exit-1" }),
+    sessionThemeDrafts: new Map(),
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name,
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.state]),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    clearError: () => calls.push(["clear-error"]),
+    setError: (message) => calls.push(["error", message])
+  });
+
+  await refs.startStopBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    ["restart", "s1"],
+    ["event", "session.updated", "running"],
+    ["clear-error"],
+    ["feedback", "Restarted [1] Alpha."]
   ]);
 });
 
@@ -1219,6 +1280,10 @@ test("session-card-interactions controller blocks start-stop for start-blocked s
     api: {
       startSession: async () => {
         calls.push(["unexpected-start"]);
+        return null;
+      },
+      restartSession: async () => {
+        calls.push(["unexpected-restart"]);
         return null;
       },
       stopSession: async () => {

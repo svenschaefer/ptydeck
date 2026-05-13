@@ -221,6 +221,28 @@ test("session-card-render controller toggles the start-stop control for stopped 
   assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-stop-filled"), false);
 });
 
+test("session-card-render controller toggles the start-stop control for exited sessions", () => {
+  const entry = createEntry();
+  const controller = createSessionCardRenderController({
+    setSessionCardVisibility: () => {},
+    getSessionRuntimeState: (session) => session.state,
+    isSessionExited: (session) => session.state === "exited"
+  });
+
+  controller.updateExistingSessionCard({
+    entry,
+    session: { id: "s10x", name: "delta", state: "exited" },
+    activeSessionId: "other",
+    nextVisible: true
+  });
+
+  assert.equal(entry.element.classList.contains("exited"), true);
+  assert.equal(entry.startStopBtn.disabled, false);
+  assert.equal(entry.startStopBtn.getAttribute("aria-label"), "Start session");
+  assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-play-filled"), true);
+  assert.equal(entry.startStopIconEl.classList.contains("icon-tabler-player-stop-filled"), false);
+});
+
 test("session-card-render controller disables start for start-blocked stopped sessions", () => {
   const entry = createEntry();
   const controller = createSessionCardRenderController({

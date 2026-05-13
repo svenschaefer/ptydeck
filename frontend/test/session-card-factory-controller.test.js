@@ -207,6 +207,37 @@ test("session-card-factory controller applies the initial start icon state for s
   assert.equal(result.startStopIconEl.classList.contains("icon-tabler-player-stop-filled"), false);
 });
 
+test("session-card-factory controller applies the initial start icon state for exited sessions", () => {
+  const template = {
+    content: {
+      firstElementChild: {
+        cloneNode() {
+          return createNodeStub();
+        }
+      }
+    }
+  };
+  const controller = createSessionCardFactoryController({
+    getSessionRuntimeState: (session) => session.state,
+    isSessionExited: (session) => session.state === "exited",
+    renderSessionAppIdentity: () => {},
+    renderSessionTagList: () => {},
+    renderSessionNote: () => {},
+    setSessionCardVisibility: () => {}
+  });
+
+  const result = controller.createSessionCardView({
+    template,
+    session: { id: "s-exit", name: "echo", state: "exited" },
+    visible: true
+  });
+
+  assert.equal(result.startStopBtn.disabled, false);
+  assert.equal(result.startStopBtn.getAttribute("aria-label"), "Start session");
+  assert.equal(result.startStopIconEl.classList.contains("icon-tabler-player-play-filled"), true);
+  assert.equal(result.startStopIconEl.classList.contains("icon-tabler-player-stop-filled"), false);
+});
+
 test("session-card-factory controller uses the derived session header label", () => {
   const template = {
     content: {
