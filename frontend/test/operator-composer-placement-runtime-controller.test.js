@@ -317,6 +317,81 @@ test("operator composer placement controller initializes from the server-side pl
   controller.dispose();
 });
 
+test("operator composer placement controller suppresses pre-attach operator-client bootstrap races and can retry later", async () => {
+  const errors = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const workspaceShellEl = new FakeElement("section");
+  const controlPaneEl = new FakeElement("section");
+  const controlPaneBodyEl = new FakeElement("div");
+  const controlPaneResizeHandleEl = new FakeElement("div");
+  const composerPlacementModeSelectEl = new FakeElement("select");
+  const commandInput = new FakeElement("textarea");
+  const session = { id: "s-race", name: "Race" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 40 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+  controlPaneEl.appendChild(controlPaneBodyEl);
+
+  let phase = 0;
+  const api = {
+    async getOperatorComposerPlacement() {
+      if (phase === 0) {
+        phase = 1;
+        const error = new Error("This action requires the active operator client id. Reconnect the session UI and retry.");
+        error.status = 409;
+        error.error = "OperatorClientRequired";
+        throw error;
+      }
+      return createApiState({
+        mode: "active-overlay",
+        sharedDraft: "whoami"
+      });
+    }
+  };
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api,
+    workspaceShellEl,
+    controlPaneEl,
+    controlPaneBodyEl,
+    controlPaneResizeHandleEl,
+    composerPlacementModeSelectEl,
+    commandInput,
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session,
+    formatSessionToken: () => "R",
+    formatSessionDisplayName: (entry) => entry?.name || "",
+    setError: (message) => errors.push(message)
+  });
+
+  await controller.initialize();
+
+  assert.deepEqual(errors, []);
+  assert.equal(commandInput.value, "");
+  assert.equal(composerPlacementModeSelectEl.value, "shared-footer");
+
+  await controller.initialize();
+
+  assert.equal(composerPlacementModeSelectEl.value, "active-overlay");
+  assert.equal(commandInput.value, "whoami");
+  assert.equal(workspaceShellEl.classList.contains("composer-placement-active-overlay"), true);
+  controller.dispose();
+});
+
 test("operator composer placement controller keeps stopped sessions visually empty in overlay mode", async () => {
   const documentRef = createDocumentRef();
   const windowRef = createWindowRef();

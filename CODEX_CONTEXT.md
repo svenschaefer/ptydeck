@@ -123,6 +123,7 @@ Last updated: 2026-05-13 (the backend runtime still delegates startup/session-di
   - the control pane now exposes a global mode selector for `shared-footer` versus `active-overlay`
   - session cards now expose pin and unpin actions plus overlay hosts for pinned composers
   - the frontend now reuses the shared composer body for the active overlay path instead of cloning the shared footer composer into a second source of truth
+  - the operator composer placement bootstrap must tolerate one bounded startup race: `GET /api/v1/operator/composer-placement` can legitimately return `409 OperatorClientRequired` before the WebSocket/session-control attachment finishes, so `frontend/src/public/operator-composer-placement-runtime-controller.js` now suppresses that one pre-attach case, avoids latching the failed initialization promise forever, and allows the later runtime snapshot or a second initialize call to hydrate the placement state once attachment is active
   - pinned overlays use isolated drafts and keep using the normal guarded send/completion/runtime command seams
   - focused regression coverage now locks down REST wiring, runtime snapshot/update application, overlay migration, pin lifecycle, draft isolation, and the shipped template/CSS contract
 - The active-overlay runtime contract now also requires stable DOM mounting across no-op rerenders:

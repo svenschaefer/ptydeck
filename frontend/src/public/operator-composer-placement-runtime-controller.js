@@ -932,6 +932,16 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     pendingPlacementState.pinnedDrafts = clonePinnedDrafts(value);
   }
 
+  function isOperatorClientBootstrapRace(error) {
+    const status = Number.isFinite(error?.status) ? error.status : 0;
+    const code = normalizeText(error?.error);
+    const message = normalizeText(error?.message);
+    return (
+      status === 409 &&
+      (code === "OperatorClientRequired" || /active operator client id/iu.test(message))
+    );
+  }
+
   function setSharedComposerDraftLocally(value, { scheduleRefresh = false } = {}) {
     const nextValue = typeof value === "string" ? value : "";
     if (sharedRepairPreview.active === true && sharedRepairPreview.originalText !== nextValue) {
@@ -1564,8 +1574,14 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
         return getPlacementState();
       })
       .catch((error) => {
+        if (isOperatorClientBootstrapRace(error)) {
+          return getPlacementState();
+        }
         setError(getErrorMessage(error, "Failed to load composer placement."));
         return getPlacementState();
+      })
+      .finally(() => {
+        initializePromise = null;
       });
     return initializePromise;
   }
