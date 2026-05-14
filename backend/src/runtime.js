@@ -1705,6 +1705,34 @@ export function createRuntime(config) {
     };
   }
 
+  function sendSocketPayloadSafely(socket, payload, traceContext = null, { removeOnFailure = false } = {}) {
+    try {
+      socket.send(JSON.stringify(payload));
+      return true;
+    } catch (error) {
+      recordWsError("socket_send_failed");
+      logDebug(
+        "ws.send.failed",
+        {
+          message: error instanceof Error ? error.message : String(error || "socket send failed")
+        },
+        traceContext || payload?.trace || socket?.traceContext || null
+      );
+      if (removeOnFailure) {
+        sockets.delete(socket);
+      }
+      socket.closeReasonHint = socket.closeReasonHint || "send_failed";
+      try {
+        if (typeof socket.terminate === "function") {
+          socket.terminate();
+        } else if (typeof socket.close === "function") {
+          socket.close();
+        }
+      } catch {}
+      return false;
+    }
+  }
+
   function broadcast(payload, traceSeed = null) {
     const tracedPayload = withTracePayload(payload, traceSeed);
     for (const socket of sockets) {
@@ -1713,7 +1741,9 @@ export function createRuntime(config) {
         if (!filteredPayload) {
           continue;
         }
-        socket.send(JSON.stringify(filteredPayload));
+        sendSocketPayloadSafely(socket, filteredPayload, filteredPayload.trace || tracedPayload.trace, {
+          removeOnFailure: true
+        });
       }
     }
   }
@@ -1759,7 +1789,9 @@ export function createRuntime(config) {
       if (!filteredPayload) {
         continue;
       }
-      socket.send(JSON.stringify(filteredPayload));
+      sendSocketPayloadSafely(socket, filteredPayload, filteredPayload.trace || tracedPayload.trace, {
+        removeOnFailure: true
+      });
     }
   }
 
@@ -1811,7 +1843,9 @@ export function createRuntime(config) {
       if (socket.readyState !== socket.OPEN || socket.sessionControlAttachmentKey !== attachmentKey) {
         continue;
       }
-      socket.send(JSON.stringify(tracedPayload));
+      sendSocketPayloadSafely(socket, tracedPayload, tracedPayload.trace, {
+        removeOnFailure: true
+      });
     }
   }
 

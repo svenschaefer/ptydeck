@@ -415,6 +415,58 @@ test("WS emits session events and reconnect receives snapshot", async () => {
   }
 });
 
+test("operator composer placement updates still respond when a websocket broadcast send fails", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime();
+
+  try {
+    const events = [];
+    const ws = new WebSocket(wsUrl);
+    ws.on("message", (buffer) => {
+      events.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() => events.some((event) => event.type === "snapshot"));
+    const snapshot = events.find((event) => event.type === "snapshot");
+    assert.equal(typeof snapshot?.clientId, "string");
+
+    const originalSend = WebSocket.prototype.send;
+    let injectedFailureCount = 0;
+    WebSocket.prototype.send = function patchedSend(data, ...args) {
+      const payload = typeof data === "string" ? data : Buffer.isBuffer(data) ? data.toString("utf8") : "";
+      if (!injectedFailureCount && payload.includes("\"type\":\"composer-placement.updated\"")) {
+        injectedFailureCount += 1;
+        throw new Error("simulated composer placement send failure");
+      }
+      return originalSend.call(this, data, ...args);
+    };
+
+    try {
+      const updateRes = await fetch(`${baseUrl}/operator/composer-placement`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-ptydeck-client-id": snapshot.clientId
+        },
+        body: JSON.stringify({
+          mode: "shared-footer",
+          sharedDraft: "repair-me"
+        })
+      });
+      assert.equal(updateRes.status, 200);
+      const updatePayload = await updateRes.json();
+      assert.equal(updatePayload.clientId, snapshot.clientId);
+      assert.equal(updatePayload.sharedDraft, "repair-me");
+    } finally {
+      WebSocket.prototype.send = originalSend;
+      ws.close();
+    }
+
+    assert.equal(injectedFailureCount, 1);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("WS snapshot and session events preserve trace and correlation continuity", async () => {
   const { runtime, baseUrl, wsUrl } = await createStartedRuntime();
   const events = [];

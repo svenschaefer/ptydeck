@@ -34,6 +34,31 @@ export function createRuntimeWsConnectionHandler(dependencies = {}) {
     recordWsError = () => {}
   } = dependencies;
 
+  function sendSocketPayloadSafely(socket, payload, traceContext = null) {
+    try {
+      socket.send(JSON.stringify(payload));
+      return true;
+    } catch (error) {
+      recordWsError("socket_send_failed");
+      logDebug(
+        "ws.send.failed",
+        {
+          message: error instanceof Error ? error.message : String(error || "socket send failed")
+        },
+        traceContext || payload?.trace || socket?.traceContext || null
+      );
+      socket.closeReasonHint = socket.closeReasonHint || "send_failed";
+      try {
+        if (typeof socket.terminate === "function") {
+          socket.terminate();
+        } else if (typeof socket.close === "function") {
+          socket.close();
+        }
+      } catch {}
+      return false;
+    }
+  }
+
   return function handleAcceptedRuntimeWsConnection(ws, { auth: wsAuth, requestContext = {}, upgradeTraceContext = {} } = {}) {
     sockets.add(ws);
     metrics.wsConnectionsOpenedTotal += 1;
@@ -139,19 +164,20 @@ export function createRuntimeWsConnectionHandler(dependencies = {}) {
           )
         },
         ws.traceContext
-      ),
-      ws.auth || null
+        ),
+        ws.auth || null
     );
-    ws.send(JSON.stringify(snapshotPayload));
-    logDebug(
-      "ws.snapshot.sent",
-      {
-        sessionCount: Array.isArray(snapshotPayload.sessions) ? snapshotPayload.sessions.length : 0,
-        outputCount: Array.isArray(snapshotPayload.outputs) ? snapshotPayload.outputs.length : 0,
-        customCommandCount: Array.isArray(snapshotPayload.customCommands) ? snapshotPayload.customCommands.length : 0
-      },
-      snapshotPayload.trace || ws.traceContext
-    );
+    if (sendSocketPayloadSafely(ws, snapshotPayload, snapshotPayload.trace || ws.traceContext)) {
+      logDebug(
+        "ws.snapshot.sent",
+        {
+          sessionCount: Array.isArray(snapshotPayload.sessions) ? snapshotPayload.sessions.length : 0,
+          outputCount: Array.isArray(snapshotPayload.outputs) ? snapshotPayload.outputs.length : 0,
+          customCommandCount: Array.isArray(snapshotPayload.customCommands) ? snapshotPayload.customCommands.length : 0
+        },
+        snapshotPayload.trace || ws.traceContext
+      );
+    }
     if (typeof broadcastSessionControlRefreshForAuthExceptSocket === "function") {
       broadcastSessionControlRefreshForAuthExceptSocket(ws.auth || null, ws, ws.traceContext);
     } else {

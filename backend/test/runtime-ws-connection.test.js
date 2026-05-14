@@ -202,6 +202,37 @@ test("runtime ws connection handler registers accepted sockets and sends the fil
   assert.equal(socket.isAlive, true);
 });
 
+test("runtime ws connection handler tolerates snapshot send failures deterministically", () => {
+  const { dependencies, observed, sockets, metrics } = createDependencies();
+  const handler = createRuntimeWsConnectionHandler(dependencies);
+  const socket = createSocket();
+  let terminated = 0;
+  socket.terminate = () => {
+    terminated += 1;
+  };
+  socket.send = () => {
+    throw new Error("simulated snapshot send failure");
+  };
+
+  assert.doesNotThrow(() => {
+    handler(socket, {
+      auth: { subject: "alice", sessionControlClientId: "client-1" },
+      requestContext: { clientIp: "127.0.0.1" },
+      upgradeTraceContext: { traceId: "upgrade-send-failure" }
+    });
+  });
+
+  assert.equal(sockets.has(socket), true);
+  assert.equal(metrics.wsConnectionsOpenedTotal, 1);
+  assert.deepEqual(observed.errors, ["socket_send_failed"]);
+  assert.equal(terminated, 1);
+  assert.equal(socket.closeReasonHint, "send_failed");
+  assert.equal(observed.debug[0]?.event, "ws.upgrade.accepted");
+  assert.equal(observed.debug[1]?.event, "ws.send.failed");
+  assert.equal(observed.refreshes.length, 0);
+  assert.equal(observed.refreshesExceptSocket.length, 1);
+});
+
 test("runtime ws connection handler records reconnect and close metrics and unregisters attachments deterministically", () => {
   const clientStateMap = new Map([
     [
