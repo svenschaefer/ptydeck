@@ -137,6 +137,10 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
 - Persistence for this feature is intentionally not browser-local:
   - composer mode, pinned session ids, shared overlay draft, and pinned per-session drafts are stored as server-side persisted state
   - the persistence scope is per operator client, not one shared instance-wide setting for all clients
+- The current composer-placement authority remains intentionally typed and domain-specific:
+  - backend-semantically relevant fields such as composer mode, pinned session ids, shared draft, and pinned per-session drafts should stay on the explicit composer-placement contract
+  - future FE-only presentation settings should not keep widening that domain contract one field at a time
+  - the preferred next-step architecture is a separate server-persisted operator UI preferences channel with a typed envelope plus bounded dynamic namespaces so purely presentational FE settings can evolve without repeated backend contract surgery
 - `CMP-401` implemented the backend authority baseline:
   - persisted runtime state now includes `operatorComposerPlacements`
   - startup restore rehydrates persisted operator-client composer placement entries through `backend/src/runtime-startup-restore.js`

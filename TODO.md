@@ -24,7 +24,9 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Queued Open Tasks (Next Wave)
 
-1. `None.`
+1. `PREF-411` Owner `BE`: add a server-persisted operator UI preferences authority with a typed top-level envelope plus bounded dynamic namespace storage so FE-only presentation settings can evolve without widening backend domain contracts for every new key.
+2. `PREF-412` Owner `FE`: route the current overlay-only presentation settings through the new operator UI preferences channel, starting with active-overlay dock position (`top` / `bottom`) and visibility state (`normal` / `minimized`) while keeping composer mode, pins, and drafts on the existing typed composer-placement authority.
+3. `PREF-413` Owner `QA`: add regression coverage for operator UI preferences persistence, fail-closed decoding of malformed or unknown values, and restore behavior across frontend reloads and backend restart for the initial overlay dock/visibility settings.
 
 ## Active Ownership Role
 

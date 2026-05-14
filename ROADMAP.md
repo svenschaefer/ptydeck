@@ -16,7 +16,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active wave:
   - `v0.4.0-H187` Repo-Wide Quality and Coverage Follow-Up
 - Queued next waves:
-  - `None.`
+  - `v0.4.0-H188` Operator UI Preferences Foundation
 
 ## Active Wave Order
 
@@ -42,11 +42,15 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Queued Wave Order
 
-1. `None.`
+1. `PREF-411` Owner `BE`
+2. `PREF-412` Owner `FE`
+3. `PREF-413` Owner `QA`
 
 ## Queued Wave Dependencies
 
-- `None.`
+- `PREF-411 -> PREF-412`
+- `PREF-411 -> PREF-413`
+- `PREF-412 -> PREF-413`
 
 ## Sequencing Rules
 
