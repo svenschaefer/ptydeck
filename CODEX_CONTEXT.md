@@ -34,6 +34,9 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
   - the session card remains in the grid/deck
   - the reserved layout slot stays occupied
   - the terminal viewport itself is cleared so the terminal area appears visually empty while stopped
+- Stopped sessions must still participate in deck-wide terminal geometry updates even though they remain non-interactive:
+  - changing `TERMINAL SIZE` for the active deck must continue to update the reserved card width/height for stopped sessions in that deck
+  - `frontend/src/public/ui/session-terminal-resize-controller.js` therefore still applies local mount/card geometry to stopped sessions, but it must not issue PTY-local `terminal.resize(...)` calls or remote `resizeSession(...)` writes for those stopped entries
 - Frontend write paths must fail closed for stopped sessions:
   - direct terminal typing
   - shared-footer or overlay composer sends

@@ -167,34 +167,48 @@ test("session-terminal-resize controller clears pending resize timers for blocke
   assert.equal(terminalSizes.has("s1"), false);
 });
 
-test("session-terminal-resize controller clears pending resize timers for stopped sessions", () => {
+test("session-terminal-resize controller keeps stopped session card geometry in sync while clearing pending remote resize", () => {
   const windowRef = createFakeWindow();
   const resizeTimers = new Map([["s1", 77]]);
   const terminalSizes = new Map();
+  const resizeCalls = [];
+  const entry = {
+    mount: { clientWidth: 640, clientHeight: 320, style: {} },
+    element: { style: {} },
+    terminal: {
+      resize(cols, rows) {
+        resizeCalls.push(`${cols}x${rows}`);
+      }
+    }
+  };
   const controller = createSessionTerminalResizeController({
     windowRef,
     terminals: new Map([
       [
         "s1",
-        {
-          mount: { clientWidth: 640, clientHeight: 320, style: {} },
-          element: { style: {} },
-          terminal: { resize() {} }
-        }
+        entry
       ]
     ]),
     resizeTimers,
     terminalSizes,
     getSessionById: (sessionId) => ({ id: sessionId, state: "stopped" }),
     isSessionActionBlocked: () => false,
-    isSessionStopped: (session) => session?.state === "stopped"
+    isSessionStopped: (session) => session?.state === "stopped",
+    getSessionTerminalGeometry: () => ({ cols: 96, rows: 28 }),
+    computeFixedMountHeightPx: (rows) => rows * 10,
+    computeFixedCardWidthPx: (cols) => cols * 5 + 20
   });
 
   controller.applyResizeForSession("s1");
 
   assert.deepEqual(windowRef.cleared, [77]);
   assert.equal(resizeTimers.has("s1"), false);
-  assert.equal(terminalSizes.has("s1"), false);
+  assert.deepEqual(terminalSizes.get("s1"), { cols: 96, rows: 28 });
+  assert.equal(entry.mount.style.height, "280px");
+  assert.equal(entry.mount.style.width, "500px");
+  assert.equal(entry.element.style.width, "500px");
+  assert.deepEqual(resizeCalls, []);
+  assert.equal(windowRef.scheduled.length, 0);
 });
 
 test("session-terminal-resize controller offers reclaim UI instead of remote resize when this client is not writable", () => {
@@ -290,6 +304,60 @@ test("session-terminal-resize controller scopes scheduled global resize passes b
   windowRef.scheduled[0].fn();
 
   assert.deepEqual(resized, ["s1:90x30"]);
+});
+
+test("session-terminal-resize controller applies deck geometry to stopped cards during deck-wide resize passes", () => {
+  const windowRef = createFakeWindow();
+  const resized = [];
+  const terminals = new Map([
+    [
+      "s1",
+      {
+        mount: { clientWidth: 640, clientHeight: 320, style: {} },
+        element: { style: {} },
+        terminal: { resize(cols, rows) { resized.push(`s1:${cols}x${rows}`); } }
+      }
+    ],
+    [
+      "s2",
+      {
+        mount: { clientWidth: 640, clientHeight: 320, style: {} },
+        element: { style: {} },
+        terminal: { resize(cols, rows) { resized.push(`s2:${cols}x${rows}`); } }
+      }
+    ]
+  ]);
+  const sessions = new Map([
+    ["s1", { id: "s1", deckId: "d1", state: "running" }],
+    ["s2", { id: "s2", deckId: "d1", state: "stopped" }]
+  ]);
+  const terminalSizes = new Map();
+
+  const controller = createSessionTerminalResizeController({
+    windowRef,
+    terminals,
+    resizeTimers: new Map(),
+    terminalSizes,
+    getSessionById: (sessionId) => sessions.get(sessionId),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionTerminalGeometry: () => ({ cols: 90, rows: 30 }),
+    isSessionStopped: (session) => session?.state === "stopped",
+    computeFixedMountHeightPx: (rows) => rows * 10,
+    computeFixedCardWidthPx: (cols) => cols * 5 + 20,
+    api: {
+      resizeSession() {
+        return Promise.resolve();
+      }
+    }
+  });
+
+  controller.applySettingsToAllTerminals({ deckId: "d1", force: true });
+
+  assert.deepEqual(resized, ["s1:90x30"]);
+  assert.deepEqual(terminalSizes.get("s2"), { cols: 90, rows: 30 });
+  assert.equal(terminals.get("s2").mount.style.height, "300px");
+  assert.equal(terminals.get("s2").mount.style.width, "470px");
+  assert.equal(terminals.get("s2").element.style.width, "470px");
 });
 
 test("session-terminal-resize controller uses runtime cell metrics for width and preserves the last row", () => {

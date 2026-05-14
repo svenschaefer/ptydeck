@@ -77,18 +77,22 @@ export function createSessionTerminalResizeController(options = {}) {
     };
   }
 
+  function clearPendingResizeTimer(sessionId) {
+    const pendingTimer = resizeTimers.get(sessionId);
+    if (pendingTimer) {
+      clearTimer(pendingTimer);
+      resizeTimers.delete(sessionId);
+    }
+  }
+
   function applyResizeForSession(sessionId, options = {}) {
     const entry = terminals.get(sessionId);
     if (!entry) {
       return;
     }
     const session = getSessionById(sessionId);
-    if (isSessionActionBlocked(session) || isSessionStopped(session)) {
-      const pendingTimer = resizeTimers.get(sessionId);
-      if (pendingTimer) {
-        clearTimer(pendingTimer);
-        resizeTimers.delete(sessionId);
-      }
+    if (isSessionActionBlocked(session)) {
+      clearPendingResizeTimer(sessionId);
       return;
     }
 
@@ -103,6 +107,12 @@ export function createSessionTerminalResizeController(options = {}) {
     }
 
     applyMountHeight(entry, cols, rows);
+    const sessionStopped = isSessionStopped(session);
+    if (sessionStopped) {
+      terminalSizes.set(sessionId, { cols, rows });
+      clearPendingResizeTimer(sessionId);
+      return;
+    }
 
     const previous = terminalSizes.get(sessionId);
     if (!options.force && previous && previous.cols === cols && previous.rows === rows) {
@@ -128,10 +138,7 @@ export function createSessionTerminalResizeController(options = {}) {
       return;
     }
 
-    const pendingTimer = resizeTimers.get(sessionId);
-    if (pendingTimer) {
-      clearTimer(pendingTimer);
-    }
+    clearPendingResizeTimer(sessionId);
 
     const timer = scheduleTimer(() => {
       debugLog("terminal.resize.remote.start", { sessionId, cols, rows });
