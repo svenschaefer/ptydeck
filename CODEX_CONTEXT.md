@@ -190,22 +190,23 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
 Validated evidence on the current stabilization tree:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
-- backend coverage: `97.38%` line / `90.88%` branch / `87.60%` funcs
-- frontend coverage: `97.44%` line / `90.50%` branch / `82.02%` funcs
+- backend coverage: `97.37%` line / `90.88%` branch / `87.63%` funcs
+- frontend coverage: `97.43%` line / `90.53%` branch / `81.96%` funcs
 
 Current lane health:
 
 - `npm run lint`, `npm run docs:check`, and `git diff --check` are green on the current tree.
 - `npm run test:root:coverage` is green on the current tree.
 - `npm --prefix backend run test:coverage` is green on the current tree.
-- A 2026-05-14 intensive inventory check disproved the current broad-lane stability claim for the frontend/root wrapper lanes:
-  - `npm --prefix frontend run test` did not terminate within `180 s` or `420 s`
-  - `npm --prefix frontend run test:coverage` did not terminate within `180 s`
-  - `npm run test` again went silent after long green progress during the frontend leg and had to be terminated per repo hygiene
-- The current reproduced hang is no longer just a generic suspicion:
-  - the stalled FE broad lane leaves `node --test --test-concurrency=1` alive with the active child process `frontend/test/app-runtime-composition-controller.test.js`
-  - the visible log tail stalls after test `98` (`app-runtime composition controller stream adapter records debug traces and clears activity after quiet idle`)
-  - this reopens `v0.4.0-H186` as an explicit active quality wave focused on deterministic FE broad-lane termination
+- `npm --prefix frontend run test` is green on the current tree and now exits cleanly with `1061` passing tests.
+- `npm --prefix frontend run test:coverage` is green on the current tree and now exits cleanly with frontend totals `97.43%` line / `90.53%` branch / `81.96%` funcs.
+- `npm run test` is green on the current tree.
+- `npm run test:coverage:check` is green on the current tree.
+- The H186 broad-lane termination fix is now part of the baseline:
+  - the previously hanging broad-lane child `frontend/test/app-runtime-composition-controller.test.js` now exits cleanly
+  - `frontend/src/public/app-runtime-composition-controller.js` exposes a top-level `dispose()` that delegates to lifecycle/controller cleanup seams
+  - `frontend/test/app-runtime-composition-controller.test.js` now disposes every created controller harness in `afterEach(...)`
+  - the retained root cause was open-handle residue from auth-bootstrap/runtime collaborator timers surviving past successful test completion
 
 Current highest retained hotspots:
 
@@ -225,8 +226,7 @@ Current highest retained hotspots:
 
 Current active tasks:
 
-- `QLT-363` Owner `FE`: isolate and eliminate the non-terminating frontend broad-lane path rooted in `frontend/test/app-runtime-composition-controller.test.js` so `npm --prefix frontend run test` exits cleanly without external timeout and without leaving open-handle residue.
-- `QLT-364` Owner `QA`: revalidate and document full-lane frontend/root evidence after `QLT-363`, including `npm --prefix frontend run test`, `npm --prefix frontend run test:coverage`, `npm run test`, and `npm run test:coverage:check`.
+- `None.`
 
 ## H185 Session Lifecycle Stabilization Closeout
 

@@ -1370,6 +1370,10 @@ return {
     await operatorComposerPlacementRuntimeController?.initialize?.();
     return result;
   },
-  setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)
+  setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message),
+  dispose: () => {
+    operatorComposerPlacementRuntimeController?.dispose?.();
+    appLifecycleController?.handleBeforeUnload?.();
+  }
 };
 }

@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 
 import {
@@ -397,14 +397,24 @@ function createControllerHarness(options = {}) {
       })),
     testHooks: hooks
   });
-  return {
+  const harness = {
     controller,
     fixture,
     windowRef,
     hooks,
     getEnsuredIdentityCount: () => ensuredIdentityCount
   };
+  controllerHarnesses.add(harness);
+  return harness;
 }
+const controllerHarnesses = new Set();
+
+afterEach(() => {
+  for (const harness of controllerHarnesses) {
+    harness?.controller?.dispose?.();
+  }
+  controllerHarnesses.clear();
+});
 
 test("collectAppRuntimeDomRefs resolves query and id based runtime refs deterministically", () => {
   const appShellEl = { id: "app-shell" };

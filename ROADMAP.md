@@ -14,18 +14,17 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H186` Frontend Broad-Lane Termination Hardening
+  - `None.`
 - Queued next waves:
   - `None.`
 
 ## Active Wave Order
 
-1. `QLT-363` Owner `FE`
-2. `QLT-364` Owner `QA`
+1. `None.`
 
 ## Wave Dependencies
 
-- `QLT-363 -> QLT-364`
+- `None.`
 
 ## Queued Wave Order
 
