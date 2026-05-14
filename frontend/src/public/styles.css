@@ -1641,7 +1641,7 @@ button:hover {
   background: #0f151f;
   min-width: 0;
   position: relative;
-  z-index: 2;
+  z-index: 8;
 }
 
 .terminal-toolbar-main {
@@ -1665,7 +1665,7 @@ button:hover {
   align-items: center;
   gap: 6px;
   position: relative;
-  z-index: 2;
+  z-index: 8;
   padding-bottom: 6px;
   margin-bottom: -6px;
 }
@@ -1692,7 +1692,7 @@ button:hover {
   position: absolute;
   right: 0;
   top: 100%;
-  z-index: 6;
+  z-index: 9;
   display: grid;
   gap: 8px;
   inline-size: max-content;
@@ -1901,6 +1901,10 @@ button:hover {
 
 .session-composer-overlay-shell-minimized .session-composer-overlay-body {
   display: none;
+}
+
+.session-composer-overlay-shell-minimized {
+  opacity: 0.5;
 }
 
 .session-composer-overlay-shell .control-pane-body {

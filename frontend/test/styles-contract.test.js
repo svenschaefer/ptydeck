@@ -73,15 +73,15 @@ test("session quick-send hover actions stay clickable while moving from the tool
   const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
   assert.match(
     stylesCss,
-    /\.terminal-toolbar \{[\s\S]*position: relative;[\s\S]*z-index: 2;[\s\S]*\}/m
+    /\.terminal-toolbar \{[\s\S]*position: relative;[\s\S]*z-index: 8;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,
-    /\.session-toolbar-actions \{[\s\S]*position: relative;[\s\S]*z-index: 2;[\s\S]*padding-bottom: 6px;[\s\S]*margin-bottom: -6px;[\s\S]*\}/m
+    /\.session-toolbar-actions \{[\s\S]*position: relative;[\s\S]*z-index: 8;[\s\S]*padding-bottom: 6px;[\s\S]*margin-bottom: -6px;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,
-    /\.session-quick-send-panel \{[\s\S]*top: 100%;[\s\S]*z-index: 6;[\s\S]*inline-size: max-content;[\s\S]*max-inline-size: min\(30rem, calc\(100vw - 32px\)\);[\s\S]*pointer-events: none;[\s\S]*\}/m
+    /\.session-quick-send-panel \{[\s\S]*top: 100%;[\s\S]*z-index: 9;[\s\S]*inline-size: max-content;[\s\S]*max-inline-size: min\(30rem, calc\(100vw - 32px\)\);[\s\S]*pointer-events: none;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,
@@ -142,6 +142,10 @@ test("active-overlay composer mode collapses the footer body and uses non-resizi
   assert.match(
     stylesCss,
     /\.session-composer-overlay-shell-minimized \.session-composer-overlay-body \{[\s\S]*display: none;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell-minimized \{[\s\S]*opacity: 0\.5;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,

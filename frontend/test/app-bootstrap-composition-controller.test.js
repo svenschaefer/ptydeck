@@ -305,6 +305,59 @@ test("app bootstrap composition controller composes the startup controller chain
   );
 });
 
+test("app bootstrap composition controller forwards shared command value changes to the optional placement sync hook", () => {
+  const { options } = createBaseOptions();
+  const sharedDraftSyncValues = [];
+  let composerRuntimeOptions = null;
+
+  const controller = createAppBootstrapCompositionController({
+    ...options,
+    onSharedCommandValueChange: (value) => sharedDraftSyncValues.push(value),
+    createCommandEngine: () => ({ parseAutocompleteContext: () => ({}) }),
+    createCommandTargetRuntimeController: () => ({
+      resolveTargetSelectors: () => [],
+      resolveFilterSelectors: () => [],
+      resolveDeckToken: () => "",
+      parseSizeCommandArgs: () => null,
+      parseCustomDefinition: () => null,
+      resolveSettingsTargets: () => [],
+      parseSettingsPayload: () => null,
+      resolveQuickSwitchTarget: () => null,
+      activateSessionTarget: () => {},
+      activateDeckTarget: () => {},
+      parseDirectTargetRoutingInput: () => null,
+      formatQuickSwitchPreview: () => ""
+    }),
+    createCommandExecutor: () => ({ execute: async () => true }),
+    createAuthBootstrapRuntimeController: () => ({
+      getWsAuthToken: () => "token",
+      dispose() {}
+    }),
+    createWsRuntimeController: () => ({ start: () => ({ close() {} }) }),
+    createCommandComposerAutocompleteController: () => ({
+      bindUiEvents() {},
+      resetAutocompleteState() {},
+      recordSlashHistory() {},
+      resetSlashHistoryNavigationState() {},
+      dispose() {}
+    }),
+    createCommandComposerRuntimeController: (nextOptions) => {
+      composerRuntimeOptions = nextOptions;
+      return { dispose() {} };
+    },
+    createAppLifecycleController: () => ({
+      bindUiEvents() {},
+      bindWindowEvents() {},
+      initializeRuntime: async () => {}
+    })
+  });
+
+  controller.composeControllers();
+  composerRuntimeOptions.setCommandValue("");
+
+  assert.deepEqual(sharedDraftSyncValues, [""]);
+});
+
 test("app bootstrap composition controller hydrates UI bindings and starts runtime after composition", async () => {
   const { calls, options } = createBaseOptions();
 

@@ -201,6 +201,8 @@ export function createAppRuntimeBootstrapAssembly(options = {}) {
     typeof options.handleCommandFeedbackAction === "function"
       ? options.handleCommandFeedbackAction
       : () => Promise.resolve(false);
+  const onSharedCommandValueChange =
+    typeof options.onSharedCommandValueChange === "function" ? options.onSharedCommandValueChange : () => {};
   const devAuthRefreshMinDelayMs = Number.isFinite(options.devAuthRefreshMinDelayMs)
     ? options.devAuthRefreshMinDelayMs
     : 15000;
@@ -223,6 +225,7 @@ export function createAppRuntimeBootstrapAssembly(options = {}) {
     recordTrace,
     defaultDeckId,
     delayedSubmitMs,
+    onSharedCommandValueChange,
     systemSlashCommands,
     terminalThemePresets,
     themeProfileKeys,

@@ -98,6 +98,8 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
   const setAccessState = typeof options.setAccessState === "function" ? options.setAccessState : () => {};
   const getWsTicketPayload = typeof options.getWsTicketPayload === "function" ? options.getWsTicketPayload : () => ({});
+  const onSharedCommandValueChange =
+    typeof options.onSharedCommandValueChange === "function" ? options.onSharedCommandValueChange : () => {};
   const disposeStreamDebugTrace =
     typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
   const createBtn = options.createBtn || null;
@@ -382,7 +384,9 @@ export function createAppBootstrapCompositionController(options = {}) {
       windowRef,
       getCommandValue: () => commandInput.value || "",
       setCommandValue: (value) => {
-        commandInput.value = value;
+        const nextValue = String(value || "");
+        commandInput.value = nextValue;
+        onSharedCommandValueChange(nextValue);
       },
       resetCommandAutocompleteState: () => commandComposerAutocompleteController?.resetAutocompleteState?.(),
       interpretComposerInput,

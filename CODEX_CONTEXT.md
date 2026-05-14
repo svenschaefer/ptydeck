@@ -159,7 +159,9 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
   - overlay shells must sit flush against the terminal-card frame with no side gaps and no visible terminal bleed-through around the overlay edges
   - the shared and pinned overlay shells must not repeat session id or display name inside the overlay body because that context already lives in the terminal header
   - the overlay head must keep the placement and pin controls together in one grouped chrome surface, including direct return to `shared-footer`, top/bottom docking, minimize/expand, and `Pin Input` / `Unpin Input`
-  - slash-command previews inside overlay composers must stay clipped inside the overlay input surface, and overlay suggestion surfaces must stay visually above the overlay body instead of disappearing behind it
+  - once that grouped overlay-head control exists, the legacy header-level `Pin Input` affordance must stay hidden so pinning is not presented twice in the same terminal card
+  - slash-command previews inside overlay composers must stay clipped inside the overlay input surface, and overlay suggestion surfaces plus the Top-5 quick-send hover panel must stay visually above the overlay body instead of disappearing behind it
+  - minimized overlay shells should remain visible but quieter, using a half-transparent visual treatment instead of a fully opaque minimized bar
 - The active-overlay runtime contract now also requires stable DOM mounting across no-op rerenders:
   - `frontend/src/public/operator-composer-placement-runtime-controller.js` must not clear and re-append the active shared overlay host or an unchanged pinned overlay host when the effective placement target has not changed
   - this preserves textarea focus while the composer preview/suggestion/runtime render loop updates on input
@@ -168,6 +170,7 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
   - local updates to `mode`, `pinnedSessionIds`, `sharedDraft`, and `pinnedDrafts` are held as pending local placement authority
   - `frontend/src/public/operator-composer-placement-runtime-controller.js` must not overwrite a newer local footer or overlay draft with a stale REST `PATCH` response or `composer-placement.updated` echo from older state
   - the current shipped regression coverage explicitly locks down the stale shared-footer draft echo case in `frontend/test/operator-composer-placement-runtime-controller.test.js`
+  - the shared/footer composer clear-after-send path must now use that same placement authority instead of mutating only the textarea DOM value; programmatic shared-draft changes must flow back through `syncSharedDraftFromCommandValue(...)` so a successful send cannot leave stale persisted text behind and later rehydrate it into the input
 - The composer-placement runtime must also preserve the browser's native undo/redo stack while the operator is actively editing:
   - focused shared-footer and pinned-overlay textareas must not be programmatically rewritten from server placement state while they still hold focus
   - deliberate local semantic transitions such as pin/unpin draft transfer may still move or clear the shared draft explicitly
@@ -201,7 +204,7 @@ Validated evidence on the current stabilization tree:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
 - backend coverage: `97.37%` line / `90.85%` branch / `87.63%` funcs
-- frontend coverage: `97.42%` line / `90.53%` branch / `81.96%` funcs
+- frontend coverage: `97.42%` line / `90.57%` branch / `81.77%` funcs
 
 Current lane health:
 
@@ -213,7 +216,7 @@ Current lane health:
   - the same isolated test then passed immediately
   - one immediate full backend coverage rerun also passed with backend totals `97.37%` line / `90.85%` branch / `87.63%` funcs
   - current conclusion: the backend WebSocket integration/coverage lane has a nondeterministic trace/correlation continuity flaw, not a permanently red test
-- `npm --prefix frontend run test` is green on the current tree and now exits cleanly with `1061` passing tests.
+- `npm --prefix frontend run test` is green on the current tree and now exits cleanly with `1064` passing tests.
 - `npm run test` is green on the current tree.
 - `npm run test:coverage:check` is green on the current tree.
 - The H186 broad-lane termination fix is now part of the baseline:

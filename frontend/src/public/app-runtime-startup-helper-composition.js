@@ -69,6 +69,7 @@ export function createAppRuntimeStartupHelperComposition(options = {}) {
     showBlockedWriteReclaimUi: options.showBlockedWriteReclaimUi,
     setAccessState: options.setAccessState,
     handleCommandFeedbackAction: options.handleCommandFeedbackAction,
+    onSharedCommandValueChange: options.onSharedCommandValueChange,
     commandPaletteDialogEl: options.commandPaletteDialogEl,
     commandPaletteMetaEl: options.commandPaletteMetaEl,
     commandPaletteInputEl: options.commandPaletteInputEl,

@@ -146,6 +146,8 @@ export function createAppRuntimeStartupComposition(options = {}) {
     typeof options.handleCommandFeedbackAction === "function"
       ? options.handleCommandFeedbackAction
       : () => Promise.resolve(false);
+  const onSharedCommandValueChange =
+    typeof options.onSharedCommandValueChange === "function" ? options.onSharedCommandValueChange : () => {};
   const devAuthRefreshMinDelayMs = Number.isFinite(options.devAuthRefreshMinDelayMs)
     ? options.devAuthRefreshMinDelayMs
     : 15000;
@@ -234,6 +236,7 @@ export function createAppRuntimeStartupComposition(options = {}) {
     showBlockedWriteReclaimUi,
     setAccessState,
     handleCommandFeedbackAction,
+    onSharedCommandValueChange,
     devAuthRefreshMinDelayMs,
     devAuthRefreshSafetyMs,
     devAuthRetryDelayMs

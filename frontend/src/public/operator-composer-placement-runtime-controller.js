@@ -185,7 +185,7 @@ function renderRepairPreview(refs, repairState) {
 }
 
 function createOverlayNode(documentRef, className, tagName = "div") {
-  return documentRef?.createElement?.(tagName) || {
+  const node = documentRef?.createElement?.(tagName) || {
     className,
     hidden: false,
     textContent: "",
@@ -210,6 +210,10 @@ function createOverlayNode(documentRef, className, tagName = "div") {
     setAttribute() {},
     removeAttribute() {}
   };
+  if (!node.dataset || typeof node.dataset !== "object") {
+    node.dataset = {};
+  }
+  return node;
 }
 
 function buildPinnedOverlaySurface(documentRef) {
@@ -555,8 +559,12 @@ function createPinnedSurfaceController(options = {}) {
     refs.textarea.disabled = writeLocked;
     refs.sendBtn.disabled = writeLocked;
     refs.root.classList?.toggle?.("session-composer-overlay-shell-minimized", minimized);
-    refs.positionBtn.textContent = getOverlayPosition() === OVERLAY_POSITION_TOP ? "Bottom" : "Top";
-    refs.visibilityBtn.textContent = minimized ? "Expand" : "Minimize";
+    if (refs.positionBtn) {
+      refs.positionBtn.textContent = getOverlayPosition() === OVERLAY_POSITION_TOP ? "Bottom" : "Top";
+    }
+    if (refs.visibilityBtn) {
+      refs.visibilityBtn.textContent = minimized ? "Expand" : "Minimize";
+    }
     if (writeLocked) {
       refs.textarea.setAttribute?.("title", writeLockMessage);
       refs.sendBtn.setAttribute?.("title", writeLockMessage);
@@ -1030,14 +1038,14 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     );
   }
 
-  function setSharedComposerDraftLocally(value, { scheduleRefresh = false } = {}) {
+  function setSharedComposerDraftLocally(value, { scheduleRefresh = false, forceDomValue = false } = {}) {
     const nextValue = typeof value === "string" ? value : "";
     if (sharedRepairPreview.active === true && sharedRepairPreview.originalText !== nextValue) {
       applyRepairPreviewState(sharedRepairPreview, createEmptyRepairPreviewState());
     }
     placementState.sharedDraft = nextValue;
     if (commandInput && commandInput.value !== nextValue) {
-      if (sharedInputFocused) {
+      if (sharedInputFocused && forceDomValue !== true) {
         return;
       }
       commandInput.value = nextValue;
@@ -1111,10 +1119,16 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     }
     const activeSessionId = normalizeText(activeSession?.id);
     sharedOverlay.shell.classList?.toggle?.("session-composer-overlay-shell-minimized", isOverlayMinimized());
-    sharedOverlay.positionBtn.textContent = getOverlayPositionToggleLabel();
-    sharedOverlay.visibilityBtn.textContent = getOverlayVisibilityToggleLabel();
-    sharedOverlay.pinBtn.dataset.sessionId = activeSessionId;
-    sharedOverlay.pinBtn.hidden = !activeSessionId || isPinnedSession(activeSessionId);
+    if (sharedOverlay.positionBtn) {
+      sharedOverlay.positionBtn.textContent = getOverlayPositionToggleLabel();
+    }
+    if (sharedOverlay.visibilityBtn) {
+      sharedOverlay.visibilityBtn.textContent = getOverlayVisibilityToggleLabel();
+    }
+    if (sharedOverlay.pinBtn) {
+      sharedOverlay.pinBtn.dataset.sessionId = activeSessionId;
+      sharedOverlay.pinBtn.hidden = !activeSessionId || isPinnedSession(activeSessionId);
+    }
   }
 
   function setOverlayPosition(nextPosition, { feedback = true } = {}) {
@@ -1257,26 +1271,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     if (!button) {
       return;
     }
-    const overlayMode = placementState.mode === ACTIVE_OVERLAY_MODE;
-    button.hidden = overlayMode !== true;
-    if (!overlayMode) {
-      return;
-    }
-    const pinned = isPinnedSession(session?.id);
-    const label = pinned ? "Unpin Input" : "Pin Input";
-    button.textContent = label;
-    button.setAttribute?.("aria-label", label);
-    button.dataset.sessionId = String(session?.id || "");
-    if (button.dataset.boundComposerPlacement !== "true") {
-      button.dataset.boundComposerPlacement = "true";
-      button.addEventListener?.("click", () => {
-        const targetSessionId = normalizeText(button.dataset.sessionId);
-        if (!targetSessionId) {
-          return;
-        }
-        void togglePinnedSession(targetSessionId);
-      });
-    }
+    button.hidden = true;
   }
 
   function moveSharedComposerBody(targetParent) {
@@ -1590,6 +1585,17 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     queuePersistPatch({ sharedDraft: placementState.sharedDraft });
   }
 
+  function syncSharedDraftFromCommandValue(value, { persist = false, scheduleRefresh = false } = {}) {
+    const nextValue = String(value || "");
+    setSharedComposerDraftLocally(nextValue, { scheduleRefresh, forceDomValue: true });
+    setPendingSharedDraft(placementState.sharedDraft);
+    if (persist) {
+      queuePersistPatch({ sharedDraft: placementState.sharedDraft });
+    }
+    render();
+    return placementState.sharedDraft;
+  }
+
   function clearSharedRepairPreview({ renderAfterClear = true } = {}) {
     const hadPreview = sharedRepairPreview.active === true;
     applyRepairPreviewState(sharedRepairPreview, createEmptyRepairPreviewState());
@@ -1805,6 +1811,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     initialize,
     render,
     getState: getPlacementState,
+    syncSharedDraftFromCommandValue,
     setMode,
     pinSession,
     unpinSession,

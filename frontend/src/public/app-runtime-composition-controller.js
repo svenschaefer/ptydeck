@@ -1268,6 +1268,8 @@ const appRuntimeSessionGridActions = createAppRuntimeSessionGridActions({
   showBlockedWriteReclaimUi,
   setAccessState,
   handleCommandFeedbackAction,
+  onSharedCommandValueChange: (value) =>
+    operatorComposerPlacementRuntimeController?.syncSharedDraftFromCommandValue?.(value, { persist: true }),
   commandPaletteDialogEl,
   commandPaletteMetaEl,
   commandPaletteInputEl,

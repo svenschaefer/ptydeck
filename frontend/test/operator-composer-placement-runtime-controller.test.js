@@ -245,7 +245,7 @@ test("operator composer placement controller moves the shared composer into the 
   assert.equal(composerPlacementModeSelectEl.value, "active-overlay");
   assert.equal(workspaceShellEl.classList.contains("composer-placement-active-overlay"), true);
   assert.equal(overlayHostEl.hidden, false);
-  assert.equal(composerPinBtn.hidden, false);
+  assert.equal(composerPinBtn.hidden, true);
   assert.notEqual(controlPaneBodyEl.parentNode, controlPaneEl);
   assert.equal(overlayHostEl.children.length, 1);
   assert.equal(findNodeByClass(overlayHostEl.firstChild, "session-composer-overlay-title"), null);
@@ -260,6 +260,66 @@ test("operator composer placement controller moves the shared composer into the 
   assert.equal(controlPaneBodyEl.parentNode, controlPaneEl);
   assert.equal(overlayHostEl.hidden, true);
   assert.equal(workspaceShellEl.classList.contains("composer-placement-active-overlay"), false);
+  controller.dispose();
+});
+
+test("operator composer placement controller syncs programmatic shared draft clears into the persisted placement state", async () => {
+  const patchCalls = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const workspaceShellEl = new FakeElement("section");
+  const controlPaneEl = new FakeElement("section");
+  const controlPaneBodyEl = new FakeElement("div");
+  const controlPaneResizeHandleEl = new FakeElement("div");
+  const composerPlacementModeSelectEl = new FakeElement("select");
+  const commandInput = new FakeElement("textarea");
+  const session = { id: "s-shared-draft", name: "Shared Draft" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 42 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+  controlPaneEl.appendChild(controlPaneBodyEl);
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState(payload);
+      }
+    },
+    workspaceShellEl,
+    controlPaneEl,
+    controlPaneBodyEl,
+    controlPaneResizeHandleEl,
+    composerPlacementModeSelectEl,
+    commandInput,
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session
+  });
+
+  commandInput.value = "echo before-clear";
+  const sharedDraft = controller.syncSharedDraftFromCommandValue("", { persist: true });
+
+  assert.equal(sharedDraft, "");
+  assert.equal(commandInput.value, "");
+  assert.equal(controller.getState().sharedDraft, "");
+
+  await waitForTurn();
+  await waitForTurn();
+
+  assert.deepEqual(patchCalls, [{ sharedDraft: "" }]);
   controller.dispose();
 });
 
