@@ -14,6 +14,7 @@ export function createAppLifecycleController(options = {}) {
   const getActiveDeck = typeof options.getActiveDeck === "function" ? options.getActiveDeck : () => null;
   const setActiveDeck = typeof options.setActiveDeck === "function" ? options.setActiveDeck : () => false;
   const setActiveSession = typeof options.setActiveSession === "function" ? options.setActiveSession : () => {};
+  const getConnectionState = typeof options.getConnectionState === "function" ? options.getConnectionState : () => "";
   const resolveSessionDeckId =
     typeof options.resolveSessionDeckId === "function" ? options.resolveSessionDeckId : (session) => String(session?.deckId || "");
   const applyRuntimeEvent = typeof options.applyRuntimeEvent === "function" ? options.applyRuntimeEvent : () => {};
@@ -77,9 +78,19 @@ export function createAppLifecycleController(options = {}) {
     typeof options.disconnectTerminalObservers === "function" ? options.disconnectTerminalObservers : () => {};
   const disposeTerminals = typeof options.disposeTerminals === "function" ? options.disposeTerminals : () => {};
 
+  function getCreateWhileDisconnectedMessage() {
+    const connectionState = String(getConnectionState() || "").trim() || "connecting";
+    return `Connection state: ${connectionState}. Wait for the session UI to establish session control before creating sessions.`;
+  }
+
   async function handleCreateSession() {
     if (isReadOnlyMode()) {
       setError(getReadOnlyModeMessage());
+      return;
+    }
+    const connectionState = String(getConnectionState() || "").trim();
+    if (connectionState && connectionState !== "connected") {
+      setError(getCreateWhileDisconnectedMessage());
       return;
     }
     try {

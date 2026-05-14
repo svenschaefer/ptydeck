@@ -178,6 +178,32 @@ test("app lifecycle controller passes the active deck into create-session so no 
   ]);
 });
 
+test("app lifecycle controller blocks create-session while the session-control connection is reconnecting", async () => {
+  const createBtn = createEventTarget();
+  const errors = [];
+  let createCalls = 0;
+
+  const controller = createAppLifecycleController({
+    createBtn,
+    api: {
+      async createSession() {
+        createCalls += 1;
+        return { id: "s-3", deckId: "ops" };
+      }
+    },
+    getConnectionState: () => "reconnecting",
+    setError: (message) => errors.push(message)
+  });
+
+  controller.bindUiEvents();
+  await createBtn.dispatch("click");
+
+  assert.equal(createCalls, 0);
+  assert.deepEqual(errors, [
+    "Connection state: reconnecting. Wait for the session UI to establish session control before creating sessions."
+  ]);
+});
+
 test("app lifecycle controller binds deck/send actions and window cleanup hooks", async () => {
   const listeners = new Map();
   const deckCreateBtn = createEventTarget();

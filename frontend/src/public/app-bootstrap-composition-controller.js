@@ -458,6 +458,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
       setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
       setActiveSession: (sessionId) => store?.setActiveSession?.(sessionId),
+      getConnectionState: () => store?.getState?.().connectionState || "",
       resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session),
       applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
       setError: (message) => appCommandUiFacadeController?.setError?.(message),

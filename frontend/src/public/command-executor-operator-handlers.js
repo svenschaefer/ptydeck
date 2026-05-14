@@ -52,6 +52,11 @@ export function createCommandExecutorOperatorHandlers(options = {}) {
   const moveSessionToDeck = typeof api.moveSessionToDeck === "function" ? api.moveSessionToDeck.bind(api) : null;
   const createSession = typeof api.createSession === "function" ? api.createSession.bind(api) : null;
 
+  function getCreateWhileDisconnectedMessage(connectionState = "") {
+    const normalizedState = String(connectionState || "").trim() || "connecting";
+    return `Connection state: ${normalizedState}. Wait for the session UI to establish session control before creating sessions.`;
+  }
+
   function getCurrentState(fallbackState = {}) {
     return typeof store.getState === "function" ? store.getState() || fallbackState : fallbackState;
   }
@@ -353,6 +358,10 @@ export function createCommandExecutorOperatorHandlers(options = {}) {
     if (command === "new") {
       if (!createSession) {
         return "Session creation is unavailable.";
+      }
+      const connectionState = String(state.connectionState || "").trim();
+      if (connectionState && connectionState !== "connected") {
+        return getCreateWhileDisconnectedMessage(state.connectionState);
       }
       const activeDeck = getActiveDeck();
       const payload = {};

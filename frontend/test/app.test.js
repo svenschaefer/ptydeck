@@ -1625,8 +1625,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.workspaceManagerDialog.open, false);
 
   fixture.elements.createSession.click();
-  await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to create session.", { timeoutMs: 1200 });
-  assert.equal(fixture.elements.statusMessage.textContent, "Failed to create session.");
+  await waitFor(
+    () =>
+      fixture.elements.statusMessage.textContent ===
+      "Connection state: connecting. Wait for the session UI to establish session control before creating sessions.",
+    { timeoutMs: 1200 }
+  );
+  assert.equal(
+    fixture.elements.statusMessage.textContent,
+    "Connection state: connecting. Wait for the session UI to establish session control before creating sessions."
+  );
 
   const card = listTerminalCards(fixture.elements.terminalGrid)[0];
   assert.ok(card, "expected terminal card to exist");

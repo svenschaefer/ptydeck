@@ -8,7 +8,8 @@ function createBaseOptions(overrides = {}) {
     sessions: [],
     decks: [],
     activeDeckId: "default",
-    activeSessionId: ""
+    activeSessionId: "",
+    connectionState: "connected"
   };
   const calls = [];
   const store = {
@@ -291,8 +292,10 @@ test("app bootstrap composition controller composes the startup controller chain
   );
   assert.equal(typeof lifecycleFactoryOptions.setActiveDeck, "function");
   assert.equal(typeof lifecycleFactoryOptions.setActiveSession, "function");
+  assert.equal(typeof lifecycleFactoryOptions.getConnectionState, "function");
   assert.equal(lifecycleFactoryOptions.setActiveDeck("ops"), true);
   lifecycleFactoryOptions.setActiveSession("s-1");
+  assert.equal(lifecycleFactoryOptions.getConnectionState(), "connected");
   assert.deepEqual(
     calls.filter((entry) => entry[0] === "set-active-deck" || entry[0] === "set-active-session"),
     [

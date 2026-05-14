@@ -380,6 +380,59 @@ test("operator handlers create new sessions in the active deck and switch decks 
   ]);
 });
 
+test("operator handlers block /new while the session-control connection is reconnecting", async () => {
+  const calls = [];
+  const state = {
+    sessions: [],
+    decks: [{ id: "ops", name: "Ops" }],
+    activeSessionId: "",
+    connectionState: "reconnecting"
+  };
+
+  const handlers = createCommandExecutorOperatorHandlers({
+    store: {
+      getState() {
+        return state;
+      },
+      setActiveSession(sessionId) {
+        calls.push(["set-active-session", sessionId]);
+      }
+    },
+    api: {
+      async createSession(payload) {
+        calls.push(["create-session", payload]);
+        return { id: "s-new", name: "bash", deckId: "ops" };
+      }
+    },
+    defaultDeckId: "default",
+    systemSlashCommands: ["new"],
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    setActiveDeck: (deckId) => {
+      calls.push(["set-active-deck", deckId]);
+      return true;
+    },
+    applyRuntimeEvent: (event) => calls.push(["event", event]),
+    resolveSessionDeckId: (session) => session.deckId || "default",
+    formatSessionToken: (id) => id,
+    formatSessionDisplayName: (session) => session.name
+  });
+
+  const feedback = await handlers.executeStructuredCommand({
+    command: "new",
+    args: ["bash"],
+    sessions: state.sessions,
+    decks: state.decks,
+    activeSessionId: "",
+    state
+  });
+
+  assert.equal(
+    feedback,
+    "Connection state: reconnecting. Wait for the session UI to establish session control before creating sessions."
+  );
+  assert.deepEqual(calls, []);
+});
+
 test("operator handlers honor extracted deck rename and delete edge cases", async () => {
   const harness = createHarness();
 
