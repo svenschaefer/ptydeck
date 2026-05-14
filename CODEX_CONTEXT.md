@@ -87,6 +87,7 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
   - the card layout slot still remains occupied while the session is stopped
 - The current session-create/delete stabilization baseline now includes two additional frontend invariants:
   - `frontend/src/public/app-lifecycle-controller.js` must pass the active deck as `deckId` directly into `api.createSession(...)` instead of depending on an immediate follow-up `moveSessionToDeck(...)` request, because fast-exiting sessions can vanish before that second request completes and otherwise produce a false create failure plus wrong-deck residue
+  - both frontend create entry points must then follow the backend-selected visible target as well: after a successful create, `frontend/src/public/app-lifecycle-controller.js` and `frontend/src/public/command-executor-operator-handlers.js` must activate the created session id and the final session deck id reported by the backend, because otherwise the UI can remain focused on an older exited card or a different deck and falsely present the new create as another `exited` residue
   - `frontend/src/public/ui/session-card-interactions-controller.js` must treat missing live session records and backend `404 SessionNotFound` delete responses as bounded stale-card cleanup cases, removing the card locally instead of leaving a permanent undeletable ghost card behind
 - The backend validator now treats `deckId` as an explicit create-only session field:
   - `backend/src/validation.js` validates `deckId` for `POST /api/v1/sessions`

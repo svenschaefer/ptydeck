@@ -12,6 +12,8 @@ export function createAppLifecycleController(options = {}) {
   const workflowKillBtn = options.workflowKillBtn || null;
   const api = options.api || null;
   const getActiveDeck = typeof options.getActiveDeck === "function" ? options.getActiveDeck : () => null;
+  const setActiveDeck = typeof options.setActiveDeck === "function" ? options.setActiveDeck : () => false;
+  const setActiveSession = typeof options.setActiveSession === "function" ? options.setActiveSession : () => {};
   const resolveSessionDeckId =
     typeof options.resolveSessionDeckId === "function" ? options.resolveSessionDeckId : (session) => String(session?.deckId || "");
   const applyRuntimeEvent = typeof options.applyRuntimeEvent === "function" ? options.applyRuntimeEvent : () => {};
@@ -93,6 +95,12 @@ export function createAppLifecycleController(options = {}) {
         type: session.deckId === createdSession.deckId ? "session.created" : "session.updated",
         session
       });
+      if (session?.deckId) {
+        setActiveDeck(session.deckId);
+      }
+      if (session?.id) {
+        setActiveSession(session.id);
+      }
       clearUiError();
       debugLog("sessions.create.ok", { sessionId: session.id, deckId: session.deckId || null });
     } catch {

@@ -27,6 +27,9 @@ function createBaseOptions(overrides = {}) {
     },
     setSessions(value) {
       calls.push(["sessions", value]);
+    },
+    setActiveSession(sessionId) {
+      calls.push(["set-active-session", sessionId]);
     }
   };
   const api = {
@@ -53,7 +56,10 @@ function createBaseOptions(overrides = {}) {
     scheduleBootstrapFallback: () => calls.push(["schedule-fallback"])
   };
   const appLayoutDeckFacadeController = {
-    setActiveDeck: (deckId) => calls.push(["set-active-deck", deckId]),
+    setActiveDeck: (deckId) => {
+      calls.push(["set-active-deck", deckId]);
+      return true;
+    },
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyTerminalSizeSettings: () => {},
@@ -194,6 +200,7 @@ function createBaseOptions(overrides = {}) {
 
 test("app bootstrap composition controller composes the startup controller chain in order", () => {
   const { calls, options } = createBaseOptions();
+  let lifecycleFactoryOptions = null;
 
   const controller = createAppBootstrapCompositionController({
     ...options,
@@ -257,7 +264,8 @@ test("app bootstrap composition controller composes the startup controller chain
         dispose() {}
       };
     },
-    createAppLifecycleController: () => {
+    createAppLifecycleController: (nextOptions) => {
+      lifecycleFactoryOptions = nextOptions;
       calls.push(["factory", "lifecycle"]);
       return {
         bindUiEvents() {},
@@ -280,6 +288,17 @@ test("app bootstrap composition controller composes the startup controller chain
   assert.deepEqual(
     calls.filter((entry) => entry[0] === "factory").map((entry) => entry[1]),
     ["engine", "target", "executor", "auth", "startup-warmup", "ws", "autocomplete", "composer-runtime", "lifecycle"]
+  );
+  assert.equal(typeof lifecycleFactoryOptions.setActiveDeck, "function");
+  assert.equal(typeof lifecycleFactoryOptions.setActiveSession, "function");
+  assert.equal(lifecycleFactoryOptions.setActiveDeck("ops"), true);
+  lifecycleFactoryOptions.setActiveSession("s-1");
+  assert.deepEqual(
+    calls.filter((entry) => entry[0] === "set-active-deck" || entry[0] === "set-active-session"),
+    [
+      ["set-active-deck", "ops"],
+      ["set-active-session", "s-1"]
+    ]
   );
 });
 

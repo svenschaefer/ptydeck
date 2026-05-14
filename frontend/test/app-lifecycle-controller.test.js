@@ -61,6 +61,8 @@ test("app lifecycle controller wires create-session flow and moves session into 
   const runtimeEvents = [];
   const errors = [];
   let clearCalls = 0;
+  const activatedDecks = [];
+  const activatedSessions = [];
   const createPayloads = [];
 
   const controller = createAppLifecycleController({
@@ -83,6 +85,13 @@ test("app lifecycle controller wires create-session flow and moves session into 
       }
     },
     getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    setActiveDeck: (deckId) => {
+      activatedDecks.push(deckId);
+      return true;
+    },
+    setActiveSession: (sessionId) => {
+      activatedSessions.push(sessionId);
+    },
     resolveSessionDeckId: (session) => session.deckId,
     applyRuntimeEvent: (event) => runtimeEvents.push(event),
     setError: (message) => errors.push(message),
@@ -105,6 +114,8 @@ test("app lifecycle controller wires create-session flow and moves session into 
     }
   ]);
   assert.deepEqual(createPayloads, [{ deckId: "ops" }]);
+  assert.deepEqual(activatedDecks, ["ops"]);
+  assert.deepEqual(activatedSessions, ["s-1"]);
   assert.equal(clearCalls, 1);
   assert.deepEqual(errors, []);
   assert.deepEqual(
@@ -117,6 +128,8 @@ test("app lifecycle controller passes the active deck into create-session so no 
   const createBtn = createEventTarget();
   const runtimeEvents = [];
   const createPayloads = [];
+  const activatedDecks = [];
+  const activatedSessions = [];
   let moveCalls = 0;
 
   const controller = createAppLifecycleController({
@@ -135,6 +148,13 @@ test("app lifecycle controller passes the active deck into create-session so no 
       }
     },
     getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    setActiveDeck: (deckId) => {
+      activatedDecks.push(deckId);
+      return true;
+    },
+    setActiveSession: (sessionId) => {
+      activatedSessions.push(sessionId);
+    },
     resolveSessionDeckId: (session) => session.deckId,
     applyRuntimeEvent: (event) => runtimeEvents.push(event),
     setError: () => {}
@@ -145,6 +165,8 @@ test("app lifecycle controller passes the active deck into create-session so no 
 
   assert.deepEqual(createPayloads, [{ deckId: "ops" }]);
   assert.equal(moveCalls, 0);
+  assert.deepEqual(activatedDecks, ["ops"]);
+  assert.deepEqual(activatedSessions, ["s-2"]);
   assert.deepEqual(runtimeEvents, [
     {
       type: "session.created",
@@ -416,6 +438,61 @@ test("app lifecycle controller surfaces create-session and guarded action failur
     "Failed to send guarded command.",
     "interrupt exploded",
     "kill exploded"
+  ]);
+});
+
+test("app lifecycle controller activates the backend deck when create-session falls back to another deck", async () => {
+  const createBtn = createEventTarget();
+  const activatedDecks = [];
+  const activatedSessions = [];
+  const runtimeEvents = [];
+
+  const controller = createAppLifecycleController({
+    createBtn,
+    api: {
+      async createSession(payload) {
+        assert.deepEqual(payload, { deckId: "ops" });
+        return {
+          id: "s-3",
+          deckId: "default"
+        };
+      },
+      async moveSessionToDeck(deckId, sessionId) {
+        assert.equal(deckId, "ops");
+        assert.equal(sessionId, "s-3");
+        return {
+          id: "s-3",
+          deckId: "ops"
+        };
+      }
+    },
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    setActiveDeck: (deckId) => {
+      activatedDecks.push(deckId);
+      return true;
+    },
+    setActiveSession: (sessionId) => {
+      activatedSessions.push(sessionId);
+    },
+    resolveSessionDeckId: (session) => session.deckId,
+    applyRuntimeEvent: (event) => runtimeEvents.push(event),
+    setError: () => {},
+    clearUiError: () => {}
+  });
+
+  controller.bindUiEvents();
+  await createBtn.dispatch("click");
+
+  assert.deepEqual(activatedDecks, ["ops"]);
+  assert.deepEqual(activatedSessions, ["s-3"]);
+  assert.deepEqual(runtimeEvents, [
+    {
+      type: "session.updated",
+      session: {
+        id: "s-3",
+        deckId: "ops"
+      }
+    }
   ]);
 });
 

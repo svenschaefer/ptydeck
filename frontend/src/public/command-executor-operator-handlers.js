@@ -354,11 +354,19 @@ export function createCommandExecutorOperatorHandlers(options = {}) {
       if (!createSession) {
         return "Session creation is unavailable.";
       }
+      const activeDeck = getActiveDeck();
       const payload = {};
+      if (activeDeck?.id) {
+        payload.deckId = activeDeck.id;
+      }
       if (args.length > 0) {
         payload.shell = args[0];
       }
       const session = await createSession(payload);
+      const targetDeckId = resolveSessionDeckId(session);
+      if (targetDeckId && activeDeck?.id !== targetDeckId) {
+        setActiveDeck(targetDeckId);
+      }
       applyRuntimeEvent({ type: "session.created", session });
       setActiveSession(session.id);
       return `Created session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;

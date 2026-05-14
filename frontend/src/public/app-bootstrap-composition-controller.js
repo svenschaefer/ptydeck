@@ -456,6 +456,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       commandGuardCancelBtn: options.commandGuardCancelBtn,
       api,
       getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
+      setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
+      setActiveSession: (sessionId) => store?.setActiveSession?.(sessionId),
       resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session),
       applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
       setError: (message) => appCommandUiFacadeController?.setError?.(message),

@@ -315,8 +315,67 @@ test("operator handlers route deck, move, size, filter, list, and new through th
     ["filter", "ops::s-ops"],
     ["set-active-deck", "ops"],
     ["set-active-session", "s-ops"],
-    ["create-session", { shell: "zsh" }],
+    ["create-session", { deckId: "ops", shell: "zsh" }],
     ["event", { type: "session.created", session: { id: "s-new", name: "zsh", deckId: "ops" } }, undefined],
+    ["set-active-session", "s-new"]
+  ]);
+});
+
+test("operator handlers create new sessions in the active deck and switch decks when the backend returns another deck", async () => {
+  const calls = [];
+  const state = {
+    sessions: [],
+    decks: [
+      { id: "default", name: "Default" },
+      { id: "ops", name: "Ops" }
+    ],
+    activeSessionId: ""
+  };
+  let activeDeckId = "ops";
+
+  const handlers = createCommandExecutorOperatorHandlers({
+    store: {
+      getState() {
+        return state;
+      },
+      setActiveSession(sessionId) {
+        calls.push(["set-active-session", sessionId]);
+      }
+    },
+    api: {
+      async createSession(payload) {
+        calls.push(["create-session", payload]);
+        return { id: "s-new", name: "bash", deckId: "default" };
+      }
+    },
+    defaultDeckId: "default",
+    systemSlashCommands: ["new"],
+    getActiveDeck: () => state.decks.find((deck) => deck.id === activeDeckId) || null,
+    setActiveDeck: (deckId) => {
+      calls.push(["set-active-deck", deckId]);
+      activeDeckId = deckId;
+      return true;
+    },
+    applyRuntimeEvent: (event) => calls.push(["event", event]),
+    resolveSessionDeckId: (session) => session.deckId || "default",
+    formatSessionToken: (id) => id,
+    formatSessionDisplayName: (session) => session.name
+  });
+
+  const feedback = await handlers.executeStructuredCommand({
+    command: "new",
+    args: ["bash"],
+    sessions: state.sessions,
+    decks: state.decks,
+    activeSessionId: "",
+    state
+  });
+
+  assert.equal(feedback, "Created session [s-new] bash.");
+  assert.deepEqual(calls, [
+    ["create-session", { deckId: "ops", shell: "bash" }],
+    ["set-active-deck", "default"],
+    ["event", { type: "session.created", session: { id: "s-new", name: "bash", deckId: "default" } }],
     ["set-active-session", "s-new"]
   ]);
 });
