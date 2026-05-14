@@ -264,9 +264,9 @@ function buildPinnedOverlaySurface(documentRef) {
   sendBtn.type = "button";
   sendBtn.textContent = "Send";
   commandEntryRow.appendChild(commandInputWrap);
+  actionsColumn.appendChild(sendBtn);
   actionsColumn.appendChild(normalizeBtn);
   actionsColumn.appendChild(repairBtn);
-  actionsColumn.appendChild(sendBtn);
   commandEntryRow.appendChild(actionsColumn);
   commandInputColumn.appendChild(commandEntryRow);
 

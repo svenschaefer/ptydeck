@@ -992,12 +992,27 @@ body {
   padding: 6px 10px;
   font-size: 12px;
   line-height: 1.2;
+  border-color: #35516d;
+  background: rgba(23, 49, 75, 0.6);
+  color: #dceaf7;
 }
 
 .command-send-btn,
 .session-composer-overlay-send {
+  padding: 6px 10px;
   font-size: 12px;
   line-height: 1.2;
+  border-color: #5f9bd4;
+  background: linear-gradient(180deg, rgba(79, 138, 204, 0.96) 0%, rgba(45, 94, 149, 0.96) 100%);
+  color: #f7fbff;
+}
+
+.command-send-btn:hover,
+.command-send-btn:focus-visible,
+.session-composer-overlay-send:hover,
+.session-composer-overlay-send:focus-visible {
+  border-color: #8cc0f0;
+  background: linear-gradient(180deg, rgba(99, 157, 221, 0.98) 0%, rgba(55, 107, 166, 0.98) 100%);
 }
 
 .status-message {

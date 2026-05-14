@@ -1053,8 +1053,8 @@ test("operator composer placement controller normalizes pinned drafts and persis
   );
 
   const pinnedRoot = overlayHostEl.firstChild;
-  const pinnedTextarea = pinnedRoot?.children?.[2]?.children?.[0]?.children?.[0]?.children?.[0]?.children?.[0] || null;
-  const normalizeBtn = pinnedRoot?.children?.[2]?.children?.[0]?.children?.[0]?.children?.[1]?.children?.[0] || null;
+  const pinnedTextarea = findNodeByClass(pinnedRoot, "session-composer-overlay-input");
+  const normalizeBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-normalize");
   assert.ok(pinnedTextarea);
   assert.ok(normalizeBtn);
 
@@ -1130,6 +1130,7 @@ test("operator composer placement controller opens pinned repair previews withou
 
   const pinnedRoot = overlayHostEl.firstChild;
   const pinnedTextarea = findNodeByClass(pinnedRoot, "session-composer-overlay-input");
+  const actionsColumn = findNodeByClass(pinnedRoot, "command-actions-column");
   const repairBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-repair");
   const repairEl = findNodeByClass(pinnedRoot, "command-repair");
   const repairSummaryEl = findNodeByClass(pinnedRoot, "command-repair-summary");
@@ -1152,9 +1153,14 @@ test("operator composer placement controller opens pinned repair previews withou
   const repairApplyBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-repair-apply");
 
   assert.ok(pinnedTextarea);
+  assert.ok(actionsColumn);
   assert.ok(repairBtn);
   assert.ok(repairEl);
   assert.ok(repairApplyBtn);
+  assert.deepEqual(
+    Array.from(actionsColumn.children || []).map((child) => child.textContent),
+    ["Send", "Normalize", "Repair"]
+  );
 
   repairBtn.dispatch("click");
   await waitForTurn();

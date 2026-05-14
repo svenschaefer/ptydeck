@@ -164,13 +164,14 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
   - deliberate local semantic transitions such as pin/unpin draft transfer may still move or clear the shared draft explicitly
   - regression coverage now locks down the focused shared-footer no-overwrite contract in `frontend/test/operator-composer-placement-runtime-controller.test.js`
 - The composer-placement runtime now also exposes one explicit conservative whitespace-normalization action before `Send`:
-  - the shared footer composer now has a `Normalize` button above the primary `Send` button
-  - pinned overlay composers now expose the same `Normalize` action inside their action column
+  - the shared footer composer now keeps one fixed action order: `Send`, `Normalize`, `Repair`
+  - pinned overlay composers now expose the same action order inside their action column
   - the normalize action must normalize CRLF to LF, trim leading and trailing horizontal whitespace on each line, and trim outer whitespace after that line-wise cleanup
   - it must not attempt structure-aware repair beyond that whitespace cleanup
   - shared normalize persists through the same server-side `sharedDraft` authority, and pinned normalize persists through the same server-side `pinnedDrafts` authority
   - regression coverage now locks down both the shared-footer normalize path and the pinned-overlay normalize path in `frontend/test/operator-composer-placement-runtime-controller.test.js`
-  - the `Normalize`, `Repair`, and `Send` action stack now stretches against the shared composer min-height instead of using taller fixed button heights, so the footer and overlay action column stays vertically aligned with the input box
+  - `Send` is the explicit primary action in that stack and must remain visually distinct from the secondary `Normalize` and `Repair` actions
+  - the `Send`, `Normalize`, and `Repair` action stack now stretches against the shared composer min-height instead of using taller fixed button heights, so the footer and overlay action column stays vertically aligned with the input box
 - The composer-placement runtime now also exposes an explicit opt-in `Repair` action beside `Normalize` for the shared footer composer and pinned overlay composers:
   - `Repair` must open a preview/apply shell instead of mutating the current draft immediately
   - the original draft must remain recoverable until the operator explicitly clicks `Apply Repair`
