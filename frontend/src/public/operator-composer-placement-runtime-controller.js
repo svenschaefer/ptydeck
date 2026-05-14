@@ -6,6 +6,10 @@ import { interpretComposerInput as defaultInterpretComposerInput } from "./comma
 const DEFAULT_MODE = "shared-footer";
 const ACTIVE_OVERLAY_MODE = "active-overlay";
 const SHARED_FOOTER_MODE = "shared-footer";
+const OVERLAY_POSITION_TOP = "top";
+const OVERLAY_POSITION_BOTTOM = "bottom";
+const OVERLAY_VISIBILITY_NORMAL = "normal";
+const OVERLAY_VISIBILITY_MINIMIZED = "minimized";
 const DRAFT_PERSIST_DELAY_MS = 180;
 
 function normalizeText(value) {
@@ -214,22 +218,33 @@ function buildPinnedOverlaySurface(documentRef) {
 
   const head = createOverlayNode(documentRef, "session-composer-overlay-head");
   head.className = "session-composer-overlay-head";
-  const titleEl = createOverlayNode(documentRef, "session-composer-overlay-title", "p");
-  titleEl.className = "session-composer-overlay-title";
-  titleEl.textContent = "Pinned Input";
   const actionsEl = createOverlayNode(documentRef, "session-composer-overlay-actions");
   actionsEl.className = "session-composer-overlay-actions";
+  const actionGroupEl = createOverlayNode(documentRef, "session-composer-overlay-action-group");
+  actionGroupEl.className = "session-composer-overlay-action-group";
+  const footerBtn = createOverlayNode(documentRef, "session-composer-overlay-switch-footer", "button");
+  footerBtn.className = "session-composer-overlay-switch-footer";
+  footerBtn.type = "button";
+  footerBtn.textContent = "Footer";
+  const positionBtn = createOverlayNode(documentRef, "session-composer-overlay-position", "button");
+  positionBtn.className = "session-composer-overlay-position";
+  positionBtn.type = "button";
+  const visibilityBtn = createOverlayNode(documentRef, "session-composer-overlay-visibility", "button");
+  visibilityBtn.className = "session-composer-overlay-visibility";
+  visibilityBtn.type = "button";
   const unpinBtn = createOverlayNode(documentRef, "session-composer-overlay-unpin", "button");
   unpinBtn.className = "session-composer-overlay-unpin";
   unpinBtn.type = "button";
-  unpinBtn.textContent = "Unpin";
-  actionsEl.appendChild(unpinBtn);
-  head.appendChild(titleEl);
+  unpinBtn.textContent = "Unpin Input";
+  actionGroupEl.appendChild(footerBtn);
+  actionGroupEl.appendChild(positionBtn);
+  actionGroupEl.appendChild(visibilityBtn);
+  actionGroupEl.appendChild(unpinBtn);
+  actionsEl.appendChild(actionGroupEl);
   head.appendChild(actionsEl);
 
-  const targetEl = createOverlayNode(documentRef, "session-composer-overlay-target", "p");
-  targetEl.className = "session-composer-overlay-target";
-
+  const bodyEl = createOverlayNode(documentRef, "session-composer-overlay-body");
+  bodyEl.className = "session-composer-overlay-body";
   const commandRow = createOverlayNode(documentRef, "command-row session-composer-overlay-command-row", "section");
   commandRow.className = "command-row session-composer-overlay-command-row";
   const commandInputColumn = createOverlayNode(documentRef, "command-input-column");
@@ -366,13 +381,12 @@ function buildPinnedOverlaySurface(documentRef) {
 
   commandRow.appendChild(commandInputColumn);
   root.appendChild(head);
-  root.appendChild(targetEl);
-  root.appendChild(commandRow);
+  bodyEl.appendChild(commandRow);
+  root.appendChild(bodyEl);
 
   return {
     root,
-    titleEl,
-    targetEl,
+    bodyEl,
     textarea,
     inlineHintEl,
     previewEl,
@@ -396,6 +410,9 @@ function buildPinnedOverlaySurface(documentRef) {
     guardSendOnceBtn,
     guardCancelBtn,
     suggestionsEl,
+    footerBtn,
+    positionBtn,
+    visibilityBtn,
     unpinBtn
   };
 }
@@ -405,18 +422,38 @@ function buildSharedOverlayShell(documentRef) {
   shell.className = "session-composer-overlay-shell session-composer-overlay-shell-shared";
   const head = createOverlayNode(documentRef, "session-composer-overlay-head");
   head.className = "session-composer-overlay-head";
-  const titleEl = createOverlayNode(documentRef, "session-composer-overlay-title", "p");
-  titleEl.className = "session-composer-overlay-title";
-  titleEl.textContent = "Send to Active Session";
-  head.appendChild(titleEl);
-  const targetEl = createOverlayNode(documentRef, "session-composer-overlay-target", "p");
-  targetEl.className = "session-composer-overlay-target";
+  const actionsEl = createOverlayNode(documentRef, "session-composer-overlay-actions");
+  actionsEl.className = "session-composer-overlay-actions";
+  const actionGroupEl = createOverlayNode(documentRef, "session-composer-overlay-action-group");
+  actionGroupEl.className = "session-composer-overlay-action-group";
+  const footerBtn = createOverlayNode(documentRef, "session-composer-overlay-switch-footer", "button");
+  footerBtn.className = "session-composer-overlay-switch-footer";
+  footerBtn.type = "button";
+  footerBtn.textContent = "Footer";
+  const positionBtn = createOverlayNode(documentRef, "session-composer-overlay-position", "button");
+  positionBtn.className = "session-composer-overlay-position";
+  positionBtn.type = "button";
+  const visibilityBtn = createOverlayNode(documentRef, "session-composer-overlay-visibility", "button");
+  visibilityBtn.className = "session-composer-overlay-visibility";
+  visibilityBtn.type = "button";
+  const pinBtn = createOverlayNode(documentRef, "session-composer-overlay-pin", "button");
+  pinBtn.className = "session-composer-overlay-pin";
+  pinBtn.type = "button";
+  pinBtn.textContent = "Pin Input";
+  actionGroupEl.appendChild(footerBtn);
+  actionGroupEl.appendChild(positionBtn);
+  actionGroupEl.appendChild(visibilityBtn);
+  actionGroupEl.appendChild(pinBtn);
+  actionsEl.appendChild(actionGroupEl);
+  head.appendChild(actionsEl);
+  const bodyEl = createOverlayNode(documentRef, "session-composer-overlay-body");
+  bodyEl.className = "session-composer-overlay-body";
   const slotEl = createOverlayNode(documentRef, "session-composer-overlay-slot");
   slotEl.className = "session-composer-overlay-slot";
+  bodyEl.appendChild(slotEl);
   shell.appendChild(head);
-  shell.appendChild(targetEl);
-  shell.appendChild(slotEl);
-  return { shell, titleEl, targetEl, slotEl };
+  shell.appendChild(bodyEl);
+  return { shell, bodyEl, slotEl, footerBtn, positionBtn, visibilityBtn, pinBtn };
 }
 
 function createPinnedSurfaceController(options = {}) {
@@ -464,7 +501,12 @@ function createPinnedSurfaceController(options = {}) {
     formatQuickSwitchPreview = () => "",
     runWorkflowDetailed = null,
     requestRepairCandidate = null,
+    getOverlayPosition = () => OVERLAY_POSITION_TOP,
+    getOverlayVisibility = () => OVERLAY_VISIBILITY_NORMAL,
     onDraftChange = () => {},
+    onSwitchToFooter = () => {},
+    onToggleOverlayPosition = () => {},
+    onToggleOverlayVisibility = () => {},
     onUnpin = () => {},
     readClipboardText = async () => "",
     writeClipboardText = async () => false
@@ -490,6 +532,10 @@ function createPinnedSurfaceController(options = {}) {
   let composerRuntimeController = null;
   let autocompleteController = null;
   let textareaFocused = false;
+  let footerListener = null;
+  let positionListener = null;
+  let visibilityListener = null;
+  let unpinListener = null;
 
   function getPinnedState() {
     const state = getState() || {};
@@ -505,9 +551,12 @@ function createPinnedSurfaceController(options = {}) {
     const writeLockMessage = isReadOnlyMode()
       ? getReadOnlyModeMessage()
       : getSessionWriteBlockedMessage(session);
-    refs.targetEl.textContent = session ? `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}` : "";
+    const minimized = getOverlayVisibility() === OVERLAY_VISIBILITY_MINIMIZED;
     refs.textarea.disabled = writeLocked;
     refs.sendBtn.disabled = writeLocked;
+    refs.root.classList?.toggle?.("session-composer-overlay-shell-minimized", minimized);
+    refs.positionBtn.textContent = getOverlayPosition() === OVERLAY_POSITION_TOP ? "Bottom" : "Top";
+    refs.visibilityBtn.textContent = minimized ? "Expand" : "Minimize";
     if (writeLocked) {
       refs.textarea.setAttribute?.("title", writeLockMessage);
       refs.sendBtn.setAttribute?.("title", writeLockMessage);
@@ -763,9 +812,22 @@ function createPinnedSurfaceController(options = {}) {
   refs.guardCancelBtn.addEventListener?.("click", () => {
     composerRuntimeController?.cancelPendingSend?.();
   });
-  refs.unpinBtn.addEventListener?.("click", () => {
+  footerListener = () => {
+    onSwitchToFooter();
+  };
+  positionListener = () => {
+    onToggleOverlayPosition();
+  };
+  visibilityListener = () => {
+    onToggleOverlayVisibility();
+  };
+  unpinListener = () => {
     onUnpin();
-  });
+  };
+  refs.footerBtn.addEventListener?.("click", footerListener);
+  refs.positionBtn.addEventListener?.("click", positionListener);
+  refs.visibilityBtn.addEventListener?.("click", visibilityListener);
+  refs.unpinBtn.addEventListener?.("click", unpinListener);
   autocompleteController.bindUiEvents?.();
   render();
 
@@ -804,6 +866,10 @@ function createPinnedSurfaceController(options = {}) {
       refs.textarea.removeEventListener?.("change", changeListener);
       refs.textarea.removeEventListener?.("blur", blurListener);
       refs.textarea.removeEventListener?.("focus", focusListener);
+      refs.footerBtn.removeEventListener?.("click", footerListener);
+      refs.positionBtn.removeEventListener?.("click", positionListener);
+      refs.visibilityBtn.removeEventListener?.("click", visibilityListener);
+      refs.unpinBtn.removeEventListener?.("click", unpinListener);
       autocompleteController?.dispose?.();
       composerRuntimeController?.dispose?.();
       removeNode(refs.root);
@@ -894,11 +960,17 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
   let sharedRepairClickListener = null;
   let sharedRepairApplyListener = null;
   let sharedRepairCancelListener = null;
+  let sharedFooterSwitchListener = null;
+  let sharedPositionToggleListener = null;
+  let sharedVisibilityToggleListener = null;
+  let sharedPinListener = null;
   let persistTimer = null;
   let pendingPersistPatch = {};
   let initializePromise = null;
   const pinnedSurfaces = new Map();
   let sharedInputFocused = false;
+  let overlayPosition = OVERLAY_POSITION_TOP;
+  let overlayVisibility = OVERLAY_VISIBILITY_NORMAL;
   const sharedRepairPreview = createEmptyRepairPreviewState();
   const pendingPlacementState = {
     mode: null,
@@ -914,6 +986,22 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
   function isPinnedSession(sessionId) {
     const normalizedSessionId = normalizeText(sessionId);
     return normalizedSessionId ? placementState.pinnedSessionIds.includes(normalizedSessionId) : false;
+  }
+
+  function isOverlayBottomDocked() {
+    return overlayPosition === OVERLAY_POSITION_BOTTOM;
+  }
+
+  function isOverlayMinimized() {
+    return overlayVisibility === OVERLAY_VISIBILITY_MINIMIZED;
+  }
+
+  function getOverlayPositionToggleLabel() {
+    return isOverlayBottomDocked() ? "Top" : "Bottom";
+  }
+
+  function getOverlayVisibilityToggleLabel() {
+    return isOverlayMinimized() ? "Expand" : "Minimize";
   }
 
   function setPendingMode(value) {
@@ -1017,6 +1105,63 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     return Promise.resolve(null);
   }
 
+  function renderSharedOverlayChrome(activeSession) {
+    if (!sharedOverlay?.shell) {
+      return;
+    }
+    const activeSessionId = normalizeText(activeSession?.id);
+    sharedOverlay.shell.classList?.toggle?.("session-composer-overlay-shell-minimized", isOverlayMinimized());
+    sharedOverlay.positionBtn.textContent = getOverlayPositionToggleLabel();
+    sharedOverlay.visibilityBtn.textContent = getOverlayVisibilityToggleLabel();
+    sharedOverlay.pinBtn.dataset.sessionId = activeSessionId;
+    sharedOverlay.pinBtn.hidden = !activeSessionId || isPinnedSession(activeSessionId);
+  }
+
+  function setOverlayPosition(nextPosition, { feedback = true } = {}) {
+    const normalizedNextPosition = normalizeText(nextPosition) === OVERLAY_POSITION_BOTTOM ? OVERLAY_POSITION_BOTTOM : OVERLAY_POSITION_TOP;
+    if (overlayPosition === normalizedNextPosition) {
+      render();
+      return overlayPosition;
+    }
+    overlayPosition = normalizedNextPosition;
+    render();
+    if (feedback) {
+      setCommandFeedback(
+        overlayPosition === OVERLAY_POSITION_BOTTOM
+          ? "Overlay composer docked to the bottom of the terminal card."
+          : "Overlay composer docked below the terminal header."
+      );
+    }
+    return overlayPosition;
+  }
+
+  function toggleOverlayPosition() {
+    return setOverlayPosition(isOverlayBottomDocked() ? OVERLAY_POSITION_TOP : OVERLAY_POSITION_BOTTOM);
+  }
+
+  function setOverlayVisibility(nextVisibility, { feedback = true } = {}) {
+    const normalizedNextVisibility =
+      normalizeText(nextVisibility) === OVERLAY_VISIBILITY_MINIMIZED ? OVERLAY_VISIBILITY_MINIMIZED : OVERLAY_VISIBILITY_NORMAL;
+    if (overlayVisibility === normalizedNextVisibility) {
+      render();
+      return overlayVisibility;
+    }
+    overlayVisibility = normalizedNextVisibility;
+    render();
+    if (feedback) {
+      setCommandFeedback(
+        overlayVisibility === OVERLAY_VISIBILITY_MINIMIZED
+          ? "Overlay composer minimized."
+          : "Overlay composer restored."
+      );
+    }
+    return overlayVisibility;
+  }
+
+  function toggleOverlayVisibility() {
+    return setOverlayVisibility(isOverlayMinimized() ? OVERLAY_VISIBILITY_NORMAL : OVERLAY_VISIBILITY_MINIMIZED);
+  }
+
   function createPinnedSurface(sessionId) {
     const normalizedSessionId = normalizeText(sessionId);
     if (!normalizedSessionId) {
@@ -1070,10 +1215,21 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       formatQuickSwitchPreview,
       runWorkflowDetailed,
       requestRepairCandidate,
+      getOverlayPosition: () => overlayPosition,
+      getOverlayVisibility: () => overlayVisibility,
       onDraftChange: (draft) => {
         setPinnedDraftLocally(normalizedSessionId, draft);
         setPendingPinnedDrafts(placementState.pinnedDrafts);
         queuePersistPatch({ pinnedDrafts: placementState.pinnedDrafts });
+      },
+      onSwitchToFooter: () => {
+        void setMode(SHARED_FOOTER_MODE);
+      },
+      onToggleOverlayPosition: () => {
+        toggleOverlayPosition();
+      },
+      onToggleOverlayVisibility: () => {
+        toggleOverlayVisibility();
       },
       onUnpin: () => {
         void unpinSession(normalizedSessionId);
@@ -1137,6 +1293,8 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     if (!host) {
       return;
     }
+    host.classList?.toggle?.("session-composer-overlay-host-top", !isOverlayBottomDocked());
+    host.classList?.toggle?.("session-composer-overlay-host-bottom", isOverlayBottomDocked());
     const overlayMode = placementState.mode === ACTIVE_OVERLAY_MODE;
     if (!overlayMode) {
       clearNodeChildren(host);
@@ -1175,7 +1333,6 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       return;
     }
 
-    sharedOverlay.targetEl.textContent = session ? `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}` : "";
     ensureNodeChild(host, sharedOverlay.shell);
     moveSharedComposerBody(sharedOverlay.slotEl);
     host.hidden = false;
@@ -1208,6 +1365,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       },
       sharedRepairPreview
     );
+    renderSharedOverlayChrome(activeSession);
 
     if (!overlayMode) {
       moveSharedComposerBody(controlPaneEl);
@@ -1226,7 +1384,7 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       renderEntryOverlay(entry, session, activeSessionId);
       const toolbarHeight = Number(entry.toolbarEl?.offsetHeight) || Number(entry.toolbarEl?.clientHeight) || 0;
       if (entry.composerOverlayHostEl?.style?.setProperty) {
-        entry.composerOverlayHostEl.style.setProperty("--session-composer-overlay-top-px", `${Math.max(toolbarHeight + 8, 52)}px`);
+        entry.composerOverlayHostEl.style.setProperty("--session-composer-overlay-top-px", `${toolbarHeight > 0 ? toolbarHeight : 52}px`);
       }
     }
 
@@ -1551,6 +1709,34 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
       };
       repairCancelBtn.addEventListener?.("click", sharedRepairCancelListener);
     }
+    if (!sharedFooterSwitchListener && sharedOverlay.footerBtn) {
+      sharedFooterSwitchListener = () => {
+        void setMode(SHARED_FOOTER_MODE);
+      };
+      sharedOverlay.footerBtn.addEventListener?.("click", sharedFooterSwitchListener);
+    }
+    if (!sharedPositionToggleListener && sharedOverlay.positionBtn) {
+      sharedPositionToggleListener = () => {
+        toggleOverlayPosition();
+      };
+      sharedOverlay.positionBtn.addEventListener?.("click", sharedPositionToggleListener);
+    }
+    if (!sharedVisibilityToggleListener && sharedOverlay.visibilityBtn) {
+      sharedVisibilityToggleListener = () => {
+        toggleOverlayVisibility();
+      };
+      sharedOverlay.visibilityBtn.addEventListener?.("click", sharedVisibilityToggleListener);
+    }
+    if (!sharedPinListener && sharedOverlay.pinBtn) {
+      sharedPinListener = () => {
+        const targetSessionId = normalizeText(sharedOverlay.pinBtn.dataset.sessionId);
+        if (!targetSessionId) {
+          return;
+        }
+        void pinSession(targetSessionId);
+      };
+      sharedOverlay.pinBtn.addEventListener?.("click", sharedPinListener);
+    }
     if (!modeChangeListener && composerPlacementModeSelectEl && typeof composerPlacementModeSelectEl.addEventListener === "function") {
       modeChangeListener = () => {
         void setMode(composerPlacementModeSelectEl.value || SHARED_FOOTER_MODE);
@@ -1596,6 +1782,10 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     repairBtn?.removeEventListener?.("click", sharedRepairClickListener);
     repairApplyBtn?.removeEventListener?.("click", sharedRepairApplyListener);
     repairCancelBtn?.removeEventListener?.("click", sharedRepairCancelListener);
+    sharedOverlay.footerBtn?.removeEventListener?.("click", sharedFooterSwitchListener);
+    sharedOverlay.positionBtn?.removeEventListener?.("click", sharedPositionToggleListener);
+    sharedOverlay.visibilityBtn?.removeEventListener?.("click", sharedVisibilityToggleListener);
+    sharedOverlay.pinBtn?.removeEventListener?.("click", sharedPinListener);
     composerPlacementModeSelectEl?.removeEventListener?.("change", modeChangeListener);
     for (const sessionId of Array.from(pinnedSurfaces.keys())) {
       disposePinnedSurface(sessionId);

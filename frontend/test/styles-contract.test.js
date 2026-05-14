@@ -109,11 +109,39 @@ test("active-overlay composer mode collapses the footer body and uses non-resizi
   );
   assert.match(
     stylesCss,
-    /\.session-composer-overlay-host \{[\s\S]*position: absolute;[\s\S]*pointer-events: none;[\s\S]*\}/m
+    /\.session-composer-overlay-host \{[\s\S]*position: absolute;[\s\S]*left: 0;[\s\S]*right: 0;[\s\S]*pointer-events: none;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,
-    /\.session-composer-overlay-shell \{[\s\S]*width: 100%;[\s\S]*backdrop-filter: blur\(8px\);[\s\S]*\}/m
+    /\.session-composer-overlay-host\.session-composer-overlay-host-top \{[\s\S]*top: var\(--session-composer-overlay-top-px, 52px\);[\s\S]*bottom: auto;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-host\.session-composer-overlay-host-bottom \{[\s\S]*top: auto;[\s\S]*bottom: 0;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell \{[\s\S]*width: 100%;[\s\S]*border-left: 0;[\s\S]*border-right: 0;[\s\S]*backdrop-filter: blur\(8px\);[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-host-top \.session-composer-overlay-shell \{[\s\S]*border-top: 0;[\s\S]*border-top-left-radius: 0;[\s\S]*border-top-right-radius: 0;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-head \{[\s\S]*justify-content: flex-end;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-action-group \{[\s\S]*display: inline-flex;[\s\S]*border-radius: 999px;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-action-group button \{[\s\S]*background: transparent;[\s\S]*color: #d6e7f2;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell-minimized \.session-composer-overlay-body \{[\s\S]*display: none;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,
@@ -126,6 +154,14 @@ test("active-overlay composer mode collapses the footer body and uses non-resizi
   assert.match(
     stylesCss,
     /\.session-composer-overlay-shell \.command-input-column \{[\s\S]*--command-composer-min-height: 6\.25rem;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell \.command-input-wrap \{[\s\S]*overflow: hidden;[\s\S]*border-radius: 6px;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-composer-overlay-shell \.command-suggestions \{[\s\S]*position: relative;[\s\S]*z-index: 4;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,

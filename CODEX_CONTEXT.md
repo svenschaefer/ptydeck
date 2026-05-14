@@ -151,6 +151,11 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
   - the operator composer placement bootstrap must tolerate one bounded startup race: `GET /api/v1/operator/composer-placement` can legitimately return `409 OperatorClientRequired` before the WebSocket/session-control attachment finishes, so `frontend/src/public/operator-composer-placement-runtime-controller.js` now suppresses that one pre-attach case, avoids latching the failed initialization promise forever, and allows the later runtime snapshot or a second initialize call to hydrate the placement state once attachment is active
   - pinned overlays use isolated drafts and keep using the normal guarded send/completion/runtime command seams
   - focused regression coverage now locks down REST wiring, runtime snapshot/update application, overlay migration, pin lifecycle, draft isolation, and the shipped template/CSS contract
+- The active-overlay surface contract has now been visually tightened as well:
+  - overlay shells must sit flush against the terminal-card frame with no side gaps and no visible terminal bleed-through around the overlay edges
+  - the shared and pinned overlay shells must not repeat session id or display name inside the overlay body because that context already lives in the terminal header
+  - the overlay head must keep the placement and pin controls together in one grouped chrome surface, including direct return to `shared-footer`, top/bottom docking, minimize/expand, and `Pin Input` / `Unpin Input`
+  - slash-command previews inside overlay composers must stay clipped inside the overlay input surface, and overlay suggestion surfaces must stay visually above the overlay body instead of disappearing behind it
 - The active-overlay runtime contract now also requires stable DOM mounting across no-op rerenders:
   - `frontend/src/public/operator-composer-placement-runtime-controller.js` must not clear and re-append the active shared overlay host or an unchanged pinned overlay host when the effective placement target has not changed
   - this preserves textarea focus while the composer preview/suggestion/runtime render loop updates on input

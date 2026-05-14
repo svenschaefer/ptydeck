@@ -1787,8 +1787,8 @@ button:hover {
 .session-composer-overlay-host {
   position: absolute;
   top: var(--session-composer-overlay-top-px, 52px);
-  left: 10px;
-  right: 10px;
+  left: 0;
+  right: 0;
   z-index: 5;
   pointer-events: none;
 }
@@ -1797,64 +1797,110 @@ button:hover {
   display: none !important;
 }
 
+.session-composer-overlay-host.session-composer-overlay-host-top {
+  top: var(--session-composer-overlay-top-px, 52px);
+  bottom: auto;
+}
+
+.session-composer-overlay-host.session-composer-overlay-host-bottom {
+  top: auto;
+  bottom: 0;
+}
+
 .session-composer-overlay-host > * {
   pointer-events: auto;
 }
 
 .session-composer-overlay-shell {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   min-width: 0;
-  padding: 10px 12px 12px;
+  padding: 8px 10px 10px;
   border: 1px solid #28435d;
-  border-radius: 12px;
+  border-left: 0;
+  border-right: 0;
   background:
-    linear-gradient(180deg, rgba(14, 23, 35, 0.96), rgba(10, 17, 28, 0.97)),
-    rgba(10, 17, 28, 0.96);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+    linear-gradient(180deg, rgba(15, 24, 36, 0.985), rgba(10, 17, 28, 0.985)),
+    rgba(10, 17, 28, 0.985);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26);
   backdrop-filter: blur(8px);
+}
+
+.session-composer-overlay-host-top .session-composer-overlay-shell {
+  border-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.session-composer-overlay-host-bottom .session-composer-overlay-shell {
+  border-bottom: 0;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .session-composer-overlay-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
-}
-
-.session-composer-overlay-title,
-.session-composer-overlay-target {
-  margin: 0;
-}
-
-.session-composer-overlay-title {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #8fb4cf;
-}
-
-.session-composer-overlay-target {
-  min-width: 0;
-  color: #d9e9f5;
-  font-size: 12px;
-  line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .session-composer-overlay-actions {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.session-composer-overlay-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #35526d;
+  border-radius: 999px;
+  background: rgba(16, 28, 41, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.session-composer-overlay-action-group button {
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #d6e7f2;
+  font-size: 11px;
+  line-height: 1.1;
+  box-shadow: none;
+}
+
+.session-composer-overlay-action-group button:hover,
+.session-composer-overlay-action-group button:focus-visible {
+  background: rgba(41, 71, 101, 0.92);
+  color: #f4fbff;
 }
 
 .session-composer-overlay-slot {
   min-width: 0;
+}
+
+.session-composer-overlay-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.session-composer-overlay-shell-minimized .session-composer-overlay-body {
+  display: none;
 }
 
 .session-composer-overlay-shell .control-pane-body {
@@ -1871,10 +1917,30 @@ button:hover {
   min-width: 0;
 }
 
+.session-composer-overlay-shell .command-input-wrap {
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.session-composer-overlay-shell .command-preview {
+  overflow: hidden;
+}
+
+.session-composer-overlay-shell .command-suggestions {
+  position: relative;
+  z-index: 4;
+  background: #0d1723;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26);
+}
+
 .session-composer-overlay-input {
   min-height: 6.25rem;
 }
 
+.session-composer-overlay-switch-footer,
+.session-composer-overlay-position,
+.session-composer-overlay-visibility,
+.session-composer-overlay-pin,
 .session-composer-overlay-unpin,
 .session-composer-overlay-normalize,
 .session-composer-overlay-repair,
@@ -1883,16 +1949,6 @@ button:hover {
 .session-composer-overlay-guard-send,
 .session-composer-overlay-guard-cancel {
   min-height: 32px;
-}
-
-.session-composer-overlay-unpin {
-  padding: 5px 9px;
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 1.1;
-  border-color: #35526d;
-  color: #d6e7f2;
-  background: #1a2b3d;
 }
 
 .terminal-toolbar-meta {

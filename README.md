@@ -13,7 +13,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Server-persisted per-session start/stop lifecycle with a session-header toggle that preserves the card slot while stopped
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`, plus one-shot SSH launches through `/ssh ...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
-- Server-persisted operator-client composer placement modes with a shared footer, active-terminal overlay placement, and per-terminal pinned overlays
+- Server-persisted operator-client composer placement modes with a shared footer, active-terminal overlay placement, in-overlay footer/top-bottom/minimize controls, and per-terminal pinned overlays
 - Conservative composer `Normalize` actions for the shared footer and pinned overlays before `Send`
 - Opt-in composer `Repair` previews with explicit apply/cancel flow, plus shipped shell-family, JSON, and XML repair candidates that fail closed when confidence or validation is insufficient
 - Session-card hover quick actions with per-session top custom-command favorites plus direct `Clipboard` send

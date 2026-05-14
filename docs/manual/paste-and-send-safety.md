@@ -61,6 +61,9 @@ In `active-overlay` mode, you can also pin individual terminals:
 - multiple terminals can stay pinned at the same time
 - pinned terminals keep their own drafts
 - the shared overlay composer is shown only for the active terminal when that terminal is not pinned
+- the overlay keeps session context in the terminal header instead of repeating session id and name inside the composer body
+- the overlay chrome can return directly to `shared-footer`, switch between top and bottom docking, and toggle between normal and minimized visibility
+- the same overlay chrome keeps `Pin Input` / `Unpin Input` on the overlay itself so placement and pinning controls stay in one place
 
 Use this when accidental sends happen because the footer composer is still visible while a different terminal is active.
 

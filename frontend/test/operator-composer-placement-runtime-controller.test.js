@@ -248,8 +248,111 @@ test("operator composer placement controller moves the shared composer into the 
   assert.equal(composerPinBtn.hidden, false);
   assert.notEqual(controlPaneBodyEl.parentNode, controlPaneEl);
   assert.equal(overlayHostEl.children.length, 1);
+  assert.equal(findNodeByClass(overlayHostEl.firstChild, "session-composer-overlay-title"), null);
+  assert.equal(findNodeByClass(overlayHostEl.firstChild, "session-composer-overlay-target"), null);
+  assert.ok(findNodeByClass(overlayHostEl.firstChild, "session-composer-overlay-switch-footer"));
+  assert.ok(findNodeByClass(overlayHostEl.firstChild, "session-composer-overlay-position"));
+  assert.ok(findNodeByClass(overlayHostEl.firstChild, "session-composer-overlay-visibility"));
+  assert.ok(findNodeByClass(overlayHostEl.firstChild, "session-composer-overlay-pin"));
 
   await controller.setMode("shared-footer");
+
+  assert.equal(controlPaneBodyEl.parentNode, controlPaneEl);
+  assert.equal(overlayHostEl.hidden, true);
+  assert.equal(workspaceShellEl.classList.contains("composer-placement-active-overlay"), false);
+  controller.dispose();
+});
+
+test("operator composer placement controller exposes shared overlay chrome controls for pinning, docking, minimizing, and returning to the footer", async () => {
+  const patchCalls = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const workspaceShellEl = new FakeElement("section");
+  const controlPaneEl = new FakeElement("section");
+  const controlPaneBodyEl = new FakeElement("div");
+  const controlPaneResizeHandleEl = new FakeElement("div");
+  const composerPlacementModeSelectEl = new FakeElement("select");
+  const commandInput = new FakeElement("textarea");
+  const session = { id: "s-overlay-controls", name: "Overlay Controls" };
+  const overlayHostEl = new FakeElement("div");
+  const composerPinBtn = new FakeElement("button");
+  const toolbarEl = new FakeElement("div", { offsetHeight: 42 });
+  const terminals = new Map([
+    [
+      session.id,
+      {
+        composerOverlayHostEl: overlayHostEl,
+        composerPinBtn,
+        toolbarEl
+      }
+    ]
+  ]);
+  controlPaneEl.appendChild(controlPaneBodyEl);
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async updateOperatorComposerPlacement(payload) {
+        patchCalls.push(payload);
+        return createApiState({
+          mode: payload.mode || "active-overlay",
+          pinnedSessionIds: payload.pinnedSessionIds || [],
+          sharedDraft: payload.sharedDraft || "",
+          pinnedDrafts: payload.pinnedDrafts || {}
+        });
+      }
+    },
+    workspaceShellEl,
+    controlPaneEl,
+    controlPaneBodyEl,
+    controlPaneResizeHandleEl,
+    composerPlacementModeSelectEl,
+    commandInput,
+    terminals,
+    getState: () => ({ sessions: [session], activeSessionId: session.id }),
+    getSessionById: () => session
+  });
+
+  await controller.setMode("active-overlay");
+
+  let overlayRoot = overlayHostEl.firstChild;
+  const positionBtn = findNodeByClass(overlayRoot, "session-composer-overlay-position");
+  const visibilityBtn = findNodeByClass(overlayRoot, "session-composer-overlay-visibility");
+  const pinBtn = findNodeByClass(overlayRoot, "session-composer-overlay-pin");
+  const footerBtn = findNodeByClass(overlayRoot, "session-composer-overlay-switch-footer");
+
+  assert.ok(positionBtn);
+  assert.ok(visibilityBtn);
+  assert.ok(pinBtn);
+  assert.ok(footerBtn);
+  assert.equal(positionBtn.textContent, "Bottom");
+  assert.equal(visibilityBtn.textContent, "Minimize");
+  assert.equal(pinBtn.textContent, "Pin Input");
+
+  positionBtn.dispatch("click");
+  assert.equal(overlayHostEl.classList.contains("session-composer-overlay-host-bottom"), true);
+
+  visibilityBtn.dispatch("click");
+  assert.equal(overlayRoot.classList.contains("session-composer-overlay-shell-minimized"), true);
+
+  pinBtn.dispatch("click");
+  await waitForTurn();
+  await waitForTurn();
+
+  overlayRoot = overlayHostEl.firstChild;
+  assert.ok(findNodeByClass(overlayRoot, "session-composer-overlay-unpin"));
+  assert.equal(findNodeByClass(overlayRoot, "session-composer-overlay-pin"), null);
+  assert.deepEqual(patchCalls.at(-1), {
+    pinnedSessionIds: [session.id],
+    sharedDraft: "",
+    pinnedDrafts: { [session.id]: "" }
+  });
+
+  const pinnedFooterBtn = findNodeByClass(overlayRoot, "session-composer-overlay-switch-footer");
+  assert.ok(pinnedFooterBtn);
+  pinnedFooterBtn.dispatch("click");
+  await waitForTurn();
 
   assert.equal(controlPaneBodyEl.parentNode, controlPaneEl);
   assert.equal(overlayHostEl.hidden, true);
@@ -557,7 +660,7 @@ test("operator composer placement controller keeps the shared overlay mounted ac
   assert.equal(overlayHostEl.firstChild, mountedChild);
   assert.equal(overlayHostEl.appendChildCalls, appendCallsAfterFirstMount);
   assert.equal(overlayHostEl.removeChildCalls, removeCallsAfterFirstMount);
-  assert.equal(controlPaneBodyEl.parentNode?.parentNode, mountedChild);
+  assert.equal(controlPaneBodyEl.parentNode?.parentNode?.parentNode, mountedChild);
   controller.dispose();
 });
 
@@ -972,7 +1075,7 @@ test("operator composer placement controller ignores stale pinned-draft echoes w
   );
 
   const pinnedRoot = overlayHostEl.firstChild;
-  const pinnedTextarea = pinnedRoot?.children?.[2]?.children?.[0]?.children?.[0]?.children?.[0]?.children?.[0] || null;
+  const pinnedTextarea = findNodeByClass(pinnedRoot, "session-composer-overlay-input");
   assert.ok(pinnedTextarea);
 
   pinnedTextarea.dispatch("focus");
@@ -1131,6 +1234,10 @@ test("operator composer placement controller opens pinned repair previews withou
   const pinnedRoot = overlayHostEl.firstChild;
   const pinnedTextarea = findNodeByClass(pinnedRoot, "session-composer-overlay-input");
   const actionsColumn = findNodeByClass(pinnedRoot, "command-actions-column");
+  const pinnedFooterBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-switch-footer");
+  const pinnedPositionBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-position");
+  const pinnedVisibilityBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-visibility");
+  const pinnedUnpinBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-unpin");
   const repairBtn = findNodeByClass(pinnedRoot, "session-composer-overlay-repair");
   const repairEl = findNodeByClass(pinnedRoot, "command-repair");
   const repairSummaryEl = findNodeByClass(pinnedRoot, "command-repair-summary");
@@ -1154,9 +1261,15 @@ test("operator composer placement controller opens pinned repair previews withou
 
   assert.ok(pinnedTextarea);
   assert.ok(actionsColumn);
+  assert.ok(pinnedFooterBtn);
+  assert.ok(pinnedPositionBtn);
+  assert.ok(pinnedVisibilityBtn);
+  assert.ok(pinnedUnpinBtn);
   assert.ok(repairBtn);
   assert.ok(repairEl);
   assert.ok(repairApplyBtn);
+  assert.equal(findNodeByClass(pinnedRoot, "session-composer-overlay-title"), null);
+  assert.equal(findNodeByClass(pinnedRoot, "session-composer-overlay-target"), null);
   assert.deepEqual(
     Array.from(actionsColumn.children || []).map((child) => child.textContent),
     ["Send", "Normalize", "Repair"]
