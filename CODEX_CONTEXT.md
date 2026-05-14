@@ -195,10 +195,17 @@ Validated evidence on the current stabilization tree:
 
 Current lane health:
 
-- `npm run test` is green on the current tree.
-- `npm run test:coverage:check` is green on the current tree.
-- `npm run docs:check`, `npm run lint`, and `git diff --check` are green on the current tree.
-- The previously reported frontend broad-lane stall is currently resolved. The decisive stabilization outcome was not a hidden open-handle fix alone; it also required aligning the broad frontend/runtime-composition tests with the newer fail-closed session-control contract, especially around pre-attach `connecting` state versus later `connected` session-control behavior.
+- `npm run lint`, `npm run docs:check`, and `git diff --check` are green on the current tree.
+- `npm run test:root:coverage` is green on the current tree.
+- `npm --prefix backend run test:coverage` is green on the current tree.
+- A 2026-05-14 intensive inventory check disproved the current broad-lane stability claim for the frontend/root wrapper lanes:
+  - `npm --prefix frontend run test` did not terminate within `180 s` or `420 s`
+  - `npm --prefix frontend run test:coverage` did not terminate within `180 s`
+  - `npm run test` again went silent after long green progress during the frontend leg and had to be terminated per repo hygiene
+- The current reproduced hang is no longer just a generic suspicion:
+  - the stalled FE broad lane leaves `node --test --test-concurrency=1` alive with the active child process `frontend/test/app-runtime-composition-controller.test.js`
+  - the visible log tail stalls after test `98` (`app-runtime composition controller stream adapter records debug traces and clears activity after quiet idle`)
+  - this reopens `v0.4.0-H186` as an explicit active quality wave focused on deterministic FE broad-lane termination
 
 Current highest retained hotspots:
 
@@ -218,7 +225,8 @@ Current highest retained hotspots:
 
 Current active tasks:
 
-- `None.`
+- `QLT-363` Owner `FE`: isolate and eliminate the non-terminating frontend broad-lane path rooted in `frontend/test/app-runtime-composition-controller.test.js` so `npm --prefix frontend run test` exits cleanly without external timeout and without leaving open-handle residue.
+- `QLT-364` Owner `QA`: revalidate and document full-lane frontend/root evidence after `QLT-363`, including `npm --prefix frontend run test`, `npm --prefix frontend run test:coverage`, `npm run test`, and `npm run test:coverage:check`.
 
 ## H185 Session Lifecycle Stabilization Closeout
 
