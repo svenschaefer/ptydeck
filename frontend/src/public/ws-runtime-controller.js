@@ -132,7 +132,13 @@ export function createWsRuntimeController(options = {}) {
       debug,
       log,
       protocolsProvider: async () => {
-        const authToken = getWsAuthToken();
+        let authToken = getWsAuthToken();
+        if (!authToken && createWsTicket) {
+          const refreshed = await bootstrapDevAuthToken({ reason: "ws-missing-auth" });
+          if (refreshed) {
+            authToken = getWsAuthToken();
+          }
+        }
         if (!authToken) {
           const trustedLocalProtocol = encodeTrustedLocalClientProtocol(getTrustedLocalWsClientMetadata?.() || {});
           return trustedLocalProtocol ? ["ptydeck.v1", trustedLocalProtocol] : ["ptydeck.v1"];

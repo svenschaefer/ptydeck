@@ -45,6 +45,46 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
   ]);
 });
 
+test("runtime-event controller preserves an established runtime client id across conflicting snapshots", () => {
+  const calls = [];
+  const controller = createRuntimeEventController({
+    getRuntimeClientId: () => "trusted-local-1",
+    setRuntimeClientId: (clientId) => calls.push(["clientId", clientId]),
+    setComposerPlacementState: (state) => calls.push(["composerPlacement", state?.mode || ""]),
+    setDecks: () => calls.push(["decks"]),
+    replaceCustomCommandState: () => calls.push(["commands"]),
+    setSessions: () => calls.push(["sessions"]),
+    replaySnapshotOutputs: () => calls.push(["outputs"]),
+    scheduleCommandPreview: () => calls.push(["preview"]),
+    scheduleCommandSuggestions: () => calls.push(["suggestions"]),
+    clearError: () => calls.push(["clearError"]),
+    markRuntimeBootstrapReady: (source) => calls.push(["bootstrap", source]),
+    scheduleSnapshotTerminalStabilization: (sessionIds) => calls.push(["stabilize", sessionIds])
+  });
+
+  controller.applyRuntimeEvent({
+    type: "snapshot",
+    clientId: "",
+    composerPlacement: { mode: "shared-footer" },
+    sessions: []
+  });
+  controller.applyRuntimeEvent({
+    type: "snapshot",
+    clientId: "ws-ephemeral-1",
+    composerPlacement: { mode: "active-overlay" },
+    sessions: []
+  });
+
+  assert.deepEqual(
+    calls.filter(([type]) => type === "clientId"),
+    []
+  );
+  assert.deepEqual(
+    calls.filter(([type]) => type === "composerPlacement"),
+    [["composerPlacement", "shared-footer"], ["composerPlacement", "active-overlay"]]
+  );
+});
+
 test("runtime-event controller applies composer placement updates", () => {
   const calls = [];
   const controller = createRuntimeEventController({

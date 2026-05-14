@@ -1,4 +1,5 @@
 export function createRuntimeEventController(options = {}) {
+  const normalizeText = (value) => (typeof value === "string" ? value.trim() : "");
   const defaultDeckId = String(options.defaultDeckId || "").trim();
   const getPreferredActiveDeckId = options.getPreferredActiveDeckId || (() => "");
   const setDecks = options.setDecks || (() => {});
@@ -10,6 +11,8 @@ export function createRuntimeEventController(options = {}) {
   const scheduleCommandSuggestions = options.scheduleCommandSuggestions || (() => {});
   const clearError = options.clearError || (() => {});
   const markRuntimeBootstrapReady = options.markRuntimeBootstrapReady || (() => {});
+  const getRuntimeClientId =
+    typeof options.getRuntimeClientId === "function" ? options.getRuntimeClientId : () => "";
   const setRuntimeClientId = typeof options.setRuntimeClientId === "function" ? options.setRuntimeClientId : () => {};
   const setComposerPlacementState =
     typeof options.setComposerPlacementState === "function" ? options.setComposerPlacementState : () => {};
@@ -64,7 +67,13 @@ export function createRuntimeEventController(options = {}) {
   }
 
   function applyRuntimeSnapshot(event) {
-    setRuntimeClientId(event?.clientId || "");
+    const currentRuntimeClientId = normalizeText(getRuntimeClientId());
+    const snapshotRuntimeClientId = normalizeText(event?.clientId);
+    if (!currentRuntimeClientId) {
+      setRuntimeClientId(snapshotRuntimeClientId);
+    } else if (snapshotRuntimeClientId && snapshotRuntimeClientId === currentRuntimeClientId) {
+      setRuntimeClientId(snapshotRuntimeClientId);
+    }
     setComposerPlacementState(event?.composerPlacement || null);
     const sessionIds = Array.isArray(event.sessions)
       ? event.sessions.map((session) => String(session?.id || "").trim()).filter(Boolean)

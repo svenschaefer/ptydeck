@@ -124,6 +124,62 @@ test("ws-runtime controller retries ws ticket acquisition once after 401 refresh
   assert.deepEqual(protocols, ["ptydeck.v1", "ptydeck.auth.ticket-123"]);
 });
 
+test("ws-runtime controller bootstraps auth before falling back to trusted-local ws protocols", async () => {
+  let capturedOptions = null;
+  let authToken = "";
+  let ticketCalls = 0;
+  const refreshReasons = [];
+  createWsRuntimeController({
+    createWsClient(_url, _handlers, options) {
+      capturedOptions = options;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    getWsAuthToken: () => authToken,
+    createWsTicket: async () => {
+      ticketCalls += 1;
+      return { ticket: "ticket-after-refresh" };
+    },
+    bootstrapDevAuthToken: async ({ reason }) => {
+      refreshReasons.push(reason);
+      authToken = "bearer-after-refresh";
+      return true;
+    },
+    getTrustedLocalWsClientMetadata: () => ({ clientId: "trusted-local-1", label: "Desk Browser" })
+  }).start();
+
+  const protocols = await capturedOptions.protocolsProvider();
+
+  assert.deepEqual(refreshReasons, ["ws-missing-auth"]);
+  assert.equal(ticketCalls, 1);
+  assert.deepEqual(protocols, ["ptydeck.v1", "ptydeck.auth.ticket-after-refresh"]);
+});
+
+test("ws-runtime controller falls back to trusted-local metadata when auth bootstrap still has no token", async () => {
+  let capturedOptions = null;
+  const refreshReasons = [];
+  createWsRuntimeController({
+    createWsClient(_url, _handlers, options) {
+      capturedOptions = options;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    getWsAuthToken: () => "",
+    createWsTicket: async () => ({ ticket: "unused" }),
+    bootstrapDevAuthToken: async ({ reason }) => {
+      refreshReasons.push(reason);
+      return false;
+    },
+    getTrustedLocalWsClientMetadata: () => ({ clientId: "trusted-local-1", label: "Desk Browser" })
+  }).start();
+
+  const protocols = await capturedOptions.protocolsProvider();
+
+  assert.deepEqual(refreshReasons, ["ws-missing-auth"]);
+  assert.equal(protocols[0], "ptydeck.v1");
+  assert.match(protocols[1], /^ptydeck\.client\./);
+});
+
 test("ws-runtime controller delays ready notification until runtime bootstrap is no longer pending and routes unmapped session data through runtime events", () => {
   const calls = [];
   let capturedHandlers = null;

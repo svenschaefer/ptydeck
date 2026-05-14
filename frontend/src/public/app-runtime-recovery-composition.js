@@ -54,6 +54,7 @@ export function createAppRuntimeRecoveryComposition(options = {}) {
     clearError: typeof options.clearError === "function" ? options.clearError : () => {},
     markRuntimeBootstrapReady:
       typeof options.markRuntimeBootstrapReady === "function" ? options.markRuntimeBootstrapReady : () => {},
+    getRuntimeClientId: typeof options.getRuntimeClientId === "function" ? options.getRuntimeClientId : () => "",
     setRuntimeClientId: typeof options.setRuntimeClientId === "function" ? options.setRuntimeClientId : () => {},
     setComposerPlacementState:
       typeof options.setComposerPlacementState === "function" ? options.setComposerPlacementState : () => {},

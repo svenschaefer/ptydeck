@@ -974,6 +974,7 @@ sessionRuntimeController = createSessionRuntimeController({
   scheduleCommandSuggestions: () => appCommandUiFacadeController?.scheduleCommandSuggestions(),
   clearError: () => appRuntimeStateController?.clearError(),
   markRuntimeBootstrapReady: (source) => appCommandUiFacadeController?.markRuntimeBootstrapReady(source),
+  getRuntimeClientId,
   setRuntimeClientId,
   setComposerPlacementState: (nextState) =>
     operatorComposerPlacementRuntimeController?.applyPlacementState?.(nextState),

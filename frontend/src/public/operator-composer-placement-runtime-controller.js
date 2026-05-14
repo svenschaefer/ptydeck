@@ -937,8 +937,8 @@ export function createOperatorComposerPlacementRuntimeController(options = {}) {
     const code = normalizeText(error?.error);
     const message = normalizeText(error?.message);
     return (
-      status === 409 &&
-      (code === "OperatorClientRequired" || /active operator client id/iu.test(message))
+      ((status === 409 && (code === "OperatorClientRequired" || /active operator client id/iu.test(message))) ||
+        (status === 401 && /missing bearer token/iu.test(message)))
     );
   }
 

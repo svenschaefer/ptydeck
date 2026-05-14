@@ -392,6 +392,59 @@ test("operator composer placement controller suppresses pre-attach operator-clie
   controller.dispose();
 });
 
+test("operator composer placement controller suppresses pre-auth bearer-token bootstrap races and can retry later", async () => {
+  const errors = [];
+  const documentRef = createDocumentRef();
+  const windowRef = createWindowRef();
+  const workspaceShellEl = new FakeElement("section");
+  const controlPaneEl = new FakeElement("section");
+  const controlPaneBodyEl = new FakeElement("div");
+  const controlPaneResizeHandleEl = new FakeElement("div");
+  const composerPlacementModeSelectEl = new FakeElement("select");
+  const commandInput = new FakeElement("textarea");
+  let phase = 0;
+
+  const controller = createOperatorComposerPlacementRuntimeController({
+    windowRef,
+    documentRef,
+    api: {
+      async getOperatorComposerPlacement() {
+        if (phase === 0) {
+          phase = 1;
+          const error = new Error("Missing bearer token.");
+          error.status = 401;
+          error.error = "Unauthorized";
+          throw error;
+        }
+        return createApiState({
+          mode: "active-overlay",
+          pinnedSessionIds: ["s-2"],
+          pinnedDrafts: { "s-2": "pwd" }
+        });
+      }
+    },
+    workspaceShellEl,
+    controlPaneEl,
+    controlPaneBodyEl,
+    controlPaneResizeHandleEl,
+    composerPlacementModeSelectEl,
+    commandInput,
+    terminals: new Map(),
+    getState: () => ({ sessions: [], activeSessionId: "" }),
+    setError: (message) => errors.push(message)
+  });
+
+  const firstState = await controller.initialize();
+  assert.equal(firstState.mode, "shared-footer");
+  assert.deepEqual(errors, []);
+
+  const secondState = await controller.initialize();
+  assert.equal(secondState.mode, "active-overlay");
+  assert.deepEqual(secondState.pinnedSessionIds, ["s-2"]);
+  assert.deepEqual(errors, []);
+  controller.dispose();
+});
+
 test("operator composer placement controller keeps stopped sessions visually empty in overlay mode", async () => {
   const documentRef = createDocumentRef();
   const windowRef = createWindowRef();
