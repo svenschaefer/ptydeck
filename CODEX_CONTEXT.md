@@ -191,16 +191,20 @@ Last updated: 2026-05-14 (the backend runtime still delegates startup/session-di
 Validated evidence on the current stabilization tree:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
-- backend coverage: `97.37%` line / `90.88%` branch / `87.63%` funcs
-- frontend coverage: `97.43%` line / `90.53%` branch / `81.96%` funcs
+- backend coverage: `97.37%` line / `90.85%` branch / `87.63%` funcs
+- frontend coverage: `97.42%` line / `90.53%` branch / `81.96%` funcs
 
 Current lane health:
 
 - `npm run lint`, `npm run docs:check`, and `git diff --check` are green on the current tree.
 - `npm run test:root:coverage` is green on the current tree.
-- `npm --prefix backend run test:coverage` is green on the current tree.
+- `npm --prefix frontend run test:coverage` is green on the current tree and exits cleanly with frontend totals `97.42%` line / `90.53%` branch / `81.96%` funcs.
+- `npm --prefix backend run test:coverage` is not yet considered deterministic again:
+  - one fresh full coverage run failed in `backend/test/ws.integration.test.js` at `WS snapshot and session events preserve trace and correlation continuity`, asserting an unexpected correlation-id drift (`actual: mgr-...`, `expected: req-...`)
+  - the same isolated test then passed immediately
+  - one immediate full backend coverage rerun also passed with backend totals `97.37%` line / `90.85%` branch / `87.63%` funcs
+  - current conclusion: the backend WebSocket integration/coverage lane has a nondeterministic trace/correlation continuity flaw, not a permanently red test
 - `npm --prefix frontend run test` is green on the current tree and now exits cleanly with `1061` passing tests.
-- `npm --prefix frontend run test:coverage` is green on the current tree and now exits cleanly with frontend totals `97.43%` line / `90.53%` branch / `81.96%` funcs.
 - `npm run test` is green on the current tree.
 - `npm run test:coverage:check` is green on the current tree.
 - The H186 broad-lane termination fix is now part of the baseline:
@@ -212,22 +216,27 @@ Current lane health:
 Current highest retained hotspots:
 
 - backend:
-  - `backend/src/runtime.js`
-  - `backend/src/runtime-library-normalization.js`
-  - `backend/src/runtime-operator-composer-authority.js`
-  - `backend/src/runtime-session-resource-authority.js`
-  - `backend/src/session-manager.js`
+  - `backend/src/runtime.js`: `2101` lines, `86.86%` line / `80.60%` branch
+  - `backend/src/runtime-library-normalization.js`: `1724` lines, `92.34%` line / `87.52%` branch
+  - `backend/src/runtime-operator-composer-authority.js`: `417` lines, `81.77%` line / `77.55%` branch
+  - `backend/src/runtime-ws-connection.js`: `161` lines, `95.65%` line / `71.05%` branch
+  - `backend/src/session-manager.js`: `258` lines, `98.45%` line / `78.08%` branch
 - frontend:
-  - `frontend/src/public/app-runtime-composition-controller.js`
-  - `frontend/src/public/ui/session-terminal-runtime-controller.js`
-  - `frontend/src/public/connection-profile-draft-state.js`
-  - `frontend/src/public/split-layout-runtime-controller.js`
-  - `frontend/src/public/layout-profile-runtime-controller.js`
-  - `frontend/src/public/layout-runtime-state.js`
+  - `frontend/src/public/app-runtime-composition-controller.js`: `1379` lines, `97.46%` line / `80.49%` branch / `16.04%` funcs
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `829` lines, `93.73%` line / `87.74%` branch
+  - `frontend/src/public/split-layout-runtime-controller.js`: `483` lines, `95.03%` line / `80.65%` branch
+  - `frontend/src/public/layout-profile-runtime-controller.js`: `433` lines, `93.53%` line / `89.78%` branch
+  - `frontend/src/public/layout-runtime-state.js`: `260` lines, `98.08%` line / `92.80%` branch
 
 Current active tasks:
 
-- `None.`
+- `QLT-365` Owner `BE`: stabilize the nondeterministic WebSocket trace/correlation continuity integration path across `backend/test/ws.integration.test.js`, `backend/src/runtime-ws-connection.js`, `backend/src/runtime-ws-upgrade.js`, and `backend/src/runtime.js` so repeated `npm --prefix backend run test:coverage` runs stay deterministic.
+- `QLT-366` Owner `BE`: extract the next retained startup/session-dispatch authority seam from `backend/src/runtime.js` and close it with direct deterministic regressions.
+- `QLT-367` Owner `BE`: harden retained normalization/operator-composer coverage across `backend/src/runtime-library-normalization.js` and `backend/src/runtime-operator-composer-authority.js`.
+- `QLT-368` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close branch/function gaps with direct deterministic regressions.
+- `QLT-369` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js` and `frontend/src/public/layout-profile-runtime-controller.js`.
+- `QLT-370` Owner `FE`: harden retained terminal/control-surface coverage across `frontend/src/public/ui/session-terminal-runtime-controller.js` and adjacent session interaction paths.
+- `QLT-371` Owner `QA`: revalidate and document repeated backend/frontend/root full-lane evidence after `QLT-365` through `QLT-370`, including repeated `npm --prefix backend run test:coverage` runs to prove the WebSocket integration lane is deterministic again.
 
 ## H185 Session Lifecycle Stabilization Closeout
 
