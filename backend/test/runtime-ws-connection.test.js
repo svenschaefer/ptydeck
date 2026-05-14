@@ -31,6 +31,7 @@ function createDependencies(overrides = {}) {
     registered: [],
     unregistered: [],
     refreshes: [],
+    refreshesExceptSocket: [],
     reconciled: [],
     errors: []
   };
@@ -69,6 +70,9 @@ function createDependencies(overrides = {}) {
     normalizeWsDisconnectReason: () => "disconnect-normalized",
     broadcastSessionControlRefreshForAuth(auth, trace) {
       observed.refreshes.push({ auth, trace });
+    },
+    broadcastSessionControlRefreshForAuthExceptSocket(auth, socket, trace) {
+      observed.refreshesExceptSocket.push({ auth, socket, trace });
     },
     listSessionIdsForAuth() {
       return ["session-1", "session-2"];
@@ -162,7 +166,9 @@ test("runtime ws connection handler registers accepted sockets and sends the fil
     }
   ]);
   assert.deepEqual(observed.reconciled, ["session-1", "session-2"]);
-  assert.equal(observed.refreshes.length, 1);
+  assert.equal(observed.refreshes.length, 0);
+  assert.equal(observed.refreshesExceptSocket.length, 1);
+  assert.equal(observed.refreshesExceptSocket[0].socket, socket);
 
   const snapshotPayload = JSON.parse(socket.sent[0]);
   assert.deepEqual(snapshotPayload, {
@@ -233,7 +239,8 @@ test("runtime ws connection handler records reconnect and close metrics and unre
   assert.deepEqual(observed.unregistered, ["ws-1"]);
   assert.equal(clientStateMap.get("127.0.0.1").activeConnections, 0);
   assert.equal(clientStateMap.get("127.0.0.1").lastDisconnectReason, "disconnect-normalized");
-  assert.equal(observed.refreshes.length, 2);
+  assert.equal(observed.refreshes.length, 1);
+  assert.equal(observed.refreshesExceptSocket.length, 1);
   assert.equal(observed.debug.at(-1)?.event, "ws.client.closed");
 });
 

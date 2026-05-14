@@ -1520,6 +1520,7 @@ export function createRuntime(config) {
     sessionControlAttachmentRegistry,
     normalizeWsDisconnectReason,
     broadcastSessionControlRefreshForAuth,
+    broadcastSessionControlRefreshForAuthExceptSocket,
     listSessionIdsForAuth,
     reconcileSessionControllerForSession,
     manager,
@@ -1731,6 +1732,45 @@ export function createRuntime(config) {
       type: "session.updated",
       session: sessionPayload
     }, traceSeed);
+  }
+
+  function broadcastSessionUpdatedExceptSocket(sessionId, excludedSocket, traceSeed = null, fallbackSession = null) {
+    let sessionPayload = null;
+    try {
+      sessionPayload = getApiSessionOrThrow(sessionId);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404 || !fallbackSession) {
+        throw error;
+      }
+      sessionPayload = fallbackSession;
+    }
+    const tracedPayload = withTracePayload(
+      {
+        type: "session.updated",
+        session: sessionPayload
+      },
+      traceSeed
+    );
+    for (const socket of sockets) {
+      if (socket === excludedSocket || socket.readyState !== socket.OPEN) {
+        continue;
+      }
+      const filteredPayload = filterPayloadForAuth(tracedPayload, socket.auth || null);
+      if (!filteredPayload) {
+        continue;
+      }
+      socket.send(JSON.stringify(filteredPayload));
+    }
+  }
+
+  function broadcastSessionControlRefreshForAuthExceptSocket(auth = null, excludedSocket = null, traceSeed = null) {
+    for (const sessionId of listSessionIdsForAuth(auth)) {
+      reconcileSessionControllerForSession(sessionId);
+      broadcastSessionUpdatedExceptSocket(sessionId, excludedSocket, {
+        ...(traceSeed && typeof traceSeed === "object" ? traceSeed : {}),
+        sessionId
+      });
+    }
   }
 
   function broadcastDeckUpsert(type, deck, traceSeed = null) {

@@ -13,6 +13,7 @@ export function createRuntimeWsConnectionHandler(dependencies = {}) {
     },
     normalizeWsDisconnectReason = () => "unknown",
     broadcastSessionControlRefreshForAuth = () => {},
+    broadcastSessionControlRefreshForAuthExceptSocket = null,
     listSessionIdsForAuth = () => [],
     reconcileSessionControllerForSession = () => {},
     manager = {
@@ -151,6 +152,10 @@ export function createRuntimeWsConnectionHandler(dependencies = {}) {
       },
       snapshotPayload.trace || ws.traceContext
     );
-    broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext);
+    if (typeof broadcastSessionControlRefreshForAuthExceptSocket === "function") {
+      broadcastSessionControlRefreshForAuthExceptSocket(ws.auth || null, ws, ws.traceContext);
+    } else {
+      broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext);
+    }
   };
 }
