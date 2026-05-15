@@ -403,6 +403,55 @@ test("session manager lifecycle helpers preserve restart payload state determini
   });
 });
 
+test("session manager lifecycle helpers build exited session records without relaunching them", () => {
+  const launchInputs = [];
+  const { session, launchBundle } = buildSessionRecord(
+    {
+      id: "exited-1",
+      kind: "local",
+      cwd: "/tmp/exited",
+      shell: "bash",
+      startCwd: "/tmp/exited",
+      startCommand: "sleep 1",
+      createdAt: 1710000000000,
+      updatedAt: 1710000005000,
+      initialState: "exited",
+      exitCode: 137,
+      exitSignal: "SIGKILL",
+      exitedAt: 1710000004000
+    },
+    {
+      defaultShell: "bash",
+      buildLaunchBundle: (input) => {
+        launchInputs.push(input);
+        return {
+          launchSpec: {
+            metaCwd: "/tmp/exited",
+            command: "bash"
+          }
+        };
+      },
+      createInitialIdentityRuntime: () => ({
+        appIdentityState: {},
+        terminalSignalState: {},
+        appIdentity: {
+          title: "shell",
+          terminalType: "shell"
+        }
+      }),
+      nowFn: () => 1710000009000
+    }
+  );
+
+  assert.equal(launchBundle, null);
+  assert.deepEqual(launchInputs, []);
+  assert.equal(session.ptyProcess, null);
+  assert.equal(session.meta.state, "exited");
+  assert.equal(session.meta.exitCode, 137);
+  assert.equal(session.meta.exitSignal, "SIGKILL");
+  assert.equal(session.meta.exitedAt, 1710000004000);
+});
+
 test("session manager lifecycle helpers normalize local defaults, quick-send usage, and theme slots deterministically", () => {
   const launchInputs = [];
   const { session, launchBundle } = buildSessionRecord(

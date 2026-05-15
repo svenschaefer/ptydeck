@@ -570,7 +570,7 @@ test("session-manager launch runtime schedules ssh reconnects on unexpected tran
     exitedAt: 1700000000000,
     state: "exited"
   });
-  assert.equal(sessions.has(localSession.id), false);
+  assert.equal(sessions.has(localSession.id), true);
 });
 
 test("session-manager launch runtime ignores intentional stopped exits", () => {

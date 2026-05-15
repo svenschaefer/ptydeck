@@ -299,3 +299,44 @@ test("session-manager session runtime marks restored stopped secret-backed ssh s
     }
   );
 });
+
+test("session-manager session runtime preserves exited sessions for restart and excludes them from the concurrent guardrail", () => {
+  const harness = createHarness({
+    sessionMaxConcurrent: 1
+  });
+
+  const exited = harness.runtime.createSession({
+    id: "session-exited",
+    cwd: "/tmp/work",
+    shell: "bash",
+    initialState: "exited",
+    exitCode: 143,
+    exitSignal: "SIGTERM",
+    exitedAt: 1710000000500
+  });
+
+  assert.equal(exited.state, "exited");
+  assert.equal(harness.sessions.get("session-exited").ptyProcess, null);
+
+  const created = harness.runtime.createSession({
+    id: "session-running",
+    cwd: "/tmp/next",
+    shell: "bash"
+  });
+
+  assert.equal(created.state, "running");
+  assert.equal(harness.sessions.has("session-exited"), true);
+  assert.equal(harness.sessions.has("session-running"), true);
+
+  harness.runtime.closeSessionWithReason("session-running", "deleted", {
+    trace: { requestId: "req-running-delete", source: "rest" }
+  });
+
+  const restarted = harness.runtime.restartSession("session-exited", {
+    trace: { requestId: "req-exited-restart", source: "rest" }
+  });
+
+  assert.equal(restarted.id, "session-exited");
+  assert.equal(restarted.state, "running");
+  assert.equal(harness.closedEvents.at(-1).sessionId, "session-exited");
+});

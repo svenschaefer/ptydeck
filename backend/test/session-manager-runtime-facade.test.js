@@ -297,3 +297,35 @@ test("session manager runtime facade forwards initial stopped state through crea
   assert.equal(calls.length, 1);
   assert.equal(calls[0].initialState, "stopped");
 });
+
+test("session manager runtime facade forwards exited restore metadata through create", () => {
+  const calls = [];
+  const facade = createSessionManagerRuntimeFacade({
+    sessionRuntime: {
+      createSession(options) {
+        calls.push(options);
+        return { ...options };
+      }
+    }
+  });
+
+  const created = facade.create({
+    id: "session-exited",
+    cwd: "/tmp",
+    shell: "bash",
+    initialState: "exited",
+    exitCode: 137,
+    exitSignal: "SIGKILL",
+    exitedAt: 1234
+  });
+
+  assert.equal(created.initialState, "exited");
+  assert.equal(created.exitCode, 137);
+  assert.equal(created.exitSignal, "SIGKILL");
+  assert.equal(created.exitedAt, 1234);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].initialState, "exited");
+  assert.equal(calls[0].exitCode, 137);
+  assert.equal(calls[0].exitSignal, "SIGKILL");
+  assert.equal(calls[0].exitedAt, 1234);
+});

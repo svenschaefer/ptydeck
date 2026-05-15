@@ -333,7 +333,10 @@ export function createRuntimeSessionResourceAuthority(dependencies = {}) {
     themeProfile,
     activeThemeProfile,
     inactiveThemeProfile,
-    initialState
+    initialState,
+    exitCode,
+    exitSignal,
+    exitedAt
   }) {
     return manager.create({
       id: session.id,
@@ -360,6 +363,9 @@ export function createRuntimeSessionResourceAuthority(dependencies = {}) {
       inactiveThemeProfile,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
+      ...(Number.isInteger(exitCode) ? { exitCode } : {}),
+      ...(typeof exitSignal === "string" && exitSignal ? { exitSignal } : {}),
+      ...(Number.isInteger(exitedAt) ? { exitedAt } : {}),
       ...(typeof initialState === "string" ? { initialState } : {})
     });
   }

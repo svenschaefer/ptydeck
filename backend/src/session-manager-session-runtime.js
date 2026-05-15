@@ -4,6 +4,7 @@ import { buildRestartSessionCreatePayload, buildSessionRecord } from "./session-
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
 const SESSION_STATE_STOPPED = "stopped";
+const SESSION_STATE_EXITED = "exited";
 
 export function createSessionManagerSessionRuntime(dependencies = {}) {
   const sessions = dependencies.sessions instanceof Map ? dependencies.sessions : new Map();
@@ -97,10 +98,21 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
     createdAt,
     updatedAt,
     trace,
-    initialState = undefined
+    initialState = undefined,
+    exitCode = null,
+    exitSignal = "",
+    exitedAt = null
   } = {}) {
-    const normalizedInitialState = initialState === SESSION_STATE_STOPPED ? SESSION_STATE_STOPPED : undefined;
-    if (sessionMaxConcurrent > 0 && sessions.size >= sessionMaxConcurrent) {
+    const normalizedInitialState =
+      initialState === SESSION_STATE_STOPPED
+        ? SESSION_STATE_STOPPED
+        : initialState === SESSION_STATE_EXITED
+          ? SESSION_STATE_EXITED
+          : undefined;
+    const concurrentSessionCount = Array.from(sessions.values()).filter(
+      (session) => session?.meta?.state !== SESSION_STATE_EXITED
+    ).length;
+    if (sessionMaxConcurrent > 0 && concurrentSessionCount >= sessionMaxConcurrent) {
       throw new ApiError(
         409,
         "SessionLimitExceeded",
@@ -136,7 +148,10 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
         createdAt,
         updatedAt,
         traceSeed: normalizeTraceSeed(trace),
-        initialState: normalizedInitialState
+        initialState: normalizedInitialState,
+        exitCode,
+        exitSignal,
+        exitedAt
       },
       {
         defaultShell,
@@ -181,6 +196,9 @@ export function createSessionManagerSessionRuntime(dependencies = {}) {
       env: session.meta.env || {},
       replayOutput: "",
       replayOutputTruncated: false,
+      exitCode: session.meta.exitCode,
+      exitSignal: session.meta.exitSignal,
+      exitedAt: session.meta.exitedAt,
       note: session.meta.note,
       mouseForwardingMode: session.meta.mouseForwardingMode,
       inputSafetyProfile: session.meta.inputSafetyProfile,

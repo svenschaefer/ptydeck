@@ -492,3 +492,49 @@ test("runtime startup restore recreates persisted stopped sessions without launc
   assert.equal(harness.unrestoredSessions.has("stopped-1"), false);
   assert.equal(harness.sessionQuickIdAssignments.get("stopped-1"), "S1");
 });
+
+test("runtime startup restore recreates persisted exited sessions without relaunching them", async () => {
+  const harness = createHarness({
+    persistedState: {
+      sessions: [
+        {
+          id: "exited-1",
+          deckId: "default",
+          kind: "local",
+          state: "exited",
+          cwd: "/srv/app",
+          startCwd: "/srv/app",
+          shell: "bash",
+          quickIdToken: "E1",
+          exitCode: 137,
+          exitSignal: "SIGKILL",
+          exitedAt: 30,
+          createdAt: 10,
+          updatedAt: 20
+        }
+      ],
+      sessionOutputs: [
+        {
+          sessionId: "exited-1",
+          data: "retained output",
+          truncated: true
+        }
+      ]
+    }
+  });
+
+  await harness.startupRestore.restorePersistedRuntimeState();
+
+  assert.equal(harness.restoreAttempts.length, 1);
+  assert.deepEqual(harness.restoreAttempts[0], {
+    sessionId: "exited-1",
+    shell: "bash",
+    cwd: "/srv/app",
+    startCwd: "/srv/app",
+    initialState: "exited",
+    replayOutput: "retained output",
+    replayOutputTruncated: true
+  });
+  assert.equal(harness.unrestoredSessions.has("exited-1"), false);
+  assert.equal(harness.sessionQuickIdAssignments.get("exited-1"), "E1");
+});

@@ -12,7 +12,7 @@ function countProvisionedRuntimeSessions(sessions = []) {
   let count = 0;
   for (const session of sessions) {
     const state = typeof session?.state === "string" ? session.state.trim().toLowerCase() : "";
-    if (state !== "stopped") {
+    if (state !== "stopped" && state !== "exited") {
       count += 1;
     }
   }

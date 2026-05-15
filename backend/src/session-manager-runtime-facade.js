@@ -241,7 +241,10 @@ export function createSessionManagerRuntimeFacade(dependencies = {}) {
       createdAt,
       updatedAt,
       trace,
-      initialState
+      initialState,
+      exitCode,
+      exitSignal,
+      exitedAt
     } = {}) {
       return sessionRuntime.createSession({
         id,
@@ -270,7 +273,10 @@ export function createSessionManagerRuntimeFacade(dependencies = {}) {
         createdAt,
         updatedAt,
         trace,
-        initialState
+        initialState,
+        exitCode,
+        exitSignal,
+        exitedAt
       });
     },
 

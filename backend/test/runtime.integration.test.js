@@ -82,6 +82,46 @@ function createDelayedBootPtyFactory({ bootChunk = "BOOT\n", bootDelayMs = 20 } 
   };
 }
 
+function createExternallyExitablePtyFactory() {
+  const ptys = [];
+  return {
+    ptys,
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      const pty = {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        },
+        emitExit(details = {}) {
+          if (exitHandler) {
+            exitHandler({
+              exitCode: Number.isInteger(details.exitCode) ? details.exitCode : 1,
+              signal: typeof details.signal === "string" ? details.signal : "SIGTERM"
+            });
+          }
+        }
+      };
+      ptys.push(pty);
+      return pty;
+    }
+  };
+}
+
 function createPatchableAsyncWritePtyFactory({ interruptOnce = true } = {}) {
   let interrupted = false;
   const fsWrite = (fd, buffer, offset, callback) => {
@@ -1661,7 +1701,7 @@ test("runtime restore preserves manual telegram forum topic names without renami
   }
 });
 
-test("session PTY control endpoints send deterministic signals and remove killed sessions", async () => {
+test("session PTY control endpoints send deterministic signals and retain killed sessions as exited", async () => {
   const killSignals = [];
   const { runtime, baseUrl } = await createStartedRuntime({
     createPty() {
@@ -1709,10 +1749,12 @@ test("session PTY control endpoints send deterministic signals and remove killed
 
     assert.deepEqual(killSignals, ["SIGINT", "SIGTERM", "SIGKILL"]);
 
-    const missingAfterKillRes = await fetch(`${baseUrl}/sessions/${created.id}`);
-    assert.equal(missingAfterKillRes.status, 404);
-    const missingAfterKillBody = await missingAfterKillRes.json();
-    assert.equal(missingAfterKillBody.error, "SessionNotFound");
+    const exitedAfterKillRes = await fetch(`${baseUrl}/sessions/${created.id}`);
+    assert.equal(exitedAfterKillRes.status, 200);
+    const exitedAfterKill = await exitedAfterKillRes.json();
+    assert.equal(exitedAfterKill.state, "exited");
+    assert.equal(exitedAfterKill.exitCode, 137);
+    assert.equal(exitedAfterKill.exitSignal, "SIGKILL");
   } finally {
     await runtime.stop();
   }
@@ -4425,6 +4467,99 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
     const restored = await restoredRes.json();
     assert.equal(restored.createdAt, createdAt);
     assert.ok(restored.updatedAt >= updatedAt);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
+test("runtime persists exited sessions across restart without relaunching them", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const exitFactory = createExternallyExitablePtyFactory();
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: () => exitFactory.createPty()
+  });
+
+  let createdId = "";
+  try {
+    await runtimeA.start();
+    const { port } = runtimeA.getAddress();
+    const baseUrlA = `http://127.0.0.1:${port}/api/v1`;
+
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    assert.equal(exitFactory.ptys.length, 1);
+    exitFactory.ptys[0].emitExit({ exitCode: 137, signal: "SIGKILL" });
+
+    let exited = null;
+    await waitFor(async () => {
+      const exitedRes = await fetch(`${baseUrlA}/sessions/${createdId}`);
+      if (exitedRes.status !== 200) {
+        return false;
+      }
+      exited = await exitedRes.json();
+      return exited.state === "exited";
+    });
+
+    assert.equal(exited.id, createdId);
+    assert.equal(exited.state, "exited");
+    assert.equal(exited.exitCode, 137);
+    assert.equal(exited.exitSignal, "SIGKILL");
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  const persistedSessions = Array.isArray(persistedRaw.sessions) ? persistedRaw.sessions : [];
+  const persistedSession = persistedSessions.find((session) => session.id === createdId);
+  assert.ok(persistedSession);
+  assert.equal(persistedSession.state, "exited");
+  assert.equal(persistedSession.exitCode, 137);
+  assert.equal(persistedSession.exitSignal, "SIGKILL");
+
+  const restoreSpawnCalls = [];
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: (options) => {
+      restoreSpawnCalls.push({
+        shell: options.shell,
+        cwd: options.cwd
+      });
+      return createFallbackAwarePtyFactory()(options);
+    }
+  });
+
+  try {
+    await runtimeB.start();
+    const { port } = runtimeB.getAddress();
+    const baseUrlB = `http://127.0.0.1:${port}/api/v1`;
+
+    const restoredRes = await fetch(`${baseUrlB}/sessions/${createdId}`);
+    assert.equal(restoredRes.status, 200);
+    const restored = await restoredRes.json();
+    assert.equal(restored.id, createdId);
+    assert.equal(restored.state, "exited");
+    assert.equal(restored.exitCode, 137);
+    assert.equal(restored.exitSignal, "SIGKILL");
+    assert.deepEqual(restoreSpawnCalls, []);
   } finally {
     await runtimeB.stop();
   }

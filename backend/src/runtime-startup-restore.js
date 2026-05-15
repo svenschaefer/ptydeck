@@ -362,6 +362,43 @@ export function createRuntimeStartupRestore(dependencies = {}) {
           });
           continue;
         }
+        if (persistedSessionState === "exited") {
+          tryCreateRestoredSession({
+            session,
+            kind,
+            remoteConnection,
+            remoteAuth,
+            shell: requestedShell,
+            cwd:
+              typeof session.cwd === "string" && session.cwd.trim()
+                ? session.cwd
+                : startupConfig.startCwd,
+            startCwd: startupConfig.startCwd,
+            startCommand: startupConfig.startCommand,
+            replayOutput: persistedReplayOutputs.get(session.id)?.data || "",
+            replayOutputTruncated: persistedReplayOutputs.get(session.id)?.truncated === true,
+            remoteSecret: undefined,
+            env: startupConfig.env,
+            quickIdToken,
+            note,
+            mouseForwardingMode,
+            inputSafetyProfile,
+            tags,
+            quickSendUsage,
+            themeProfile: themeSlots.themeProfile,
+            activeThemeProfile: themeSlots.activeThemeProfile,
+            inactiveThemeProfile: themeSlots.inactiveThemeProfile,
+            initialState: "exited",
+            exitCode: Number.isInteger(session.exitCode) ? session.exitCode : null,
+            exitSignal: typeof session.exitSignal === "string" ? session.exitSignal : "",
+            exitedAt: Number.isInteger(session.exitedAt) ? session.exitedAt : restoredUpdatedAt
+          });
+          unrestoredSessions.delete(normalizedUnrestoredSession.id);
+          logDebug("runtime.restore.session_restored_exited", {
+            sessionId: normalizedUnrestoredSession.id
+          });
+          continue;
+        }
         const requestedCwd = startupConfig.startCwd;
         const fallbackCwd = kind === sessionKindSsh ? "~" : homedir();
         const fallbackShell = kind === sessionKindSsh ? defaultSshClient : defaultShell;

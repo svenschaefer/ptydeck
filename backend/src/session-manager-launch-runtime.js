@@ -67,7 +67,6 @@ export function createSessionManagerLaunchRuntime(dependencies = {}) {
   const emitSessionUpdated = typeof dependencies.emitSessionUpdated === "function" ? dependencies.emitSessionUpdated : () => {};
   const emitSessionExit = typeof dependencies.emitSessionExit === "function" ? dependencies.emitSessionExit : () => {};
   const getSessionById = typeof dependencies.getSessionById === "function" ? dependencies.getSessionById : () => null;
-  const removeSessionById = typeof dependencies.removeSessionById === "function" ? dependencies.removeSessionById : () => {};
 
   function buildLocalShellNotFoundError(shell) {
     const normalizedShell = normalizeLocalShellCommand(shell);
@@ -336,9 +335,6 @@ export function createSessionManagerLaunchRuntime(dependencies = {}) {
       exitSignal,
       exitTimestamp
     });
-    if (current === session) {
-      removeSessionById(session.id);
-    }
   }
 
   return {

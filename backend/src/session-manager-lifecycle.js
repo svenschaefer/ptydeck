@@ -17,6 +17,7 @@ const DEFAULT_SSH_CLIENT = "ssh";
 const SESSION_KIND_LOCAL = "local";
 const SESSION_KIND_SSH = "ssh";
 const SESSION_STATE_STOPPED = "stopped";
+const SESSION_STATE_EXITED = "exited";
 const SESSION_START_BLOCKED_REASON_REMOTE_SECRET_UNAVAILABLE = "remote-secret-unavailable";
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -144,7 +145,7 @@ function normalizeQuickIdToken(value) {
 
 function resolveSessionStartBlockedReason({ state, remoteAuth, remoteSecret }) {
   if (
-    state === SESSION_STATE_STOPPED &&
+    (state === SESSION_STATE_STOPPED || state === SESSION_STATE_EXITED) &&
     remoteAuthRequiresSecret(remoteAuth) &&
     (remoteSecret === undefined || remoteSecret === null || remoteSecret === "")
   ) {
@@ -243,7 +244,10 @@ export function buildSessionRecord(
     createdAt,
     updatedAt,
     traceSeed = null,
-    initialState = undefined
+    initialState = undefined,
+    exitCode = null,
+    exitSignal = "",
+    exitedAt = null
   } = {},
   {
     defaultShell = "bash",
@@ -257,8 +261,17 @@ export function buildSessionRecord(
     nowFn = Date.now
   } = {}
 ) {
-  const normalizedInitialState = initialState === SESSION_STATE_STOPPED ? SESSION_STATE_STOPPED : SESSION_STATE_STARTING;
-  if (normalizedInitialState !== SESSION_STATE_STOPPED && typeof buildLaunchBundle !== "function") {
+  const normalizedInitialState =
+    initialState === SESSION_STATE_STOPPED
+      ? SESSION_STATE_STOPPED
+      : initialState === SESSION_STATE_EXITED
+        ? SESSION_STATE_EXITED
+        : SESSION_STATE_STARTING;
+  if (
+    normalizedInitialState !== SESSION_STATE_STOPPED &&
+    normalizedInitialState !== SESSION_STATE_EXITED &&
+    typeof buildLaunchBundle !== "function"
+  ) {
     throw new TypeError("buildSessionRecord requires a buildLaunchBundle function.");
   }
   if (typeof buildSessionLaunchSpecFn !== "function") {
@@ -290,7 +303,7 @@ export function buildSessionRecord(
   const normalizedRemoteConnection = normalizeRemoteConnection(remoteConnection, normalizedKind);
   const normalizedRemoteAuth = normalizeRemoteAuth(remoteAuth, normalizedKind);
   const allowMissingRemoteSecret =
-    normalizedInitialState === SESSION_STATE_STOPPED &&
+    (normalizedInitialState === SESSION_STATE_STOPPED || normalizedInitialState === SESSION_STATE_EXITED) &&
     remoteAuthRequiresSecret(normalizedRemoteAuth) &&
     (remoteSecret === undefined || remoteSecret === null || remoteSecret === "");
   const normalizedRemoteSecret = allowMissingRemoteSecret
@@ -315,7 +328,7 @@ export function buildSessionRecord(
         : normalizedStartCwd;
   let launchBundle = null;
   let launchSpec = null;
-  if (normalizedInitialState === SESSION_STATE_STOPPED) {
+  if (normalizedInitialState === SESSION_STATE_STOPPED || normalizedInitialState === SESSION_STATE_EXITED) {
     launchSpec = buildSessionLaunchSpecFn({
       kind: normalizedKind,
       shell: normalizedShell,
@@ -419,6 +432,13 @@ export function buildSessionRecord(
         appIdentity: initialAppIdentity,
         ...(startBlockedReason ? { startBlockedReason } : {}),
         state: normalizedInitialState,
+        ...(normalizedInitialState === SESSION_STATE_EXITED
+          ? {
+              exitCode: Number.isInteger(exitCode) ? exitCode : null,
+              exitSignal: typeof exitSignal === "string" ? exitSignal : "",
+              exitedAt: Number.isInteger(exitedAt) ? exitedAt : updatedTimestamp
+            }
+          : {}),
         activityState: SESSION_ACTIVITY_STATE_INACTIVE,
         activityUpdatedAt: initialActivityTimestamp,
         activityCompletedAt: null,

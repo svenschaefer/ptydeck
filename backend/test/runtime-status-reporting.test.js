@@ -80,7 +80,7 @@ test("runtime status reporting renders transport and websocket metrics determini
   };
 
   const payload = renderRuntimeMetrics({
-    sessions: [{ state: "running" }, { state: "idle" }, { state: "stopped" }],
+    sessions: [{ state: "running" }, { state: "idle" }, { state: "stopped" }, { state: "exited" }],
     unrestoredSessionCount: 1,
     wsConnectionCount: 2,
     metrics,
@@ -91,6 +91,7 @@ test("runtime status reporting renders transport and websocket metrics determini
 
   assert.match(payload, /ptydeck_http_requests_total 8/);
   assert.match(payload, /ptydeck_sessions_active 2/);
+  assert.match(payload, /ptydeck_sessions_active_by_lifecycle\{state="exited"\} 1/);
   assert.match(payload, /ptydeck_sessions_active_by_lifecycle\{state="stopped"\} 1/);
   assert.match(payload, /ptydeck_sessions_active_by_lifecycle\{state="unrestored"\} 1/);
   assert.match(payload, /ptydeck_ws_connections_active 2/);

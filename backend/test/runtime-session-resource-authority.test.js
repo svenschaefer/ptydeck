@@ -442,7 +442,11 @@ test("runtime session resource authority forwards restored session creation payl
     quickSendUsage: [{ lookupKey: "deploy", count: 4 }],
     themeProfile: { background: "#000000" },
     activeThemeProfile: { background: "#111111" },
-    inactiveThemeProfile: { background: "#222222" }
+    inactiveThemeProfile: { background: "#222222" },
+    initialState: "exited",
+    exitCode: 137,
+    exitSignal: "SIGKILL",
+    exitedAt: 30
   });
 
   assert.deepEqual(payload, { id: "session-restore" });
@@ -471,6 +475,10 @@ test("runtime session resource authority forwards restored session creation payl
     activeThemeProfile: { background: "#111111" },
     inactiveThemeProfile: { background: "#222222" },
     createdAt: 10,
-    updatedAt: 20
+    updatedAt: 20,
+    initialState: "exited",
+    exitCode: 137,
+    exitSignal: "SIGKILL",
+    exitedAt: 30
   });
 });
