@@ -4565,6 +4565,134 @@ test("runtime persists exited sessions across restart without relaunching them",
   }
 });
 
+
+test("runtime restores exited replay tails, reports exited metrics, and can restart the session", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const exitFactory = createExternallyExitablePtyFactory();
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: () => exitFactory.createPty(),
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 6
+  });
+
+  let createdId = "";
+  try {
+    await runtimeA.start();
+    const { port } = runtimeA.getAddress();
+    const baseUrlA = `http://127.0.0.1:${port}/api/v1`;
+
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    const inputRes = await fetch(`${baseUrlA}/sessions/${createdId}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "1234567890" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    assert.equal(exitFactory.ptys.length, 1);
+    exitFactory.ptys[0].emitExit({ exitCode: 137, signal: "SIGKILL" });
+
+    await waitFor(async () => {
+      const exitedRes = await fetch(`${baseUrlA}/sessions/${createdId}`);
+      if (exitedRes.status !== 200) {
+        return false;
+      }
+      const exited = await exitedRes.json();
+      return exited.state === "exited";
+    });
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const restartSpawnCalls = [];
+  const restartedFactory = createFallbackAwarePtyFactory();
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 6,
+    createPty: (options) => {
+      restartSpawnCalls.push({ shell: options.shell, cwd: options.cwd });
+      return restartedFactory(options);
+    }
+  });
+
+  try {
+    await runtimeB.start();
+    const { port } = runtimeB.getAddress();
+    const baseUrlB = `http://127.0.0.1:${port}/api/v1`;
+
+    const restoredRes = await fetch(`${baseUrlB}/sessions/${createdId}`);
+    assert.equal(restoredRes.status, 200);
+    const restored = await restoredRes.json();
+    assert.equal(restored.state, "exited");
+    assert.equal(restored.exitCode, 137);
+    assert.equal(restored.exitSignal, "SIGKILL");
+    assert.deepEqual(restartSpawnCalls, []);
+
+    const replayRes = await fetch(`${baseUrlB}/sessions/${createdId}/replay-export`);
+    assert.equal(replayRes.status, 200);
+    const replay = await replayRes.json();
+    assert.equal(replay.sessionState, "exited");
+    assert.equal(replay.data, "567890");
+    assert.equal(replay.retainedChars, 6);
+    assert.equal(replay.truncated, true);
+
+    const metricsRes = await fetch(`http://127.0.0.1:${port}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    const metrics = await metricsRes.text();
+    assert.match(metrics, /ptydeck_sessions_active 0/);
+    assert.match(metrics, /ptydeck_sessions_active_by_lifecycle\{state="exited"\} 1/);
+
+    const restartRes = await fetch(`${baseUrlB}/sessions/${createdId}/restart`, {
+      method: "POST"
+    });
+    assert.equal(restartRes.status, 200);
+    const restarted = await restartRes.json();
+    assert.equal(restarted.id, createdId);
+    assert.equal(restarted.state, "running");
+    assert.equal(restartSpawnCalls.length, 1);
+    assert.equal(Object.hasOwn(restarted, "exitCode"), false);
+    assert.equal(Object.hasOwn(restarted, "exitSignal"), false);
+    assert.equal(Object.hasOwn(restarted, "exitedAt"), false);
+
+    const restartedReplayRes = await fetch(`${baseUrlB}/sessions/${createdId}/replay-export`);
+    assert.equal(restartedReplayRes.status, 200);
+    const restartedReplay = await restartedReplayRes.json();
+    assert.equal(restartedReplay.sessionState, "running");
+    assert.equal(restartedReplay.data, "");
+    assert.equal(restartedReplay.retainedChars, 0);
+    assert.equal(restartedReplay.truncated, false);
+
+    const restartedMetricsRes = await fetch(`http://127.0.0.1:${port}/metrics`);
+    assert.equal(restartedMetricsRes.status, 200);
+    const restartedMetrics = await restartedMetricsRes.text();
+    assert.match(restartedMetrics, /ptydeck_sessions_active 1/);
+    assert.match(restartedMetrics, /ptydeck_sessions_active_by_lifecycle\{state="running"\} 1/);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
 test("runtime persists bounded replay output when configured and restores it into snapshot replay", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

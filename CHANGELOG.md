@@ -2,6 +2,12 @@
 
 Completed and validated release history belongs here.
 
+## 2026-05-17
+
+- [x] `v0.4.0-H187` closed `QLT-372` by hardening the retained exited-session lifecycle and restore coverage across the backend session-manager and restore seams. `backend/test/session-manager-lifecycle.test.js` now locks down the restored exited secret-backed SSH path as explicitly `startBlockedReason: remote-secret-unavailable`, `backend/test/session-manager-session-runtime.test.js` now proves restarted exited sessions preserve operator metadata while clearing stale exit metadata, and `backend/test/runtime.integration.test.js` now exercises the full restore -> replay export -> metrics -> explicit restart flow for an unexpectedly exited session.
+- [x] The exited-session replay export path no longer leaks stale persisted truncation metadata back into a restarted live session. `backend/src/runtime-session-resource-authority.js` now treats a live replay export as authoritative whenever one exists, so a restarted formerly exited session reports the real current live replay state instead of inheriting `truncated: true` from the stale persisted replay tail captured before restart.
+- [x] Validation for the `QLT-372` closeout passed with focused backend regressions (`node --test backend/test/runtime-session-resource-authority.test.js backend/test/session-manager-lifecycle.test.js backend/test/session-manager-session-runtime.test.js backend/test/runtime-startup-restore.test.js backend/test/runtime-status-reporting.test.js`), the focused integration replay/restart regression (`node --test --test-name-pattern "runtime restores exited replay tails, reports exited metrics, and can restart the session" backend/test/runtime.integration.test.js`), focused coverage probes on the same scope, `npm --prefix backend run test`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`.
+
 ## 2026-05-15
 
 - [x] Unexpected PTY exit no longer causes a persisted session to disappear across backend restart. `backend/src/session-manager-launch-runtime.js` now keeps unexpectedly exited sessions in the manager state instead of deleting them on PTY exit, while `backend/src/session-manager-lifecycle.js` and `backend/src/session-manager-session-runtime.js` now support explicit restore-time `initialState: "exited"` plus preserved `exitCode`, `exitSignal`, and `exitedAt` metadata.

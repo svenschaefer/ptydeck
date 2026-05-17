@@ -309,6 +309,9 @@ test("session-manager session runtime preserves exited sessions for restart and 
     id: "session-exited",
     cwd: "/tmp/work",
     shell: "bash",
+    note: "  relaunch me  ",
+    tags: ["ops", "prod"],
+    quickSendUsage: [{ lookupKey: "cmd::deploy", count: 2, lastUsedAt: 1710000000100 }],
     initialState: "exited",
     exitCode: 143,
     exitSignal: "SIGTERM",
@@ -338,5 +341,11 @@ test("session-manager session runtime preserves exited sessions for restart and 
 
   assert.equal(restarted.id, "session-exited");
   assert.equal(restarted.state, "running");
+  assert.equal(restarted.note, "relaunch me");
+  assert.deepEqual(restarted.tags, ["ops", "prod"]);
+  assert.deepEqual(restarted.quickSendUsage, [{ lookupKey: "cmd::deploy", count: 2, lastUsedAt: 1710000000100 }]);
+  assert.equal(Object.hasOwn(restarted, "exitCode"), false);
+  assert.equal(Object.hasOwn(restarted, "exitSignal"), false);
+  assert.equal(Object.hasOwn(restarted, "exitedAt"), false);
   assert.equal(harness.closedEvents.at(-1).sessionId, "session-exited");
 });

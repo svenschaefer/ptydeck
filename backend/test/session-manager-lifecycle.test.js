@@ -452,6 +452,55 @@ test("session manager lifecycle helpers build exited session records without rel
   assert.equal(session.meta.exitedAt, 1710000004000);
 });
 
+
+test("session manager lifecycle helpers mark restored exited secret-backed ssh sessions as start-blocked", () => {
+  const launchInputs = [];
+  const { session, launchBundle } = buildSessionRecord(
+    {
+      id: "exited-secret-1",
+      kind: "ssh",
+      shell: "ssh",
+      cwd: "~/workspace",
+      startCwd: "~/workspace",
+      remoteConnection: { host: "example.internal", port: 22, username: "ops" },
+      remoteAuth: { method: "password" },
+      initialState: "exited",
+      exitCode: 255,
+      exitSignal: "SIGTERM",
+      exitedAt: 1710000005000
+    },
+    {
+      defaultShell: "bash",
+      buildLaunchBundle: (input) => {
+        launchInputs.push(input);
+        return {
+          launchSpec: {
+            metaCwd: "~/workspace",
+            command: "ssh"
+          }
+        };
+      },
+      createInitialIdentityRuntime: () => ({
+        appIdentityState: {},
+        terminalSignalState: {},
+        appIdentity: {
+          title: "ssh",
+          terminalType: "shell"
+        }
+      }),
+      nowFn: () => 1710000009000
+    }
+  );
+
+  assert.equal(launchBundle, null);
+  assert.deepEqual(launchInputs, []);
+  assert.equal(session.meta.state, "exited");
+  assert.equal(session.meta.startBlockedReason, "remote-secret-unavailable");
+  assert.equal(session.meta.exitCode, 255);
+  assert.equal(session.meta.exitSignal, "SIGTERM");
+  assert.equal(session.meta.exitedAt, 1710000005000);
+});
+
 test("session manager lifecycle helpers normalize local defaults, quick-send usage, and theme slots deterministically", () => {
   const launchInputs = [];
   const { session, launchBundle } = buildSessionRecord(

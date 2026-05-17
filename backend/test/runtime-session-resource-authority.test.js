@@ -122,7 +122,7 @@ test("runtime session resource authority shapes replay excerpts deterministicall
 });
 
 test("runtime session resource authority prefers live replay exports and rethrows unexpected replay failures", () => {
-  const { authority } = createHarness({
+  const { authority, persistedReplayOutputs } = createHarness({
     manager: {
       getReplayExport: () => ({
         data: "live tail",
@@ -131,6 +131,12 @@ test("runtime session resource authority prefers live replay exports and rethrow
         truncated: false
       })
     }
+  });
+  persistedReplayOutputs.set("session-1", {
+    data: "persisted stale tail",
+    retainedChars: 19,
+    retentionLimitChars: 128,
+    truncated: true
   });
 
   assert.deepEqual(authority.buildSessionReplayExportOrThrow("session-1"), {

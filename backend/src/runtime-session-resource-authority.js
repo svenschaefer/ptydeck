@@ -104,6 +104,7 @@ export function createRuntimeSessionResourceAuthority(dependencies = {}) {
       }
     }
     const persistedReplayOutput = getPersistedReplayOutputs().get(sessionId) || null;
+    const hasLiveReplayExport = replayExport && typeof replayExport === "object";
     const data =
       typeof replayExport?.data === "string"
         ? replayExport.data
@@ -130,7 +131,7 @@ export function createRuntimeSessionResourceAuthority(dependencies = {}) {
       data,
       retainedChars,
       retentionLimitChars,
-      truncated: replayExport?.truncated === true || persistedReplayOutput?.truncated === true
+      truncated: hasLiveReplayExport ? replayExport?.truncated === true : persistedReplayOutput?.truncated === true
     };
   }
 
