@@ -874,3 +874,156 @@ test("runtime session-control authority rejects inactive attached clients when a
     null
   );
 });
+
+test("runtime session-control authority normalizes non-object trace seeds and non-string scope or target inputs deterministically", () => {
+  const { authority, broadcasts, sessionControlStates } = createAuthorityHarness();
+  const auth = {
+    subject: "owner",
+    tenantId: "default",
+    allowedSessions: ["session-1", "session-2"]
+  };
+  const request = {
+    headers: {
+      "x-ptydeck-client-id": "client-owner"
+    }
+  };
+
+  authority.broadcastSessionControlRefreshForAuth(auth, "ignored-trace-seed");
+  assert.ok(
+    broadcasts.some(
+      (entry) =>
+        entry.sessionId === "session-1" &&
+        entry.traceSeed &&
+        entry.traceSeed.sessionId === "session-1" &&
+        !Object.hasOwn(entry.traceSeed, "source")
+    )
+  );
+
+  const updatedState = authority.updateSessionControlStateAndBroadcast(
+    "session-1",
+    {
+      controllerClientId: "client-owner",
+      controllerChangedAt: 42,
+      allowAutoAssign: false
+    },
+    "ignored-trace-seed"
+  );
+  assert.equal(updatedState.currentController?.clientId, "client-owner");
+  assert.equal(sessionControlStates.get("session-1").controllerClientId, "client-owner");
+
+  const scopeResult = authority.takeSessionControlScopeOrThrow("all", {}, auth, request, "ignored-trace-seed");
+  assert.equal(scopeResult.scope, "all");
+  assert.equal(scopeResult.deckId, "");
+  assert.equal(scopeResult.sessionId, "");
+  assert.deepEqual(scopeResult.updatedSessions.map((session) => session.id), ["session-1", "session-2"]);
+
+  assert.throws(
+    () => authority.listClaimableSessionIdsForScope(null, {}, auth),
+    /Field 'scope' must be one of: all, deck, session/i
+  );
+  assert.throws(
+    () => authority.transferSessionControlOrThrow("session-1", null, auth, request),
+    /Field 'clientId' must be a non-empty string/i
+  );
+  assert.throws(
+    () => authority.forgetSessionControlClientOrThrow("session-1", null, auth, request),
+    /Field 'clientId' must be a non-empty string/i
+  );
+});
+
+test("runtime session-control authority covers default helper fallbacks and malformed attached-client views deterministically", () => {
+  const fallbackStates = new Map();
+  const autoAssignAuthority = createRuntimeSessionControlAuthority({
+    sessionControlStates: fallbackStates,
+    sessionControlAttachmentRegistry: {
+      listEntries() {
+        return [
+          {
+            auth: null,
+            client: {
+              clientId: "client-fallback",
+              accessMode: "operator",
+              active: true,
+              activeConnectionCount: 1
+            }
+          }
+        ];
+      },
+      findActiveAttachment() {
+        return null;
+      },
+      updateAttachmentLabel() {
+        return null;
+      },
+      forgetAttachment() {}
+    },
+    resolveSessionControlModel(sessionId) {
+      return sessionId === "session-fallback" ? { id: sessionId, deckId: "deck-a", state: "running" } : null;
+    },
+    getSessionControlState() {
+      return {
+        owner: null,
+        controllerClientId: null,
+        controllerChangedAt: 0,
+        allowAutoAssign: true
+      };
+    }
+  });
+
+  assert.equal(autoAssignAuthority.reconcileSessionControllerForSession("session-fallback"), true);
+  assert.deepEqual(fallbackStates.get("session-fallback"), {
+    owner: null,
+    controllerClientId: "client-fallback",
+    controllerChangedAt: 0,
+    allowAutoAssign: true
+  });
+  assert.deepEqual(autoAssignAuthority.recordSessionLastInput("session-fallback", null, { headers: {} }), {
+    owner: null,
+    controllerClientId: null,
+    controllerChangedAt: 0,
+    allowAutoAssign: true
+  });
+
+  const fallbackAuthority = createRuntimeSessionControlAuthority({
+    resolveSessionControlModel() {
+      return { id: "session-fallback", deckId: "deck-a", state: "running" };
+    },
+    getApiSessionOrThrow() {
+      return { id: "session-fallback" };
+    },
+    getSessionControlState() {
+      return {
+        owner: { subject: "owner", tenantId: "default" },
+        controllerClientId: null,
+        controllerChangedAt: 0,
+        allowAutoAssign: true
+      };
+    },
+    buildSessionControlStateView() {
+      return {
+        owner: { subject: "owner", tenantId: "default" },
+        currentController: null,
+        attachedClients: null
+      };
+    }
+  });
+
+  assert.deepEqual(fallbackAuthority.listAttachedClientsForSession("session-fallback"), []);
+  assert.equal(
+    fallbackAuthority.findActiveSessionControlAttachment(
+      { subject: "owner", tenantId: "default" },
+      "client-owner"
+    ),
+    null
+  );
+  assert.throws(
+    () =>
+      fallbackAuthority.ensureSessionControllerAccess(
+        "session-fallback",
+        { subject: "viewer", tenantId: "default" },
+        { headers: {} },
+        "write to this session"
+      ),
+    /Only the active controller may write to this session/i
+  );
+});

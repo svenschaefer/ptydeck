@@ -4,6 +4,7 @@ import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRuntime } from "../src/runtime.js";
+import { JsonPersistence } from "../src/persistence.js";
 
 function createStubPtyFactory() {
   return () => {
@@ -22,6 +23,43 @@ function createStubPtyFactory() {
       }
     };
   };
+}
+
+function createExternallyControlledPtyFactory() {
+  const ptys = [];
+  return {
+    ptys,
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      const pty = {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        emitData(data) {
+          if (typeof dataHandler === "function") {
+            dataHandler(data);
+          }
+        },
+        write() {},
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+      ptys.push(pty);
+      return pty;
+    }
+  };
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function createStartedRuntime(overrides = {}) {
@@ -107,6 +145,83 @@ test("runtime rejects invalid sessionId path encoding across session routes", as
       await expectApiError(response, 400, "ValidationError", /Invalid path parameter encoding for 'sessionId'\./);
     }
   } finally {
+    await runtime.stop();
+  }
+});
+
+test("runtime logs debounced persistence failures without aborting the active runtime", async () => {
+  const factory = createExternallyControlledPtyFactory();
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: () => factory.createPty()
+  });
+  const originalSaveState = JsonPersistence.prototype.saveState;
+  const originalConsoleError = console.error;
+  const consoleErrors = [];
+
+  try {
+    await createSession(baseUrl);
+    await delay(150);
+
+    JsonPersistence.prototype.saveState = async function saveStateReject() {
+      throw new Error("persist-failed");
+    };
+    console.error = (...args) => {
+      consoleErrors.push(args);
+    };
+
+    factory.ptys[0].emitData("OUT\n");
+    await delay(150);
+
+    assert.equal(
+      consoleErrors.some(
+        (entry) => entry[0] === "failed to persist runtime state" && entry[1] instanceof Error && entry[1].message === "persist-failed"
+      ),
+      true
+    );
+  } finally {
+    JsonPersistence.prototype.saveState = originalSaveState;
+    console.error = originalConsoleError;
+    await runtime.stop();
+  }
+});
+
+test("runtime clears a pending debounced persistence timer before immediate persistence", async () => {
+  const factory = createExternallyControlledPtyFactory();
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: () => factory.createPty()
+  });
+  const originalSaveState = JsonPersistence.prototype.saveState;
+  const saveCalls = [];
+
+  try {
+    await createSession(baseUrl);
+    await delay(150);
+
+    JsonPersistence.prototype.saveState = async function saveStateSpy(state) {
+      saveCalls.push({
+        sessions: Array.isArray(state?.sessions) ? state.sessions.length : -1,
+        decks: Array.isArray(state?.decks) ? state.decks.length : -1
+      });
+    };
+
+    factory.ptys[0].emitData("OUT\n");
+
+    const response = await fetch(`${baseUrl}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Ops" })
+    });
+    assert.equal(response.status, 201);
+
+    await delay(150);
+
+    assert.equal(saveCalls.length, 1);
+    assert.deepEqual(saveCalls[0], {
+      sessions: 1,
+      decks: 2
+    });
+  } finally {
+    JsonPersistence.prototype.saveState = originalSaveState;
     await runtime.stop();
   }
 });

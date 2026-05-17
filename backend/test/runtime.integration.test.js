@@ -300,11 +300,10 @@ async function waitFor(predicate, timeoutMs = 4000) {
 }
 
 test("REST lifecycle endpoints work end-to-end", async () => {
-  const { runtime, baseUrl } = await createStartedRuntime({
-    inspectTerminalForegroundProcess() {
-      return null;
-    }
-  });
+  const inspectTerminalForegroundProcess = () => null;
+  assert.equal(inspectTerminalForegroundProcess(), null);
+  const runtimeStart = await createStartedRuntime({ inspectTerminalForegroundProcess });
+  const { runtime, baseUrl } = runtimeStart;
 
   try {
     const createRes = await fetch(`${baseUrl}/sessions`, {

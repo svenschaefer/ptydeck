@@ -70,6 +70,7 @@ test("session launch spec normalizes remote auth and secret handling", () => {
   assert.throws(() => normalizeRemoteAuth({ method: "password" }, "local"), /only supported for ssh sessions/);
 
   assert.deepEqual(normalizeRemoteAuth(undefined, "ssh"), { method: "privateKey" });
+  assert.deepEqual(normalizeRemoteAuth({ method: "   " }, "ssh"), { method: "privateKey" });
   assert.deepEqual(
     normalizeRemoteAuth(
       {
@@ -229,6 +230,41 @@ test("session launch spec resolves local PowerShell launchers from PATH and WSL 
     }),
     ""
   );
+
+  assert.equal(
+    resolveLocalShellCommand("pwsh", {
+      pathEnv: " :/usr/bin: ",
+      isExecutableFileFn: (path) =>
+        path === "/mnt/c/Program Files/PowerShell/7.4.1/pwsh.exe" ||
+        path === "/mnt/c/Program Files/PowerShell/7.3.9/pwsh.exe",
+      readDirFn: () => [
+        {
+          name: "7.3.9",
+          isDirectory() {
+            return true;
+          }
+        },
+        {
+          name: "7.4.1",
+          isDirectory() {
+            return true;
+          }
+        }
+      ]
+    }),
+    "/mnt/c/Program Files/PowerShell/7.4.1/pwsh.exe"
+  );
+
+  assert.equal(
+    resolveLocalShellCommand("pwsh", {
+      pathEnv: "/usr/bin",
+      isExecutableFileFn: () => false,
+      readDirFn: () => {
+        throw new Error("missing powershell root");
+      }
+    }),
+    ""
+  );
 });
 
 test("session launch spec builds deterministic password ssh launches with askpass env", () => {
@@ -363,4 +399,33 @@ test("session launch spec constrains SSH host key algorithms to the trusted type
 
   assert.equal(launchSpec.args.includes("-o"), true);
   assert.equal(launchSpec.args.includes("HostKeyAlgorithms=ssh-rsa,ssh-ed25519"), true);
+});
+
+test("session launch spec keeps default ssh launcher semantics when optional remote branches are absent", () => {
+  const launchSpec = buildSessionLaunchSpec({
+    kind: "ssh",
+    shell: "   ",
+    spawnCwd: "/ignored",
+    startCwd: "~",
+    startCommand: "   ",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22,
+      username: "   "
+    },
+    remoteAuth: undefined,
+    remoteSecret: undefined,
+    trustedHostKeyTypes: [null, "", "bad key type", "ssh-ed25519", "ssh-ed25519"],
+    sshAskpassPath: "/tmp/askpass.sh",
+    sshKnownHostsPath: "/tmp/known_hosts"
+  });
+
+  assert.equal(launchSpec.shellAdapterId, "ssh");
+  assert.equal(launchSpec.command, "ssh");
+  assert.equal(launchSpec.args.includes("-p"), false);
+  assert.equal(launchSpec.args.includes("-l"), false);
+  assert.equal(launchSpec.args.includes("HostKeyAlgorithms=ssh-ed25519"), true);
+  assert.equal(launchSpec.args.at(-1), "example.internal");
+  assert.deepEqual(launchSpec.ptyEnvAdditions, {});
+  assert.equal(launchSpec.postStartInput, "");
 });

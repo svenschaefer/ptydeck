@@ -223,37 +223,39 @@ Last updated: 2026-05-17 (the backend runtime still delegates startup/session-di
 Validated evidence on the current stabilization tree:
 
 - root tooling coverage: `92.84%` line / `77.05%` branch / `94.83%` funcs
-- backend coverage: `97.43%` line / `91.02%-91.05%` branch / `87.65%` funcs on the current tree, with the retained repeated-run branch drift evidence still tracked separately under `QLT-365`
-- frontend coverage: `97.42%` line / `90.57%` branch / `81.77%` funcs
+- backend coverage: `97.60%` line / `91.28%` branch / `87.90%` funcs on the current tree, with repeated back-to-back backend coverage runs now holding the same aggregate totals and stable uncovered-line/source-row sets after the extracted trace-helper seam landed
+- frontend coverage: `97.43%` line / `90.58%` branch / `81.77%` funcs
 
 Current lane health:
 
 - `npm run lint`, `npm run docs:check`, and `git diff --check` are green on the current tree.
 - `npm run test:root:coverage` is green on the current tree.
-- `npm --prefix frontend run test:coverage` is green on the current tree and exits cleanly with frontend totals `97.42%` line / `90.57%` branch / `81.77%` funcs.
-- `npm --prefix backend run test:coverage` is greener on the current tree after additional direct deterministic backend regressions:
-  - back-to-back aggregate backend totals are now stable again on line/function coverage, with repeated passes holding `97.43%` line / `87.65%` funcs while the branch summary only toggles between `91.02%` and `91.05%`
+- `npm --prefix frontend run test:coverage` is green on the current tree and exits cleanly with frontend totals `97.43%` line / `90.58%` branch / `81.77%` funcs.
+- `npm --prefix backend run test:coverage` is now stable at the aggregate/runtime-seam level on the current tree after additional direct deterministic backend regressions:
+  - back-to-back aggregate backend totals now hold `97.60%` line / `91.28%` branch / `87.90%` funcs across repeated consecutive runs
   - the prior hard failure at `backend/test/ws.integration.test.js` `WS snapshot and session events preserve trace and correlation continuity` still did not reproduce
   - new direct regressions now explicitly cover:
     - restored stopped secret-backed SSH start-block removal
     - output-heuristic age expiry in `terminal-app-identity`
     - `SessionManager` cleanup-wrapper and listener delegation
     - the default `node-pty` spawn fallback plus degraded-SSH reconnect-to-connected PTY output recovery in `SessionManager`
-    - already-active and signal-only PTY runtime branches
+    - already-active, prompt-boundary-only, async write callback, signal-only, empty-chunk, and inactive-local PTY runtime branches
     - successful array-header trusted-local attachment paths
     - negative custom-command and deck guard rails in `runtime-catalog-authority`
-    - lifecycle/data/error guard rails plus event-session fallback in `runtime-session-event-authority`
+    - lifecycle/data/error guard rails plus event-session fallback, non-empty `session.data` broadcast, registered activity/data listener wiring, and empty-lifecycle update handling in `runtime-session-event-authority`
     - missing-state startup-runtime short-circuit paths
     - lenient unresolved template-variable rejection in `runtime-library-normalization`
-    - active-only rejection of inactive attached clients in `runtime-session-control-authority`
+    - active-only rejection of inactive attached clients plus fallback helper and malformed attached-client handling in `runtime-session-control-authority`
     - unexpected non-ENOENT upload-stat failures in `runtime-session-resource-authority`
-    - deterministic rotated-file readiness in `session-stream-analysis-capture`
-  - however, three repeated per-file source rows still drift and keep `QLT-365` open
-  - the earlier repeated source-row drift in `backend/src/runtime-session-control-authority.js`, `backend/src/runtime-library-normalization.js`, `backend/src/runtime-session-resource-authority.js`, `backend/src/session-manager.js`, `backend/src/terminal-app-identity.js`, and `backend/test/session-stream-analysis-capture.test.js` is now closed by direct deterministic regressions plus one dead `SessionManager` launch-runtime callback removal
-  - the remaining repeated-drift rows are now:
-    - `backend/src/runtime.js`, whose raw V8 zero/nonzero range set remained stable across back-to-back backend test runs even while the Node branch percentage still shifted from `80.34%` to `80.51%`
-    - `backend/src/runtime-session-event-authority.js`, which still shifted from `85.54%` to `86.21%` branch coverage across repeated backend coverage runs
-    - `backend/src/session-manager-pty-runtime.js`, which still shifted from `83.87%` to `86.67%` branch coverage across repeated backend coverage runs
+    - blank SSH defaults, PowerShell Core version selection, directory-read fallback, and trusted-host-key normalization in `session-launch-spec`
+    - deterministic rotated-file readiness plus timeout-path helper coverage in `session-stream-analysis-capture`
+  - `QLT-365` is now closed on the current tree:
+    - `backend/src/runtime-trace-helpers.js` now owns the retained `normalizeTrace*`, `createTrace*`, and `withTracePayload(...)` seam that previously lived inside `backend/src/runtime.js`
+    - `backend/test/runtime-trace-helpers.test.js`, `backend/test/session-manager-pty-runtime.test.js`, `backend/test/runtime.request-seams.test.js`, `backend/test/runtime-session-control-authority.test.js`, `backend/test/runtime-session-event-authority.test.js`, `backend/test/session-launch-spec.test.js`, and `backend/test/session-stream-analysis-capture.test.js` now lock the former runtime-side drift drivers down directly instead of relying on incidental integration timing
+    - repeated raw V8 coverage comparisons now show the extracted runtime seam no longer flips any zero/nonzero ranges across back-to-back backend coverage runs, so the remaining fractional branch-row wobble is coverage-reporter noise rather than an unresolved backend path gap
+  - the remaining repeated backend noise is now tracked separately under `QLT-373`:
+    - repeated backend coverage runs still show fractional per-file branch-summary movement in `backend/src/runtime.js` and `backend/test/session-manager.test.js` even when aggregate totals, uncovered lines, and raw V8 zero/nonzero range sets stay stable
+    - that residual gap now belongs to the shared coverage-report/tooling layer rather than the backend runtime seam itself
 - `QLT-372` is now closed on the current tree:
   - focused backend lifecycle/restore regressions now cover the restored exited secret-backed SSH start-blocked path, restarted exited-session metadata clearing, and the full exited replay-tail -> metrics -> restart integration flow
   - `backend/src/runtime-session-resource-authority.js` now prefers live replay export metadata whenever a live replay export exists, so restarted exited sessions do not inherit stale persisted `truncated` replay markers from the pre-restart exit snapshot
@@ -277,14 +279,15 @@ Current lane health:
 Current highest retained hotspots:
 
 - backend:
-  - `backend/src/runtime.js`: `2086` lines, `86.91%` line / `80.47%` branch
+  - `backend/src/runtime.js`: `1992` lines, `86.55%` line / `78.25%-78.45%` branch (reporter-noise range on repeated runs after the extracted trace-helper seam)
+  - `backend/src/runtime-trace-helpers.js`: `96` lines, `100.00%` line / `94.94%` branch
   - `backend/src/runtime-startup-dispatch-assembly.js`: `37` lines, `100.00%` line / `100.00%` branch
-  - `backend/src/runtime-library-normalization.js`: `1724` lines, `92.40%` line / `87.70%` branch
+  - `backend/src/runtime-library-normalization.js`: `1724` lines, `93.27%` line / `89.22%` branch
   - `backend/src/runtime-operator-composer-authority.js`: `417` lines, `81.77%` line / `79.17%` branch
   - `backend/src/runtime-ws-connection.js`: `187` lines, `96.26%` line / `71.43%` branch
   - `backend/src/session-manager-session-runtime.js`: `396` lines, `98.48%` line / `60.87%` branch
   - `backend/src/session-manager-launch-runtime.js`: `349` lines, `96.56%` line / `70.21%` branch
-  - `backend/src/session-manager-lifecycle.js`: `647` lines, `96.60%` line / `86.10%` branch
+  - `backend/src/session-manager-lifecycle.js`: `647` lines, `96.60%` line / `88.18%` branch
 - frontend:
   - `frontend/src/public/app-runtime-composition-controller.js`: `1381` lines, `97.47%` line / `80.49%` branch / `15.96%` funcs
   - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `829` lines, `93.73%` line / `87.74%` branch
@@ -294,11 +297,11 @@ Current highest retained hotspots:
 
 Current active tasks:
 
-- `QLT-365` Owner `BE`: finish stabilizing the remaining repeated backend coverage drift so back-to-back `npm --prefix backend run test:coverage` runs stop shifting the residual branch rows in `backend/src/runtime.js`, `backend/src/runtime-session-event-authority.js`, and `backend/src/session-manager-pty-runtime.js` plus the aggregate backend branch summary, now that the earlier drift in `backend/src/runtime-session-control-authority.js`, `backend/src/runtime-library-normalization.js`, `backend/src/runtime-session-resource-authority.js`, `backend/src/session-manager.js`, `backend/src/terminal-app-identity.js`, and `backend/test/session-stream-analysis-capture.test.js` has been closed and repeated raw V8 zero/nonzero coverage checks already show a stable executed-range set for `backend/src/runtime.js`.
 - `QLT-368` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close branch/function gaps with direct deterministic regressions.
 - `QLT-369` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js` and `frontend/src/public/layout-profile-runtime-controller.js`.
 - `QLT-370` Owner `FE`: harden retained terminal/control-surface coverage across `frontend/src/public/ui/session-terminal-runtime-controller.js` and adjacent session interaction paths.
-- `QLT-371` Owner `QA`: revalidate and document repeated backend/frontend/root full-lane evidence after `QLT-365` and `QLT-368` through `QLT-370`, including back-to-back `npm --prefix backend run test:coverage` runs to prove the remaining backend coverage drift is gone.
+- `QLT-373` Owner `PLAT`: stabilize the remaining normalized branch-summary reporter noise in repeated coverage outputs across `scripts/lib/coverage-report.mjs`, `backend/src/runtime.js`, and `backend/test/session-manager.test.js` so back-to-back `npm --prefix backend run test:coverage` runs stop shifting per-file branch percentages when the underlying raw V8 zero/nonzero range sets and aggregate totals are already stable.
+- `QLT-371` Owner `QA`: revalidate and document repeated backend/frontend/root full-lane evidence after `QLT-368` through `QLT-370` and `QLT-373`, including repeated `npm --prefix backend run test:coverage` runs to confirm the backend coverage lane is deterministic on the stabilized tree.
 
 ## H185 Session Lifecycle Stabilization Closeout
 

@@ -251,6 +251,26 @@ test("runtime session event authority registers manager listeners for the extrac
     bytes: 12,
     trace: { traceId: "trace-write", correlationId: "corr-write" }
   });
+  manager.emit("session.activity.completed", {
+    sessionId: "session-2",
+    activityCompletedAt: 41,
+    trace: { traceId: "trace-complete", correlationId: "corr-complete" }
+  });
+  manager.emit("session.started", {
+    sessionId: "session-2",
+    session: {
+      id: "session-2",
+      deckId: "ops",
+      state: "running"
+    },
+    trace: { traceId: "trace-started", correlationId: "corr-started" }
+  });
+  manager.emit("session.data", {
+    sessionId: "session-2",
+    data: "pwd\r\n",
+    promptBoundaries: [{ start: 0, end: 3 }],
+    trace: { traceId: "trace-data", correlationId: "corr-data" }
+  });
 
   await new Promise((resolve) => setImmediate(resolve));
 
@@ -260,7 +280,23 @@ test("runtime session event authority registers manager listeners for the extrac
       trace: { traceId: "trace-start", correlationId: "corr-start" }
     }
   ]);
-  assert.deepEqual(harness.observed.persistSoon, [true]);
+  assert.deepEqual(harness.observed.persistSoon, [true, true]);
+  assert.deepEqual(harness.observed.persistNow, ["session.activity.completed"]);
+  assert.equal(harness.metrics.sessionsStartedTotal, 1);
+  assert.deepEqual(harness.observed.data, [
+    {
+      session: { id: "session-2", deckId: "default", state: "running" },
+      data: "pwd\r\n",
+      promptBoundaries: [{ start: 0, end: 3 }],
+      trace: { traceId: "trace-data", correlationId: "corr-data" }
+    }
+  ]);
+  assert.equal(
+    harness.observed.broadcasts.some(
+      ([payload]) => payload.type === "session.data" && payload.sessionId === "session-2" && payload.data === "pwd\r\n"
+    ),
+    true
+  );
   assert.equal(
     harness.observed.debug.some(([event, details]) => event === "session.input.write" && details.writeKind === "body"),
     true
@@ -357,4 +393,41 @@ test("runtime session event authority covers lifecycle, data, and error guard ra
     failureHarness.observed.errors.some(([message]) => message === "failed to process session.updated event"),
     true
   );
+});
+
+test("runtime session event authority tolerates empty lifecycle lookups and returns true for handled updates", async () => {
+  const harness = createHarness({
+    getApiSessionOrThrow() {
+      throw new ApiError(404, "SessionNotFound", "missing live session");
+    },
+    toApiSession(session, explicitState) {
+      return {
+        id: session.id,
+        deckId: session.deckId || "ops",
+        state: explicitState || session.state || "running",
+        api: true
+      };
+    }
+  });
+
+  const handled = await harness.authority.handleManagerSessionEvent("session.updated", {
+    sessionId: "session-updated",
+    trace: { traceId: "trace-updated", correlationId: "corr-updated" }
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(harness.observed.lifecycle, []);
+  assert.deepEqual(harness.observed.broadcasts, [
+    [
+      {
+        type: "session.updated",
+        sessionId: "session-updated",
+        trace: { traceId: "trace-updated", correlationId: "corr-updated" }
+      },
+      { traceId: "trace-updated", correlationId: "corr-updated" }
+    ]
+  ]);
+  assert.deepEqual(harness.observed.persistSoon, [true]);
+  assert.deepEqual(harness.observed.warmup, []);
+  assert.deepEqual(harness.observed.errors, []);
 });

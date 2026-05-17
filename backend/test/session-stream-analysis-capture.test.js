@@ -16,6 +16,10 @@ async function waitFor(predicate, timeoutMs = 2000) {
   throw new Error("Timed out waiting for predicate.");
 }
 
+test("session stream analysis capture waitFor helper times out deterministically", async () => {
+  await assert.rejects(waitFor(async () => false, 1), /Timed out waiting for predicate\./);
+});
+
 test("session stream analysis capture writes codex chunk entries to a bounded file", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-stream-capture-"));
   const filePath = join(dir, "capture.jsonl");

@@ -102,9 +102,12 @@ function createHarness(overrides = {}) {
       }
       return { candidateMatched: false, appIdentityChanged: false, metaChanged: false };
     },
-    captureSessionStreamChunk(event) {
-      observed.capturedChunks.push(event);
-    },
+    captureSessionStreamChunk:
+      Object.prototype.hasOwnProperty.call(overrides, "captureSessionStreamChunk")
+        ? overrides.captureSessionStreamChunk
+        : (event) => {
+            observed.capturedChunks.push(event);
+          },
     emitSessionUpdated(session, options) {
       observed.sessionUpdated.push([session.id, options]);
     },
@@ -326,5 +329,176 @@ test("session-manager pty runtime keeps signal-only chunks fail-closed when meta
   assert.deepEqual(harness.observed.activityStarted, []);
   assert.deepEqual(harness.observed.activityCompletion, []);
   assert.equal(harness.observed.emitted.some(([eventName]) => eventName === "session.data"), false);
+  assert.equal(harness.observed.foregroundRefresh.length, 2);
+});
+
+test("session-manager pty runtime forwards async PTY write events through the attached patch callback", () => {
+  const ptyProcess = createFakePty();
+  const session = createSession();
+  const harness = createHarness();
+
+  harness.runtime.attachPtyProcess(session, {
+    ptyProcess,
+    shellAdapter: {
+      capability: { shellBlockTrackingSupported: false },
+      consumeOutput() {
+        return {
+          cleaned: "",
+          promptBoundaries: []
+        };
+      }
+    }
+  });
+
+  const [, patchOptions] = harness.observed.patches[0];
+  patchOptions.onAsyncWriteEvent({ stage: "retry", retryCount: 1 });
+
+  assert.deepEqual(harness.observed.asyncWrite, [[
+    "session-1",
+    { stage: "retry", retryCount: 1 }
+  ]]);
+});
+
+test("session-manager pty runtime keeps prompt-boundary-only chunks without metadata changes fail-closed apart from replay emission", () => {
+  const ptyProcess = createFakePty();
+  const session = createSession();
+  const harness = createHarness({
+    observeSessionTerminalSignals() {
+      return { metaChanged: false };
+    }
+  });
+
+  harness.runtime.attachPtyProcess(session, {
+    ptyProcess,
+    shellAdapter: {
+      capability: { shellBlockTrackingSupported: false },
+      consumeOutput() {
+        return {
+          cleaned: "",
+          promptBoundaries: [{ start: 2, end: 2 }]
+        };
+      }
+    }
+  });
+  ptyProcess.emitData("\u001b]0;prompt\u0007");
+
+  assert.deepEqual(harness.observed.sessionUpdated, []);
+  assert.deepEqual(harness.observed.replay, [["session-1", "", [{ start: 2, end: 2 }]]]);
+  assert.deepEqual(harness.observed.capturedChunks[0].terminalSignalKinds, []);
+  assert.equal(
+    harness.observed.emitted.some(
+      ([eventName, payload]) => eventName === "session.data" && payload.sessionId === "session-1" && payload.data === ""
+    ),
+    true
+  );
+  assert.equal(harness.observed.foregroundRefresh.length, 2);
+});
+
+test("session-manager pty runtime updates signal-only chunks when terminal metadata changes", () => {
+  const ptyProcess = createFakePty();
+  const session = createSession();
+  const harness = createHarness({
+    observeSessionTerminalSignals() {
+      return { signals: [{ kind: "alt_screen" }], metaChanged: true };
+    }
+  });
+
+  harness.runtime.attachPtyProcess(session, {
+    ptyProcess,
+    shellAdapter: {
+      capability: { shellBlockTrackingSupported: false },
+      consumeOutput() {
+        return {
+          cleaned: "",
+          promptBoundaries: []
+        };
+      }
+    }
+  });
+  ptyProcess.emitData(Buffer.from("\u001b[?1049h"));
+
+  assert.deepEqual(harness.observed.replay, []);
+  assert.deepEqual(harness.observed.activityStarted, []);
+  assert.deepEqual(harness.observed.activityCompletion, []);
+  assert.deepEqual(harness.observed.sessionUpdated, [[
+    "session-1",
+    {
+      trace: {
+        correlationId: "corr-1",
+        source: "pty",
+        sessionId: "session-1",
+        traceId: "trace-1"
+      },
+      updatedAt: 1700
+    }
+  ]]);
+  assert.equal(harness.observed.emitted.some(([eventName]) => eventName === "session.data"), false);
+  assert.equal(harness.observed.foregroundRefresh.length, 2);
+});
+
+test("session-manager pty runtime stays quiescent for empty chunks when stream capture is disabled and no signals are present", () => {
+  const ptyProcess = createFakePty();
+  const session = createSession();
+  const harness = createHarness({
+    captureSessionStreamChunk: null,
+    observeSessionTerminalSignals() {
+      return { signals: [], metaChanged: false };
+    }
+  });
+
+  harness.runtime.attachPtyProcess(session, {
+    ptyProcess,
+    shellAdapter: {
+      capability: { shellBlockTrackingSupported: false },
+      consumeOutput() {
+        return {
+          cleaned: "",
+          promptBoundaries: []
+        };
+      }
+    }
+  });
+  ptyProcess.emitData(Buffer.from(""));
+
+  assert.deepEqual(harness.observed.capturedChunks, []);
+  assert.deepEqual(harness.observed.replay, []);
+  assert.deepEqual(harness.observed.sessionUpdated, []);
+  assert.deepEqual(harness.observed.activityStarted, []);
+  assert.deepEqual(harness.observed.activityCompletion, []);
+  assert.deepEqual(harness.observed.traceUpdates, []);
+  assert.equal(harness.observed.emitted.some(([eventName]) => eventName === "session.data"), false);
+  assert.equal(harness.observed.foregroundRefresh.length, 1);
+});
+
+test("session-manager pty runtime starts inactive local sessions on cleaned output without forcing metadata updates", () => {
+  const ptyProcess = createFakePty();
+  const session = createSession({
+    meta: {
+      kind: "local",
+      activityState: "inactive",
+      remoteRuntime: { connectivityState: "connected" }
+    }
+  });
+  const harness = createHarness();
+
+  harness.runtime.attachPtyProcess(session, {
+    ptyProcess,
+    shellAdapter: {
+      capability: { shellBlockTrackingSupported: false },
+      consumeOutput() {
+        return {
+          cleaned: "ls\n",
+          promptBoundaries: []
+        };
+      }
+    }
+  });
+  ptyProcess.emitData("ls\r\n");
+
+  assert.deepEqual(harness.observed.remoteConnected, []);
+  assert.deepEqual(harness.observed.activityStarted, [["session-1", 1700]]);
+  assert.deepEqual(harness.observed.sessionUpdated, []);
+  assert.deepEqual(harness.observed.replay, [["session-1", "ls\n", []]]);
+  assert.equal(session.lastActivityAt, 1700);
   assert.equal(harness.observed.foregroundRefresh.length, 2);
 });
