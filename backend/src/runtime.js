@@ -1,4 +1,3 @@
-import http from "node:http";
 import crypto from "node:crypto";
 import { appendFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -16,7 +15,6 @@ import { createRuntimeCatalogAuthority } from "./runtime-catalog-authority.js";
 import { createRuntimeHttpHelpers } from "./runtime-http-helpers.js";
 import { createRuntimeLibraryAuthority } from "./runtime-library-authority.js";
 import { createRuntimeLibraryNormalization } from "./runtime-library-normalization.js";
-import { createRuntimeLifecycle } from "./runtime-lifecycle.js";
 import { createRuntimeAccessPolicy } from "./runtime-access-policy.js";
 import { createRuntimeMetrics } from "./runtime-metrics.js";
 import {
@@ -25,14 +23,13 @@ import {
 } from "./runtime-operator-composer-authority.js";
 import { createRuntimeSessionAuthority } from "./runtime-session-authority.js";
 import { createRuntimeSessionControlAuthority } from "./runtime-session-control-authority.js";
-import { createRuntimeSessionDispatchAssembly } from "./runtime-session-dispatch-assembly.js";
 import { createRuntimeSessionMessagingAuthority } from "./runtime-session-messaging-authority.js";
 import { createRuntimeSessionResourceAuthority } from "./runtime-session-resource-authority.js";
 import { createRuntimeSessionState } from "./runtime-session-state.js";
 import { createRuntimeSshTrust } from "./runtime-ssh-trust.js";
+import { createRuntimeStartupDispatchAssembly } from "./runtime-startup-dispatch-assembly.js";
 import { createRuntimeStartupReadiness } from "./runtime-startup-readiness.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
-import { createRuntimeStartupRestore } from "./runtime-startup-restore.js";
 import { createRuntimeWsConnectionHandler } from "./runtime-ws-connection.js";
 import { createRuntimeWsUpgradeHandler } from "./runtime-ws-upgrade.js";
 import { createRuntimeWsTicketRegistry, normalizeWsDisconnectReason } from "./runtime-ws-tickets.js";
@@ -1849,7 +1846,10 @@ export function createRuntime(config) {
     }
   }
 
-  const { handleHttpRequest } = createRuntimeSessionDispatchAssembly({
+  const {
+    server,
+    runtimeLifecycle
+  } = createRuntimeStartupDispatchAssembly({
     config,
     maxBodyBytes,
     metrics,
@@ -1977,13 +1977,69 @@ export function createRuntime(config) {
     recordSessionLastInput,
     defaultSshClient: DEFAULT_SSH_CLIENT,
     sessionKindSsh: SESSION_KIND_SSH,
-    normalizeTraceSeed
-  });
-
-  const server = http.createServer(handleHttpRequest);
-
-  server.on("upgrade", (request, socket, head) => {
-    void handleWsUpgrade(request, socket, head);
+    normalizeTraceSeed,
+    handleWsUpgrade,
+    persistence,
+    sessionReplayPersistMaxChars,
+    decks,
+    connectionProfiles,
+    layoutProfiles,
+    workspacePresets,
+    sshTrustEntries,
+    shareLinks,
+    operatorComposerPlacements,
+    telegramTopicBindings,
+    sessionQuickIdAssignments,
+    customCommands,
+    normalizeDeckEntity,
+    normalizeLayoutProfileEntity,
+    normalizeConnectionProfileEntity,
+    slugifyConnectionProfileId,
+    normalizeSshTrustEntryEntity,
+    findSshTrustConflict,
+    normalizePersistedShareLinkEntity,
+    normalizePersistedOperatorComposerPlacementEntry,
+    normalizeMessagingTopicBindings,
+    createLocalOperatorPrincipal,
+    normalizeQuickSendUsageEntries,
+    deriveTerminalAppIdentityFromSessionHints,
+    remoteAuthRequiresSecret,
+    tryCreateRestoredSession,
+    buildCustomCommandEntry,
+    buildCustomCommandKey,
+    compareCustomCommandEntries,
+    ensureSessionExistsOrThrow,
+    normalizeWorkspacePresetEntity,
+    hasKnownSession,
+    resolveSessionDeckId,
+    customCommandNamePattern: CUSTOM_COMMAND_NAME_PATTERN,
+    customCommandReservedNames: CUSTOM_COMMAND_RESERVED_NAMES,
+    customCommandMaxNameLength,
+    customCommandMaxContentLength,
+    customCommandMaxCount,
+    defaultDeckId: DEFAULT_DECK_ID,
+    defaultShell: config.shell,
+    accessTokenVerifier,
+    runtimeStartupReadiness,
+    setPersistedReplayOutputs: (value) => {
+      persistedReplayOutputs = value;
+    },
+    snapshotRuntimeState,
+    wsServer,
+    sessionControlAttachmentRegistry,
+    listSessionIdsForAuth,
+    clearHeartbeat: () => {
+      clearInterval(heartbeat);
+    },
+    clearGuardrailTimer: () => {
+      clearInterval(guardrailTimer);
+    },
+    clearPersistTimer: () => {
+      if (persistTimer) {
+        clearTimeout(persistTimer);
+        persistTimer = null;
+      }
+    }
   });
 
   const heartbeat = setInterval(() => {
@@ -1998,111 +2054,6 @@ export function createRuntime(config) {
       ws.ping();
     }
   }, 30000);
-
-  const runtimeStartupRestore = createRuntimeStartupRestore({
-    persistence,
-    sessionReplayPersistMaxChars,
-    startupWarmup,
-    decks,
-    connectionProfiles,
-    layoutProfiles,
-    workspacePresets,
-    sshTrustEntries,
-    shareLinks,
-    operatorComposerPlacements,
-    telegramTopicBindings,
-    sessionDeckAssignments,
-    sessionQuickIdAssignments,
-    sessionControlStates,
-    unrestoredSessions,
-    customCommands,
-    manager,
-    messagingRuntime,
-    normalizeDeckEntity,
-    normalizeLayoutProfileEntity,
-    normalizeConnectionProfileEntity,
-    slugifyConnectionProfileId,
-    normalizeSshTrustEntryEntity,
-    findSshTrustConflict,
-    normalizePersistedShareLinkEntity,
-    normalizePersistedOperatorComposerPlacementEntry,
-    normalizeMessagingTopicBindings,
-    syncSshKnownHostsFile,
-    ensureDefaultDeck,
-    logDebug,
-    createLocalOperatorPrincipal,
-    setSessionControlState,
-    normalizeSessionKind,
-    normalizeSessionStartupConfig,
-    normalizeSessionRemoteConnection,
-    normalizeSessionRemoteAuth,
-    normalizeSessionThemeSlots,
-    normalizeSessionNote,
-    normalizeSessionMouseForwardingMode,
-    normalizeSessionInputSafetyProfile,
-    normalizeSessionTags,
-    normalizeQuickSendUsageEntries,
-    assignSessionQuickIdToken,
-    deriveTerminalAppIdentityFromSessionHints,
-    remoteAuthRequiresSecret,
-    tryCreateRestoredSession,
-    listSessionIdsForAuth,
-    reconcileSessionControllerForSession,
-    buildCustomCommandEntry,
-    buildCustomCommandKey,
-    compareCustomCommandEntries,
-    ensureSessionExistsOrThrow,
-    normalizeWorkspacePresetEntity,
-    cleanupLayoutProfiles,
-    cleanupConnectionProfiles,
-    cleanupWorkspacePresets,
-    hasKnownSession,
-    resolveSessionDeckId,
-    metrics,
-    customCommandNamePattern: CUSTOM_COMMAND_NAME_PATTERN,
-    customCommandReservedNames: CUSTOM_COMMAND_RESERVED_NAMES,
-    customCommandMaxNameLength,
-    customCommandMaxContentLength,
-    customCommandMaxCount,
-    defaultDeckId: DEFAULT_DECK_ID,
-    defaultSshClient: DEFAULT_SSH_CLIENT,
-    sessionKindSsh: SESSION_KIND_SSH,
-    defaultShell: config.shell
-  });
-
-  const runtimeLifecycle = createRuntimeLifecycle({
-    accessTokenVerifier,
-    messagingRuntime,
-    runtimeStartupReadiness,
-    runtimeStartupRestore,
-    setPersistedReplayOutputs: (value) => {
-      persistedReplayOutputs = value;
-    },
-    server,
-    manager,
-    toApiSession,
-    logDebug,
-    config,
-    persistence,
-    snapshotRuntimeState,
-    sockets,
-    wsServer,
-    clearHeartbeat: () => {
-      clearInterval(heartbeat);
-    },
-    clearGuardrailTimer: () => {
-      clearInterval(guardrailTimer);
-    },
-    clearPersistTimer: () => {
-      if (persistTimer) {
-        clearTimeout(persistTimer);
-        persistTimer = null;
-      }
-    },
-    sessionControlAttachmentRegistry,
-    listSessionIdsForAuth,
-    reconcileSessionControllerForSession
-  });
 
   async function stop() {
     if (runtimeStartupReadiness.getIsStopped()) {
