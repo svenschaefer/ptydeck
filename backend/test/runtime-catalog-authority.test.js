@@ -359,3 +359,64 @@ test("runtime catalog authority snapshots persisted runtime state with session-c
   authority.deleteSessionControlState("session-4");
   assert.equal(sessionControlStates.has("session-4"), false);
 });
+
+test("runtime catalog authority covers negative custom-command and deck guard rails deterministically", () => {
+  const { authority, decks } = createHarness({
+    customCommands: new Map([
+      ["deploy:project:", { name: "deploy", scope: "project", sessionId: "", kind: "plain", content: "npm run deploy", createdAt: 1, updatedAt: 2 }],
+      ["deploy:session:session-1", { name: "deploy", scope: "session", sessionId: "session-1", kind: "plain", content: "./deploy.sh", createdAt: 3, updatedAt: 4 }]
+    ])
+  });
+
+  assert.deepEqual(authority.listCustomCommands({ scope: "session", sessionId: " session-1 " }).map((entry) => entry.sessionId), [
+    "session-1"
+  ]);
+  assert.equal(authority.removeCustomCommandsForSession("   ").length, 0);
+  assert.equal(authority.hasCustomCommand("missing", { scope: "session", sessionId: "session-404" }), false);
+
+  assert.throws(() => authority.getCustomCommandOrThrow(""), /Custom command not found/i);
+  assert.throws(
+    () => authority.getCustomCommandOrThrow("missing", { scope: "session", sessionId: "session-404" }),
+    /Custom command not found/i
+  );
+  assert.throws(
+    () => authority.upsertCustomCommand("x".repeat(33), { scope: "project", kind: "plain", content: "echo too-long" }),
+    /maximum length/i
+  );
+  assert.throws(
+    () => authority.upsertCustomCommand("bad name", { scope: "project", kind: "plain", content: "echo invalid" }),
+    /must match pattern/i
+  );
+  assert.throws(
+    () => authority.upsertCustomCommand("deploy", { scope: "session", sessionId: "missing-session", kind: "plain", content: "echo missing" }),
+    /was not found/i
+  );
+  assert.throws(
+    () => authority.upsertCustomCommand("deploy", { scope: "project", kind: "template", content: "echo conflict" }),
+    /same name must use the same kind/i
+  );
+  assert.throws(
+    () => authority.upsertCustomCommand("fresh", { scope: "project", kind: "plain", content: "x".repeat(129) }),
+    /content exceeds maximum length/i
+  );
+
+  const limited = createHarness({ customCommands: new Map() }).authority;
+  for (let index = 0; index < 8; index += 1) {
+    limited.upsertCustomCommand(`cmd${index}`, { scope: "project", kind: "plain", content: `echo ${index}` });
+  }
+  assert.throws(
+    () => limited.upsertCustomCommand("cmd-overflow", { scope: "project", kind: "plain", content: "echo overflow" }),
+    /limit reached/i
+  );
+
+  const buildFarm = authority.createDeck({ name: "Build Farm" });
+  const buildFarm2 = authority.createDeck({ name: "Build Farm" });
+  assert.equal(buildFarm.id, "build-farm");
+  assert.equal(buildFarm2.id, "build-farm-2");
+  assert.throws(() => authority.createDeck({ id: "ops", name: "Duplicate Ops" }), /already exists/i);
+  assert.throws(() => authority.updateDeck("ops", {}), /At least one updatable deck field is required/i);
+  assert.throws(() => authority.deleteDeck("default"), /cannot be deleted/i);
+
+  assert.equal(decks.has("build-farm"), true);
+  assert.equal(decks.has("build-farm-2"), true);
+});

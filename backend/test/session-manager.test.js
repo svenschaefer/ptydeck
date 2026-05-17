@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { homedir } from "node:os";
+import pty from "node-pty";
 import { SessionManager } from "../src/session-manager.js";
 
 const INPUT_SAFETY_PROFILE = {
@@ -190,6 +191,106 @@ test("SessionManager create honors the explicit stopped initial state without la
   assert.equal(created.startedAt, null);
   assert.equal(manager.get("session-stopped").ptyProcess, null);
   assert.equal(fakePty.killed, false);
+});
+
+test("SessionManager falls back to node-pty spawn when no custom PTY factory is supplied", () => {
+  const originalSpawn = pty.spawn;
+  const fakePty = createFakePty({ pid: 9010, ptyPath: "/dev/pts/default-spawn" });
+  const spawnCalls = [];
+  pty.spawn = (command, args, options) => {
+    spawnCalls.push({ command, args, options });
+    return fakePty;
+  };
+
+  try {
+    const manager = new SessionManager({ defaultShell: "bash" });
+    const spawned = manager.createPty({
+      shell: "bash",
+      args: ["-l"],
+      cwd: "/tmp/default-spawn",
+      cols: 120,
+      rows: 40,
+      env: { LANG: "C" }
+    });
+
+    assert.equal(spawned, fakePty);
+    assert.deepEqual(spawnCalls, [
+      {
+        command: "bash",
+        args: ["-l"],
+        options: {
+          name: "xterm-color",
+          cwd: "/tmp/default-spawn",
+          cols: 120,
+          rows: 40,
+          env: { LANG: "C" }
+        }
+      }
+    ]);
+  } finally {
+    pty.spawn = originalSpawn;
+  }
+});
+
+test("SessionManager cleanup wrappers and listener helpers delegate deterministically", () => {
+  const cleared = [];
+  const manager = new SessionManager({
+    createPty: () => createFakePty(),
+    clearTimeoutFn(timer) {
+      cleared.push(timer);
+    }
+  });
+  const session = {
+    activityTimer: "activity",
+    launchPostStartInputTimer: "launch",
+    foregroundProcessRefreshTimer: "foreground",
+    remoteReconnectTimer: "reconnect",
+    remoteReconnectStabilizeTimer: "stabilize",
+    pendingLaunchPostStartInput: { data: "pwd\r" },
+    pendingStartupTerminalQueryFallback: { attempts: 1 },
+    expectedExitReason: "restart",
+    expectedExitReasonTimer: "expected-exit"
+  };
+
+  manager.clearSessionActivityTimer(session);
+  manager.clearLaunchPostStartInputTimer(session);
+  manager.clearForegroundProcessRefreshTimer(session);
+  manager.clearRemoteReconnectTimer(session);
+  manager.clearRemoteReconnectStabilizeTimer(session);
+  session.remoteReconnectTimer = "reconnect-2";
+  session.remoteReconnectStabilizeTimer = "stabilize-2";
+  manager.clearRemoteReconnectTimers(session);
+  session.launchPostStartInputTimer = "launch-2";
+  manager.clearPendingLaunchPostStartInput(session);
+  manager.clearStartupTerminalQueryFallback(session);
+  manager.clearExpectedExitReason(session);
+
+  assert.deepEqual(cleared, [
+    "activity",
+    "launch",
+    "foreground",
+    "reconnect",
+    "stabilize",
+    "reconnect-2",
+    "stabilize-2",
+    "launch-2",
+    "expected-exit"
+  ]);
+  assert.equal(session.activityTimer, null);
+  assert.equal(session.launchPostStartInputTimer, null);
+  assert.equal(session.foregroundProcessRefreshTimer, null);
+  assert.equal(session.remoteReconnectTimer, null);
+  assert.equal(session.remoteReconnectStabilizeTimer, null);
+  assert.equal(session.pendingLaunchPostStartInput, null);
+  assert.equal(session.pendingStartupTerminalQueryFallback, null);
+  assert.equal(session.expectedExitReason, "");
+  assert.equal(session.expectedExitReasonTimer, null);
+
+  const listener = () => {};
+  manager.on("session.updated", listener);
+  assert.equal(manager.events.listenerCount("session.updated"), 1);
+  manager.off("session.updated", listener);
+  assert.equal(manager.events.listenerCount("session.updated"), 0);
 });
 
 test("SessionManager emits explicit created and started lifecycle events", () => {
@@ -941,6 +1042,41 @@ test("SessionManager reconnects unexpected ssh exits and restores connected remo
   assert.equal(manager.get(created.id).meta.remoteRuntime.connectivityState, "connected");
   assert.equal(manager.get(created.id).meta.remoteRuntime.reconnectAttempts, 0);
   assert.equal(typeof manager.get(created.id).meta.remoteRuntime.lastReconnectAt, "number");
+});
+
+test("SessionManager marks degraded ssh sessions connected again when PTY output resumes", async () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => 1710000004321
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22,
+      username: "ops"
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+
+  const session = manager.get(created.id);
+  session.meta.remoteRuntime.connectivityState = "degraded";
+  session.meta.remoteRuntime.reconnectAttempts = 2;
+  session.meta.remoteRuntime.disconnectedAt = 1710000004000;
+  session.meta.remoteRuntime.nextReconnectAt = 1710000005000;
+  session.meta.remoteRuntime.lastDisconnectReason = "transport drop";
+
+  fakePty.emitData("reconnected output\r\n");
+
+  assert.equal(session.meta.remoteRuntime.connectivityState, "connected");
+  assert.equal(session.meta.remoteRuntime.reconnectAttempts, 0);
+  assert.equal(session.meta.remoteRuntime.disconnectedAt, null);
+  assert.equal(session.meta.remoteRuntime.nextReconnectAt, null);
+  assert.equal(session.meta.remoteRuntime.lastReconnectAt, 1710000004321);
 });
 
 test("SessionManager marks ssh sessions offline after bounded reconnect failures", async () => {

@@ -501,6 +501,57 @@ test("session manager lifecycle helpers mark restored exited secret-backed ssh s
   assert.equal(session.meta.exitedAt, 1710000005000);
 });
 
+test("session manager lifecycle helpers mark restored stopped secret-backed ssh sessions as start-blocked and clear the block once a secret exists", () => {
+  const { session, launchBundle } = buildSessionRecord(
+    {
+      id: "stopped-secret-1",
+      kind: "ssh",
+      shell: "ssh",
+      cwd: "~/workspace",
+      startCwd: "~/workspace",
+      remoteConnection: { host: "example.internal", port: 22, username: "ops" },
+      remoteAuth: { method: "password" },
+      initialState: "stopped"
+    },
+    {
+      defaultShell: "bash",
+      buildLaunchBundle: () => {
+        throw new Error("stopped sessions must not launch");
+      },
+      createInitialIdentityRuntime: () => ({
+        appIdentityState: {},
+        terminalSignalState: {},
+        appIdentity: {
+          title: "ssh",
+          terminalType: "shell"
+        }
+      }),
+      nowFn: () => 1710000009100
+    }
+  );
+
+  assert.equal(launchBundle, null);
+  assert.equal(session.meta.state, "stopped");
+  assert.equal(session.meta.startBlockedReason, "remote-secret-unavailable");
+
+  const result = applySessionPatch(
+    session,
+    {
+      remoteSecret: "recovered-secret"
+    },
+    {
+      defaultShell: "bash",
+      remoteReconnectMaxAttempts: 3,
+      remoteReconnectDelayMs: 250,
+      nowFn: () => 1710000009200
+    }
+  );
+
+  assert.equal(result.updatedAt, 1710000009200);
+  assert.equal(session.remoteSecret, "recovered-secret");
+  assert.equal(Object.hasOwn(session.meta, "startBlockedReason"), false);
+});
+
 test("session manager lifecycle helpers normalize local defaults, quick-send usage, and theme slots deterministically", () => {
   const launchInputs = [];
   const { session, launchBundle } = buildSessionRecord(

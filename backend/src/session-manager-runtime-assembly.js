@@ -60,7 +60,6 @@ export function createSessionManagerRuntimeAssembly(dependencies = {}) {
     emitSessionUpdated = () => {},
     getSessionById = () => null,
     getSessionOrThrow = () => null,
-    removeSessionById = () => {},
     sendInput = () => {},
     updateSessionTraceSeed = () => {},
     transitionToRunning = () => {},
@@ -127,8 +126,7 @@ export function createSessionManagerRuntimeAssembly(dependencies = {}) {
         trace
       });
     },
-    getSessionById,
-    removeSessionById
+    getSessionById
   });
 
   const terminalRuntime = createTerminalRuntimeImpl({

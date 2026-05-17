@@ -257,3 +257,74 @@ test("session-manager pty runtime preserves prompt-boundary-only updates and for
   ]);
   assert.deepEqual(harness.observed.exits, [["session-1", { exitCode: 0, signal: 0 }]]);
 });
+
+test("session-manager pty runtime updates already-active sessions without re-emitting activity started", () => {
+  const ptyProcess = createFakePty();
+  const session = createSession({
+    meta: {
+      kind: "local",
+      activityState: "active",
+      updatedAt: 12,
+      remoteRuntime: { connectivityState: "connected" }
+    }
+  });
+  const harness = createHarness();
+
+  harness.runtime.attachPtyProcess(session, {
+    ptyProcess,
+    shellAdapter: {
+      capability: { shellBlockTrackingSupported: false },
+      consumeOutput() {
+        return {
+          cleaned: "echo ok\n",
+          promptBoundaries: []
+        };
+      }
+    }
+  });
+  ptyProcess.emitData("echo ok\r\n");
+
+  assert.deepEqual(harness.observed.remoteConnected, []);
+  assert.deepEqual(harness.observed.activityStarted, []);
+  assert.equal(session.meta.activityState, "active");
+  assert.equal(session.meta.updatedAt, 1700);
+  assert.deepEqual(harness.observed.replay, [["session-1", "echo ok\n", []]]);
+  assert.equal(
+    harness.observed.emitted.some(
+      ([eventName, payload]) => eventName === "session.data" && payload.sessionId === "session-1" && payload.data === "echo ok\n"
+    ),
+    true
+  );
+  assert.deepEqual(harness.observed.sessionUpdated, []);
+});
+
+test("session-manager pty runtime keeps signal-only chunks fail-closed when metadata does not change", () => {
+  const ptyProcess = createFakePty();
+  const session = createSession();
+  const harness = createHarness({
+    observeSessionTerminalSignals() {
+      return { signals: [{ kind: "alt_screen" }], metaChanged: false };
+    }
+  });
+
+  harness.runtime.attachPtyProcess(session, {
+    ptyProcess,
+    shellAdapter: {
+      capability: { shellBlockTrackingSupported: false },
+      consumeOutput() {
+        return {
+          cleaned: "",
+          promptBoundaries: []
+        };
+      }
+    }
+  });
+  ptyProcess.emitData("\u001b[?1049h");
+
+  assert.deepEqual(harness.observed.replay, []);
+  assert.deepEqual(harness.observed.sessionUpdated, []);
+  assert.deepEqual(harness.observed.activityStarted, []);
+  assert.deepEqual(harness.observed.activityCompletion, []);
+  assert.equal(harness.observed.emitted.some(([eventName]) => eventName === "session.data"), false);
+  assert.equal(harness.observed.foregroundRefresh.length, 2);
+});

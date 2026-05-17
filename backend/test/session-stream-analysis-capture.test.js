@@ -183,14 +183,8 @@ test("session stream analysis capture rotates the bounded file once the configur
     true
   );
   await waitFor(async () => capture.buildStatusSummary().capturedTotal === 2);
-  await waitFor(async () => {
-    try {
-      await stat(`${filePath}.1`);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  await waitFor(async () => capture.buildStatusSummary().rotatedTotal === 1);
+  await stat(`${filePath}.1`);
 
   const activeContent = await readFile(filePath, "utf8");
   const rotatedContent = await readFile(`${filePath}.1`, "utf8");

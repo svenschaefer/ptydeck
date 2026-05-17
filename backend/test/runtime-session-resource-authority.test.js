@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, mkdir, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -378,6 +378,23 @@ test("runtime session resource authority rejects directory targets during upload
     () => authority.uploadSessionFileOrThrow("session-1", "nested", Buffer.from("x").toString("base64")),
     (error) => error instanceof ApiError && error.statusCode === 400 && error.error === "ValidationError"
   );
+});
+
+test("runtime session resource authority surfaces unexpected upload stat failures without masking them as ENOENT", async () => {
+  const transferRoot = await mkdtemp(join(tmpdir(), "ptydeck-session-resource-"));
+  const blockedDir = join(transferRoot, "blocked");
+  await mkdir(blockedDir, { recursive: true });
+
+  const { authority } = createHarness({ transferRoot });
+  try {
+    await chmod(blockedDir, 0o000);
+    await assert.rejects(
+      () => authority.uploadSessionFileOrThrow("session-1", "blocked/upload.txt", Buffer.from("x").toString("base64")),
+      (error) => Boolean(error && error.code && error.code !== "ENOENT")
+    );
+  } finally {
+    await chmod(blockedDir, 0o755);
+  }
 });
 
 test("runtime session resource authority rejects directory targets during download", async () => {

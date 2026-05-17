@@ -234,6 +234,18 @@ test("runtime library normalization validates custom command edge cases fail-clo
       return true;
     }
   );
+  assert.equal(
+    normalization.buildCustomCommandEntry(
+      "bad-var-lenient",
+      {
+        content: "run {{var:session.note}}",
+        kind: "template",
+        templateVariables: []
+      },
+      { strict: false }
+    ),
+    null
+  );
 
   assert.equal(normalization.normalizeCustomCommandName(" Deploy "), "deploy");
   assert.equal(normalization.normalizeCustomCommandScope("GLOBAL"), "global");

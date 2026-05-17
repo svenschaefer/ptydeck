@@ -306,3 +306,27 @@ test("startup runtime answers only the remaining terminal-query budget and clear
   });
   assert.equal(cleared, 1);
 });
+
+test("startup runtime short-circuits safely when required startup state is missing", () => {
+  const runtime = createSessionManagerStartupRuntime();
+  const sessionWithoutPty = {
+    id: "session-missing-pty",
+    traceSeed: createTraceSeed("missing-pty")
+  };
+  const sessionWithoutPendingInput = {
+    id: "session-missing-input",
+    ptyProcess: {},
+    traceSeed: createTraceSeed("missing-input")
+  };
+  const launchSpecWithoutInput = {};
+
+  assert.equal(runtime.dispatchLaunchPostStartInput(sessionWithoutPty), false);
+  assert.equal(runtime.dispatchLaunchPostStartInput(sessionWithoutPendingInput), false);
+  assert.equal(runtime.scheduleLaunchPostStartInputDispatch(sessionWithoutPty), false);
+  assert.equal(runtime.scheduleLaunchPostStartInputDispatch(sessionWithoutPendingInput), false);
+  assert.equal(runtime.armLaunchPostStartInput(sessionWithoutPty, { postStartInput: "pwd\r" }), false);
+  assert.equal(runtime.armLaunchPostStartInput(sessionWithoutPendingInput, launchSpecWithoutInput), false);
+  assert.equal(runtime.observePendingLaunchPostStartInput(null, { rawData: "ignored" }), false);
+  assert.equal(runtime.observeStartupTerminalQueryFallback(null, { rawData: "\u001b[6n" }), false);
+  assert.equal(runtime.observeStartupTerminalQueryFallback(sessionWithoutPty, { rawData: "\u001b[6n" }), false);
+});

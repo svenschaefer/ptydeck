@@ -161,7 +161,6 @@ export class SessionManager {
       emitSessionUpdated: (session, options) => this.emitSessionUpdated(session, options),
       getSessionById: (sessionId) => this.sessions.get(sessionId),
       getSessionOrThrow: (sessionId) => this.get(sessionId),
-      removeSessionById: (sessionId) => this.sessions.delete(sessionId),
       sendInput: (sessionId, data, options) => this.sendInput(sessionId, data, options),
       updateSessionTraceSeed: (session, trace, overrides = {}) => this.updateSessionTraceSeed(session, trace, overrides),
       transitionToRunning: (session) => this.transitionToRunning(session),

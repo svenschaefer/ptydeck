@@ -165,6 +165,58 @@ test("runtime session event authority bridges created lifecycle events without d
   );
 });
 
+test("runtime session event authority falls back to the event session snapshot when live lookup fails", async () => {
+  const harness = createHarness({
+    getApiSessionOrThrow(sessionId) {
+      if (sessionId === "session-lookup-fails") {
+        throw new ApiError(404, "SessionNotFound", "missing live session");
+      }
+      return {
+        id: sessionId,
+        deckId: "default",
+        state: "running"
+      };
+    }
+  });
+
+  await harness.authority.dispatchManagerSessionEvent("session.updated", {
+    sessionId: "session-lookup-fails",
+    session: {
+      id: "session-lookup-fails",
+      deckId: "ops",
+      state: "running",
+      name: "fallback"
+    },
+    trace: { traceId: "trace-fallback", correlationId: "corr-fallback" }
+  });
+
+  assert.deepEqual(harness.observed.lifecycle, [
+    [
+      "session.updated",
+      {
+        id: "session-lookup-fails",
+        deckId: "ops",
+        state: "running",
+        name: "fallback",
+        api: true
+      },
+      { traceId: "trace-fallback", correlationId: "corr-fallback" }
+    ]
+  ]);
+  assert.deepEqual(harness.observed.ensured, [
+    [
+      {
+        id: "session-lookup-fails",
+        deckId: "ops",
+        state: "running",
+        name: "fallback",
+        api: true
+      },
+      { traceId: "trace-fallback", correlationId: "corr-fallback" }
+    ]
+  ]);
+});
+
 test("runtime session event authority swallows missing session data after deletion", async () => {
   const harness = createHarness({
     getApiSessionOrThrow() {
@@ -211,6 +263,98 @@ test("runtime session event authority registers manager listeners for the extrac
   assert.deepEqual(harness.observed.persistSoon, [true]);
   assert.equal(
     harness.observed.debug.some(([event, details]) => event === "session.input.write" && details.writeKind === "body"),
+    true
+  );
+});
+
+test("runtime session event authority covers lifecycle, data, and error guard rails deterministically", async () => {
+  const errorHarness = createHarness({
+    dependencies: {
+      persistNow: async () => {
+        throw new Error("persist failed");
+      }
+    }
+  });
+
+  await errorHarness.authority.handleSessionActivityStarted({
+    sessionId: "session-start",
+    trace: { traceId: "trace-start", correlationId: "corr-start" }
+  });
+  assert.deepEqual(errorHarness.observed.activityStarted, [
+    {
+      sessionId: "session-start",
+      trace: { traceId: "trace-start", correlationId: "corr-start" }
+    }
+  ]);
+  assert.deepEqual(errorHarness.observed.persistSoon, [true]);
+
+  await errorHarness.authority.handleSessionActivityCompleted({
+    sessionId: "session-start",
+    activityCompletedAt: 88,
+    trace: { traceId: "trace-complete", correlationId: "corr-complete" }
+  });
+  assert.equal(
+    errorHarness.observed.errors.some(([message, error]) => message === "failed to persist session activity completion" && error instanceof Error),
+    true
+  );
+
+  const harness = createHarness();
+  await harness.authority.dispatchManagerSessionEvent("session.data", {
+    sessionId: "session-data",
+    data: "",
+    promptBoundaries: null,
+    trace: { traceId: "trace-data", correlationId: "corr-data" }
+  });
+  assert.deepEqual(harness.observed.data, [
+    {
+      session: { id: "session-data", deckId: "default", state: "running" },
+      data: "",
+      promptBoundaries: [],
+      trace: { traceId: "trace-data", correlationId: "corr-data" }
+    }
+  ]);
+  assert.deepEqual(harness.observed.broadcasts, []);
+
+  await harness.authority.dispatchManagerSessionEvent("session.exit", {
+    session: { id: "session-exit", deckId: "ops", state: "exited" },
+    exitCode: 0,
+    trace: { traceId: "trace-exit", correlationId: "corr-exit" }
+  });
+  await harness.authority.dispatchManagerSessionEvent("session.closed", {
+    session: { id: "session-closed", deckId: "ops", state: "closed" },
+    trace: { traceId: "trace-closed", correlationId: "corr-closed" }
+  });
+
+  assert.equal(harness.metrics.sessionsExitedTotal, 1);
+  assert.deepEqual(
+    harness.observed.lifecycle.map(([eventName, session]) => [eventName, session.id]),
+    [
+      ["session.exit", "session-exit"],
+      ["session.closed", "session-closed"]
+    ]
+  );
+  assert.deepEqual(
+    harness.observed.broadcasts.map(([payload]) => payload.type),
+    ["session.exit", "session.closed"]
+  );
+  assert.deepEqual(harness.observed.warmup, ["reconcile", "reconcile"]);
+  assert.deepEqual(harness.observed.persistSoon, [true, true]);
+
+  const failureHarness = createHarness({
+    messagingRuntime: {
+      observeSessionLifecycle: async () => {
+        throw new Error("lifecycle bridge failed");
+      }
+    }
+  });
+  const failed = await failureHarness.authority.handleManagerSessionEvent("session.updated", {
+    session: { id: "session-broken", deckId: "ops", state: "running" },
+    sessionId: "session-broken",
+    trace: { traceId: "trace-broken", correlationId: "corr-broken" }
+  });
+  assert.equal(failed, false);
+  assert.equal(
+    failureHarness.observed.errors.some(([message]) => message === "failed to process session.updated event"),
     true
   );
 });

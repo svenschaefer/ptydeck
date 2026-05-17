@@ -831,7 +831,46 @@ test("runtime session-control authority covers retained success and fallback gua
         "   ",
         { subject: "owner", tenantId: "default" },
         { headers: { "x-ptydeck-client-id": "client-owner" } }
-      ),
+    ),
     /Field 'clientId' must be a non-empty string/i
+  );
+});
+
+test("runtime session-control authority accepts trimmed array client-id headers on successful operator paths", () => {
+  const { authority } = createAuthorityHarness();
+  const auth = { subject: "owner", tenantId: "default" };
+  const request = {
+    headers: {
+      "x-ptydeck-client-id": [" client-owner ", "ignored-client"]
+    }
+  };
+
+  const attached = authority.requireActiveSessionControlAttachment(auth, request);
+  assert.equal(attached.clientId, "client-owner");
+
+  const operatorAttached = authority.requireOperatorSessionControlAttachment(auth, request);
+  assert.equal(operatorAttached.clientId, "client-owner");
+
+  const requestClient = authority.requireSessionControlRequestClient("session-1", auth, request);
+  assert.equal(requestClient.clientId, "client-owner");
+
+  const operatorRequestClient = authority.requireOperatorSessionControlRequestClient("session-1", auth, request);
+  assert.equal(operatorRequestClient.clientId, "client-owner");
+
+  assert.equal(authority.resolveSessionControlClientId(request, "session-1", auth), "client-owner");
+  assert.equal(authority.findAttachedClientForSession("session-1", " client-owner ", auth)?.clientId, "client-owner");
+});
+
+test("runtime session-control authority rejects inactive attached clients when active-only resolution is required", () => {
+  const { authority } = createAuthorityHarness();
+
+  assert.equal(
+    authority.findAttachedClientForSession(
+      "session-1",
+      "client-offline",
+      { subject: "owner", tenantId: "default" },
+      { activeOnly: true }
+    ),
+    null
   );
 });

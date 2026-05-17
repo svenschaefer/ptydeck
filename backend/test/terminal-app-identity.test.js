@@ -375,6 +375,54 @@ test("deriveTerminalAppIdentityCandidateFromOutputHeuristics recognizes bounded 
   assert.equal(identity.source, "output-heuristic");
 });
 
+test("terminal app identity arbitration expires stale output-heuristic candidates only after the bounded age window", () => {
+  const session = {
+    shell: "/usr/bin/python",
+    startCommand: "",
+    name: ""
+  };
+  const outputHeuristicIdentity = deriveTerminalAppIdentityCandidateFromOutputHeuristics("✦ Section\n", {
+    updatedAt: 1710000000012
+  });
+  const baseState = normalizeTerminalAppIdentityRuntimeState(
+    {
+      current: buildUnknownTerminalAppIdentity(1710000000012),
+      candidates: {
+        "output-heuristic": outputHeuristicIdentity
+      },
+      lastOutputHintAt: 1710000000012
+    },
+    {
+      session,
+      updatedAt: 1710000000012
+    }
+  );
+
+  const boundaryReconciled = reconcileTerminalAppIdentityRuntimeState(
+    baseState,
+    {},
+    {
+      session,
+      currentIdentity: baseState.current,
+      updatedAt: 1710000010012
+    }
+  );
+  assert.equal(boundaryReconciled.current.family, "coding-agent");
+  assert.equal(boundaryReconciled.current.source, "output-heuristic");
+
+  const expiredReconciled = reconcileTerminalAppIdentityRuntimeState(
+    baseState,
+    {},
+    {
+      session,
+      currentIdentity: baseState.current,
+      updatedAt: 1710000010013
+    }
+  );
+  assert.equal(expiredReconciled.current.family, "unknown");
+  assert.equal(expiredReconciled.current.source, "unknown");
+});
+
 test("terminal app identity arbitration lets corroborated shell signals override stale explicit coding-agent hints", () => {
   const initialState = createTerminalAppIdentityRuntimeState(
     {
