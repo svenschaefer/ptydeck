@@ -260,6 +260,10 @@ Current lane health:
 - `npm --prefix frontend run test` is green on the current tree and now exits cleanly with `1064` passing tests.
 - `npm run test` is green on the current tree.
 - `npm run test:coverage:check` is green on the current tree.
+- `QLT-367` is now closed on the current tree:
+  - `backend/test/runtime-library-normalization.test.js` now locks down retained default/fallback/tie-break branches plus strict share-link and workspace-detail guard rails without widening the runtime/library contract
+  - `backend/test/runtime-operator-composer-authority.test.js` now locks down lenient persisted-entry normalization, attachmentless-client fail-closed handling, partial update preservation, and malformed persisted-list filtering
+  - focused changed-scope coverage now validates `backend/src/runtime-library-normalization.js` at `93.27%` line / `89.22%` branch / `84.78%` funcs and `backend/src/runtime-operator-composer-authority.js` at `96.40%` line / `95.50%` branch / `77.42%` funcs
 - `QLT-366` is now closed on the current tree:
   - `backend/src/runtime-startup-dispatch-assembly.js` now owns the previously inlined `runtime.js` bootstrap cluster for session-dispatch assembly handoff, HTTP server creation, optional WebSocket upgrade listener wiring, startup-restore creation, and runtime-lifecycle construction
   - `backend/test/runtime-startup-dispatch-assembly.test.js` now covers both the fully wired bootstrap path and the no-upgrade-handler branch at `100.00%` line / `100.00%` branch / `100.00%` funcs
@@ -291,11 +295,10 @@ Current highest retained hotspots:
 Current active tasks:
 
 - `QLT-365` Owner `BE`: finish stabilizing the remaining repeated backend coverage drift so back-to-back `npm --prefix backend run test:coverage` runs stop shifting the residual branch rows in `backend/src/runtime.js`, `backend/src/runtime-session-event-authority.js`, and `backend/src/session-manager-pty-runtime.js` plus the aggregate backend branch summary, now that the earlier drift in `backend/src/runtime-session-control-authority.js`, `backend/src/runtime-library-normalization.js`, `backend/src/runtime-session-resource-authority.js`, `backend/src/session-manager.js`, `backend/src/terminal-app-identity.js`, and `backend/test/session-stream-analysis-capture.test.js` has been closed and repeated raw V8 zero/nonzero coverage checks already show a stable executed-range set for `backend/src/runtime.js`.
-- `QLT-367` Owner `BE`: harden retained normalization/operator-composer coverage across `backend/src/runtime-library-normalization.js` and `backend/src/runtime-operator-composer-authority.js`.
 - `QLT-368` Owner `FE`: extract the next initialization/reclaim/operator helper seam from `frontend/src/public/app-runtime-composition-controller.js` and close branch/function gaps with direct deterministic regressions.
 - `QLT-369` Owner `FE`: isolate the next layout/workspace orchestration seam across `frontend/src/public/split-layout-runtime-controller.js` and `frontend/src/public/layout-profile-runtime-controller.js`.
 - `QLT-370` Owner `FE`: harden retained terminal/control-surface coverage across `frontend/src/public/ui/session-terminal-runtime-controller.js` and adjacent session interaction paths.
-- `QLT-371` Owner `QA`: revalidate and document repeated backend/frontend/root full-lane evidence after `QLT-365` and `QLT-367` through `QLT-370`, including back-to-back `npm --prefix backend run test:coverage` runs to prove the remaining backend coverage drift is gone.
+- `QLT-371` Owner `QA`: revalidate and document repeated backend/frontend/root full-lane evidence after `QLT-365` and `QLT-368` through `QLT-370`, including back-to-back `npm --prefix backend run test:coverage` runs to prove the remaining backend coverage drift is gone.
 
 ## H185 Session Lifecycle Stabilization Closeout
 

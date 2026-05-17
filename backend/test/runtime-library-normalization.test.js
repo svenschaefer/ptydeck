@@ -990,6 +990,14 @@ test("runtime library normalization validates retained strict share-link guard r
       }, null),
     /expiresInSeconds/i
   );
+  assert.throws(
+    () =>
+      normalization.normalizeShareLinkEntity({
+        targetType: "bogus",
+        targetId: "session-1"
+      }, null),
+    /targetType/i
+  );
 });
 
 test("runtime library normalization covers retained scalar guard rails and entity fallbacks deterministically", () => {
@@ -1084,6 +1092,48 @@ test("runtime library normalization covers retained scalar guard rails and entit
       { strict: false }
     ),
     null
+  );
+});
+
+test("runtime library normalization covers retained default and tie-break fallback branches", () => {
+  const normalization = createHarness();
+
+  assert.deepEqual(normalization.normalizeLayoutProfileLayout(undefined), {
+    activeDeckId: "default",
+    sidebarVisible: true,
+    sessionFilterText: "",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 240,
+    deckTerminalSettings: {},
+    deckSplitLayouts: {}
+  });
+  assert.deepEqual(normalization.normalizeLayoutProfileLayout([], { strict: false }), {
+    activeDeckId: "default",
+    sidebarVisible: true,
+    sessionFilterText: "",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 240,
+    deckTerminalSettings: {},
+    deckSplitLayouts: {}
+  });
+  assert.equal(normalization.normalizeConnectionProfileEntity([], { strict: false, defaultShell: "bash" }), null);
+  assert.equal(normalization.normalizeLayoutProfileEntity(null), null);
+  assert.equal(normalization.normalizeWorkspacePresetEntity(null), null);
+  assert.equal(
+    normalization.compareConnectionProfileEntries(
+      { id: "beta", name: "Alpha", createdAt: 1 },
+      { id: "alpha", name: "Alpha", createdAt: 1 }
+    ) > 0,
+    true
+  );
+  assert.equal(
+    normalization.compareWorkspacePresetEntries(
+      { id: "beta", name: "Alpha", createdAt: 1 },
+      { id: "alpha", name: "Alpha", createdAt: 1 }
+    ) > 0,
+    true
   );
 });
 
@@ -1437,4 +1487,21 @@ test("runtime library normalization covers share-link and workspace detail guard
       }),
     /activeGroupId' must be a valid group id/i
   );
+
+  const lenientWorkspace = normalization.normalizeWorkspacePresetWorkspace(
+    {
+      deckGroups: {
+        ops: {
+          groups: [{ id: "deploy", name: "Deploy" }]
+        }
+      }
+    },
+    { strict: false }
+  );
+  assert.deepEqual(lenientWorkspace.deckGroups, {
+    ops: {
+      activeGroupId: "",
+      groups: [{ id: "deploy", name: "Deploy", sessionIds: [] }]
+    }
+  });
 });

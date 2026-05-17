@@ -11,18 +11,19 @@ function createHarness(overrides = {}) {
   const operatorComposerPlacements = overrides.operatorComposerPlacements || new Map();
   const knownSessionIds = overrides.knownSessionIds || new Set(["session-1", "session-2", "session-3"]);
   const attachmentCalls = [];
+  const sessionControlAttachmentRegistry = overrides.sessionControlAttachmentRegistry || {
+    getAttachmentKey({ clientId, auth }) {
+      attachmentCalls.push({ clientId, auth });
+      const subject = auth?.subject || auth?.principal?.subject || "local-operator";
+      const tenantId = auth?.tenantId || auth?.principal?.tenantId || "local";
+      const accessMode = auth?.accessMode || auth?.principal?.accessMode || "operator";
+      const permissionMode = auth?.permissionMode || auth?.principal?.permissionMode || "";
+      return `${clientId}\u001f${subject}\u001f${tenantId}\u001f${accessMode}\u001f${permissionMode}`;
+    }
+  };
   const authority = createRuntimeOperatorComposerAuthority({
     operatorComposerPlacements,
-    sessionControlAttachmentRegistry: {
-      getAttachmentKey({ clientId, auth }) {
-        attachmentCalls.push({ clientId, auth });
-        const subject = auth?.subject || auth?.principal?.subject || "local-operator";
-        const tenantId = auth?.tenantId || auth?.principal?.tenantId || "local";
-        const accessMode = auth?.accessMode || auth?.principal?.accessMode || "operator";
-        const permissionMode = auth?.permissionMode || auth?.principal?.permissionMode || "";
-        return `${clientId}\u001f${subject}\u001f${tenantId}\u001f${accessMode}\u001f${permissionMode}`;
-      }
-    },
+    sessionControlAttachmentRegistry,
     sessionControlClientIdHeader: "x-ptydeck-client-id",
     hasKnownSession: (sessionId) => knownSessionIds.has(sessionId)
   });
@@ -263,4 +264,215 @@ test("runtime operator composer authority fails closed for missing client contex
       ),
     (error) => error instanceof ApiError && error.statusCode === 404 && error.error === "SessionNotFound"
   );
+});
+
+test("runtime operator composer authority keeps lenient persisted entry normalization deterministic", () => {
+  const sharedDraft = "x".repeat(65536 + 32);
+  const normalized = normalizePersistedOperatorComposerPlacementEntry(
+    {
+      clientId: " client-1 ",
+      subject: " alice ",
+      tenantId: " ops ",
+      accessMode: " operator ",
+      permissionMode: null,
+      mode: "bogus",
+      pinnedSessionIds: ["session-1", "session-1", "missing", " ", 17],
+      sharedDraft,
+      pinnedDrafts: "invalid"
+    },
+    {
+      strict: false,
+      hasKnownSession: (sessionId) => sessionId === "session-1",
+      getAttachmentKey: ({ clientId, principal }) =>
+        `${clientId}\u001f${principal.subject}\u001f${principal.tenantId}\u001f${principal.accessMode}\u001f${principal.permissionMode}`
+    }
+  );
+
+  assert.deepEqual(normalized, {
+    attachmentKey: "client-1\u001falice\u001fops\u001foperator\u001f",
+    clientId: "client-1",
+    subject: "alice",
+    tenantId: "ops",
+    accessMode: "operator",
+    permissionMode: "",
+    mode: "shared-footer",
+    pinnedSessionIds: ["session-1"],
+    sharedDraft: "x".repeat(65536),
+    pinnedDrafts: {}
+  });
+
+  assert.equal(normalizePersistedOperatorComposerPlacementEntry(null, { strict: false }), null);
+  assert.equal(
+    normalizePersistedOperatorComposerPlacementEntry(
+      {
+        clientId: "   "
+      },
+      { strict: false }
+    ),
+    null
+  );
+  assert.equal(
+    normalizePersistedOperatorComposerPlacementEntry(
+      {
+        clientId: "client-2"
+      },
+      {
+        strict: false,
+        getAttachmentKey: () => ""
+      }
+    ),
+    null
+  );
+});
+
+test("runtime operator composer authority fails closed for attachmentless clients and header-array requests", () => {
+  const { authority } = createHarness({
+    operatorComposerPlacements: new Map(),
+    knownSessionIds: new Set(["session-1"]),
+    sessionControlAttachmentRegistry: {
+      getAttachmentKey: () => ""
+    }
+  });
+
+  assert.deepEqual(authority.getStateForClient({ subject: "alice" }, ""), {
+    clientId: "",
+    mode: "shared-footer",
+    pinnedSessionIds: [],
+    sharedDraft: "",
+    pinnedDrafts: {}
+  });
+  assert.deepEqual(authority.getStateForClient({ subject: "alice" }, " client-1 "), {
+    clientId: "client-1",
+    mode: "shared-footer",
+    pinnedSessionIds: [],
+    sharedDraft: "",
+    pinnedDrafts: {}
+  });
+  assert.throws(
+    () =>
+      authority.getStateOrThrow(
+        { subject: "alice" },
+        {
+          headers: {
+            "x-ptydeck-client-id": ["client-1", "ignored"]
+          }
+        }
+      ),
+    (error) => error instanceof ApiError && error.statusCode === 409 && error.error === "OperatorClientRequired"
+  );
+  assert.throws(
+    () =>
+      authority.updateStateOrThrow(
+        {
+          sharedDraft: "pwd"
+        },
+        { subject: "alice" },
+        {
+          headers: {
+            "x-ptydeck-client-id": ["client-1", "ignored"]
+          }
+        }
+      ),
+    (error) => error instanceof ApiError && error.statusCode === 409 && error.error === "OperatorClientRequired"
+  );
+  assert.equal(authority.cleanupSessionState("   "), false);
+});
+
+test("runtime operator composer authority preserves unspecified fields and filters malformed persisted listings", () => {
+  const { authority, operatorComposerPlacements } = createHarness();
+  const auth = {
+    subject: "alice",
+    tenantId: "ops",
+    accessMode: "operator",
+    permissionMode: ""
+  };
+  const req = {
+    headers: {
+      "x-ptydeck-client-id": ["client-1", "ignored"]
+    }
+  };
+
+  authority.updateStateOrThrow(
+    {
+      mode: "active-overlay",
+      pinnedSessionIds: ["session-1", "session-2"],
+      sharedDraft: "shared-1",
+      pinnedDrafts: {
+        "session-1": "pwd",
+        "session-2": "ls"
+      }
+    },
+    auth,
+    req
+  );
+
+  const partial = authority.updateStateOrThrow(
+    {
+      sharedDraft: "shared-2"
+    },
+    auth,
+    req
+  );
+  assert.deepEqual(partial, {
+    clientId: "client-1",
+    mode: "active-overlay",
+    pinnedSessionIds: ["session-1", "session-2"],
+    sharedDraft: "shared-2",
+    pinnedDrafts: {
+      "session-1": "pwd",
+      "session-2": "ls"
+    }
+  });
+
+  operatorComposerPlacements.set("broken-entry", {
+    clientId: "",
+    mode: "active-overlay"
+  });
+  operatorComposerPlacements.set("client-2\u001fbob\u001fops\u001foperator\u001f", {
+    attachmentKey: "client-2\u001fbob\u001fops\u001foperator\u001f",
+    clientId: "client-2",
+    subject: "bob",
+    tenantId: "ops",
+    accessMode: "operator",
+    permissionMode: "",
+    mode: "bogus",
+    pinnedSessionIds: ["session-2", "missing", "session-2"],
+    sharedDraft: 17,
+    pinnedDrafts: {
+      "session-2": "tail -f",
+      missing: "skip"
+    }
+  });
+
+  assert.deepEqual(authority.listPersistedOperatorComposerPlacements(), [
+    {
+      attachmentKey: "client-1\u001falice\u001fops\u001foperator\u001f",
+      clientId: "client-1",
+      subject: "alice",
+      tenantId: "ops",
+      accessMode: "operator",
+      permissionMode: "",
+      mode: "active-overlay",
+      pinnedSessionIds: ["session-1", "session-2"],
+      sharedDraft: "shared-2",
+      pinnedDrafts: {
+        "session-1": "pwd",
+        "session-2": "ls"
+      }
+    },
+    {
+      attachmentKey: "client-2\u001fbob\u001fops\u001foperator\u001f",
+      clientId: "client-2",
+      subject: "bob",
+      tenantId: "ops",
+      accessMode: "operator",
+      permissionMode: "",
+      mode: "shared-footer",
+      pinnedSessionIds: ["session-2"],
+      sharedDraft: "",
+      pinnedDrafts: {
+        "session-2": "tail -f"
+      }
+    }
+  ]);
 });
